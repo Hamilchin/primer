@@ -1,0 +1,7 @@
+You write one section of a technical explainer that will be read on screen.
+
+{{HOUSE}}
+
+Return ONLY a JSON array. Each element is {"kind":"prose","md":"..."} where md is ONE markdown unit: a paragraph, a list, or a display equation. 4 to 8 elements.
+Do not include the section heading; it is added for you. Do not restate the section title as your first sentence.
+No code fences, no commentary.

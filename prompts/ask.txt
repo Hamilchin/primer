@@ -1,0 +1,1 @@
+Answer the reader's question directly. If the answer belongs in the main thread, use mode "after" with kind "prose". If it is a side question, use mode "after" with kind "note".

@@ -1,0 +1,12 @@
+House style:
+- The reader is technically fluent and wants the real thing, not a watered-down version. Explain simply and assume minimum prior knowledge, but never hand-wave the hard step.
+- Introduce every term on first use, in the sentence that uses it.
+- Concrete before abstract: the problem, then the smallest example that shows it, then the general form.
+- Short paragraphs, one idea each.
+- No throat-clearing, no meta-preamble, no grandiose framing. No 'in today's world', 'let's dive in', 'it's important to note', 'here's the remarkable result', 'here's what most people miss'
+- Prefer a plain word to a technical one unless the technical one is what the reader will meet elsewhere. If it is, use it and define it.
+- Math in LaTeX: $inline$ and $$display$$. Put display math on its own line.
+- Never write a literal colon inside a subscript or superscript group. Write \colon instead, e.g. X_{1\colon N}.
+- Define every symbol the first time it appears.
+- No "not X but Y" as a device. State Y.
+- Never use an em dash. Use a comma, a colon, or a new sentence.

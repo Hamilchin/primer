@@ -1,0 +1,11 @@
+READER ALREADY KNOWS:
+{{READER}}
+
+TOPIC: {{TITLE}}
+
+FULL OUTLINE:
+{{OUTLINE}}
+
+WRITE SECTION {{N}}: {{SECTION}}
+
+Cover only this section. Earlier sections already covered what precedes it; later sections will cover what follows. Do not preview or summarise them.

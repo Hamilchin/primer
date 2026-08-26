@@ -1,0 +1,1 @@
+Draw what the highlighted text describes. If it describes no structure, draw the structure of the surrounding block instead.

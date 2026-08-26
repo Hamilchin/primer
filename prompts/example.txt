@@ -1,0 +1,1 @@
+Add the smallest concrete example that makes the highlighted part click: real numbers, a tiny case, worked through. Prefer mode "after".
