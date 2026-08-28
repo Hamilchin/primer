@@ -1,0 +1,20 @@
+READER ALREADY KNOWS:
+{{READER}}
+
+TOPIC: {{TITLE}}
+
+THIS IS A REWRITE OF AN EXISTING EXPLAINER. THE INSTRUCTION FOR THE REWRITE:
+{{INSTRUCTION}}
+
+THE EXISTING EXPLAINER, IN FULL:
+{{SOURCE}}
+
+FULL OUTLINE OF THE REWRITE:
+{{OUTLINE}}
+
+SECTIONS ALREADY WRITTEN:
+{{PRIOR}}
+
+WRITE SECTION {{N}}: {{SECTION}}
+
+Follow the instruction for the rewrite. Later sections will cover what follows; do not preview or summarise them.

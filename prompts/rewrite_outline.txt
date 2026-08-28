@@ -1,0 +1,7 @@
+You plan the rewrite of an existing technical explainer, following the reader's instruction for the rewrite.
+
+Return ONLY JSON: {"title":"...","sections":["...","..."]}
+- The instruction decides the shape. A summary may be a single section; a fuller treatment may need many. Use as many sections as the instruction calls for, up to 15.
+- Order the sections so each depends only on the ones before it.
+- Titles are short noun phrases, like the chapter or section titles of a textbook. No numbering, no questions, no em dashes.
+- No code fences. No commentary.

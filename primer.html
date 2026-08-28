@@ -4,6 +4,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <title>Primer</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/favicon.svg">
 <script>/* theme before first paint */
 (function(){try{var t=localStorage.getItem("primer:theme");if(t!=="dark"&&t!=="light")t=matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light";document.documentElement.dataset.theme=t;}catch(e){}})();
 </script>
@@ -25,6 +27,7 @@
   --rule:#E0D8C8; --rule-2:#CBC0AC;
   --red:#A23B2A; --red-2:#7E2C1F; --red-soft:#F0DCD4; --red-tint:rgba(162,59,42,.08);
   --sel:rgba(162,59,42,.18);
+  --fold:rgba(50,35,20,.06);
   --on-ink:#F5F0E6; --on-ink-act:#F2B09E;
   --shadow:0 12px 32px rgba(50,35,20,.14),0 1px 2px rgba(50,35,20,.10);
   --col:44rem; --marg:8rem; --gap:1.25rem; --side:13rem; --sgap:2.25rem;
@@ -41,6 +44,7 @@
   --rule:#2D2721; --rule-2:#3D352D;
   --red:#E2836B; --red-2:#F0A18C; --red-soft:#3A241E; --red-tint:rgba(226,131,107,.12);
   --sel:rgba(226,131,107,.28);
+  --fold:rgba(0,0,0,.20);
   --on-ink:#191613; --on-ink-act:#A23B2A;
   --shadow:0 14px 36px rgba(0,0,0,.55),0 1px 2px rgba(0,0,0,.5);
   color-scheme:dark;
@@ -61,6 +65,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 input,textarea{font:inherit;color:inherit}
 ::selection{background:var(--sel)}
 :focus-visible{outline:2px solid var(--red);outline-offset:3px;border-radius:2px}
+[hidden]{display:none!important}
 
 /* ══ header ═══════════════════════════════════════════════════ */
 .head{
@@ -77,7 +82,9 @@ input,textarea{font:inherit;color:inherit}
   justify-self:start; position:relative; font-family:var(--disp); font-style:italic;
   font-weight:400; font-size:1.5rem; line-height:1; letter-spacing:-.01em;
   font-variation-settings:"SOFT" 100,"WONK" 1; color:var(--ink); padding:.3rem 0;
+  display:flex; align-items:center; gap:.4em;
 }
+.wordmark .logo{font-size:1.05em}
 .wordmark::after{
   content:""; position:absolute; right:-.5em; bottom:.42em; width:.26em; height:.26em;
   border-radius:50%; background:var(--red); opacity:0; transform:scale(.3);
@@ -102,6 +109,11 @@ body[data-route="cover"] .wordmark{visibility:hidden}
 .act:hover{color:var(--red)}
 .act.on{color:var(--red);border-bottom-color:var(--red)}
 .act.hide{display:none}
+.act.stop{color:var(--red)}
+.act.stop::before{
+  content:""; display:inline-block; width:.42em; height:.42em; border-radius:50%; background:var(--red);
+  margin-right:.45em; vertical-align:middle; position:relative; top:-.1em; animation:breathe 1.5s ease-in-out infinite;
+}
 .act.prime{
   color:var(--on-ink); background:var(--ink); padding:.32rem .85rem .38rem; border-radius:999px;
   border:0; transition:.2s var(--ease);
@@ -112,19 +124,46 @@ body[data-route="cover"] .act.prime{display:none}
   width:1.7rem; height:1.7rem; border-radius:50%; display:grid; place-items:center;
   font-size:1rem; line-height:1; color:var(--ink-3); transition:.2s var(--ease);
 }
-.glyph:hover{color:var(--ink);background:var(--paper-2)}
+.glyph:hover,.glyph.on{color:var(--ink);background:var(--paper-2)}
+.glyph.on{color:var(--red)}
 .glyph svg{width:1rem;height:1rem;display:block}
 
 main{padding:1.2rem 1.6rem 10rem}
 
-/* ══ cover ════════════════════════════════════════════════════ */
-.cover{max-width:var(--col);margin:9vh auto 0}
+/* ══ the mark ═════════════════════════════════════════════════
+   An open two-page spread with the editor's red rule in the margin of the
+   recto: the shape of the cover below, and of a revised block. Sized in em
+   so each use site sets it with font-size. favicon.svg is the same drawing
+   on a paper ground.                                                     */
+.logo{width:1em;height:1em;display:block;flex:0 0 auto}
+.logo .nib{stroke:var(--red)}
+
+/* ══ cover ════════════════════════════════════════════════════
+   A title page over an open book: the composer on the verso, the library
+   on the recto, a folded gutter between them.                           */
+.cover{max-width:76rem;margin:6vh auto 0}
+.cover-head{text-align:center;margin:0 0 3.4rem}
+.cover-head .logo{font-size:2.5rem;margin:0 auto .9rem}
 .masthead{
-  font-family:var(--disp); font-style:italic; font-weight:300; margin:0 0 3.2rem;
-  font-size:clamp(3.6rem,9vw,6rem); line-height:.95; letter-spacing:-.025em; color:var(--ink);
+  font-family:var(--disp); font-style:italic; font-weight:300; margin:0;
+  font-size:clamp(3rem,6.4vw,4.6rem); line-height:.95; letter-spacing:-.025em; color:var(--ink);
   font-variation-settings:"SOFT" 100,"WONK" 1;
 }
 .masthead i{font-style:normal;color:var(--red)}
+.spread{display:grid;grid-template-columns:1fr 1px 1fr;min-height:26rem}
+.spread .page{min-width:0;padding:0 3.4rem}
+.spread .page:first-child{padding-left:0}
+.spread .page:last-child{padding-right:0}
+/* The fold: a rule with the paper darkening into it from both sides,
+   fading out at the head and the tail so it reads as a fold, not a bar. */
+.gutter{
+  position:relative; background:var(--rule);
+  -webkit-mask-image:linear-gradient(transparent,#000 7%,#000 93%,transparent);
+  mask-image:linear-gradient(transparent,#000 7%,#000 93%,transparent);
+}
+.gutter::before,.gutter::after{content:"";position:absolute;top:0;bottom:0;width:1.5rem;pointer-events:none}
+.gutter::before{right:100%;background:linear-gradient(to right,transparent,var(--fold))}
+.gutter::after{left:100%;background:linear-gradient(to left,transparent,var(--fold))}
 .lab{
   display:block; font-size:.8rem; font-variant-caps:all-small-caps; letter-spacing:.13em;
   color:var(--ink-3); margin:0 0 .3rem; font-weight:500;
@@ -143,6 +182,16 @@ main{padding:1.2rem 1.6rem 10rem}
   resize:none; overflow:hidden; transition:border-color .25s var(--ease);
 }
 .known:focus{outline:none;border-bottom-color:var(--red)}
+.known::placeholder{color:var(--ink-3);opacity:1}
+.known + .lab{margin-top:1.6rem}
+/* Common instructions, one click each; they add up and toggle back off. */
+.chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.7rem}
+.chip{
+  font-size:.78rem; font-variant-caps:all-small-caps; letter-spacing:.09em; color:var(--ink-2);
+  border:1px solid var(--rule-2); border-radius:999px; padding:.16rem .6rem .22rem; transition:.15s var(--ease);
+}
+.chip:hover{color:var(--red);border-color:var(--red)}
+.chip.on{color:#fff;background:var(--red);border-color:var(--red)}
 .composer-foot{margin-top:1.6rem;display:flex;align-items:center;gap:1.4rem}
 .go{
   font-size:.92rem; font-variant-caps:all-small-caps; letter-spacing:.11em; font-weight:500;
@@ -151,8 +200,8 @@ main{padding:1.2rem 1.6rem 10rem}
 }
 .go:hover{background:var(--red-2)}
 .go:active{transform:translateY(1px)}
-.library{margin-top:5rem}
 .library .lab{margin-bottom:.4rem}
+.library .empty{margin:.3rem 0 0;font-size:.95rem}
 .shelf{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
 .shelf li{display:flex;align-items:baseline;gap:1.2rem;border-bottom:1px solid var(--rule)}
 .shelf .open{
@@ -163,12 +212,15 @@ main{padding:1.2rem 1.6rem 10rem}
 .shelf .open span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .shelf .open:hover{color:var(--red)}
 .shelf time{font-size:.8rem;font-style:italic;color:var(--ink-3);white-space:nowrap}
+.shelf .state{font-size:.8rem;font-style:italic;color:var(--ink-3);white-space:nowrap;flex:0 0 auto}
+.shelf .state.live{color:var(--red)}
+.shelf .state.failed{color:var(--red)}
 .shelf .x{
   font-size:.8rem; font-variant-caps:all-small-caps; letter-spacing:.09em; color:var(--ink-3);
   opacity:0; transition:.2s; padding:.4rem 0;
 }
-.shelf li:hover .x,.shelf .x:focus-visible{opacity:1}
-.shelf .x:hover{color:var(--red)}
+.shelf li:hover .x,.shelf .x:focus-visible,.shelf .x.stop{opacity:1}
+.shelf .x:hover,.shelf .x.stop{color:var(--red)}
 .shelf .confirm{
   flex:1; padding:.78rem 0 .82rem; display:flex; gap:1.4rem; align-items:baseline; flex-wrap:wrap;
   font-size:.98rem; color:var(--ink-2); font-style:italic;
@@ -195,6 +247,30 @@ main{padding:1.2rem 1.6rem 10rem}
 }
 .meta dt{font-size:.76rem;font-variant-caps:all-small-caps;letter-spacing:.13em;color:var(--ink-3);white-space:nowrap;font-weight:500}
 .meta dd{margin:0;color:var(--ink-2);font-style:italic}
+.meta dd .dot{
+  display:inline-block; width:.42em; height:.42em; border-radius:50%; background:var(--red);
+  margin-right:.5em; vertical-align:middle; position:relative; top:-.08em; animation:breathe 1.5s ease-in-out infinite;
+}
+.meta dd.failed{color:var(--red)}
+.meta dd .lnk{
+  font-style:normal; font-size:.78rem; font-variant-caps:all-small-caps; letter-spacing:.1em;
+  color:var(--red); border-bottom:1px solid transparent; margin-left:.9rem; white-space:nowrap;
+}
+.meta dd .lnk:hover{border-bottom-color:currentColor}
+.meta dd .link{font-style:italic;color:var(--ink-2);border-bottom:1px solid var(--rule-2);transition:.15s}
+.meta dd .link:hover{color:var(--red);border-bottom-color:currentColor}
+
+/* ── contents ─────────────────────────────── */
+.toc{margin:1.5rem 0 0;padding-top:.9rem;border-top:1px solid var(--rule)}
+.toc ol{list-style:none;margin:.15rem 0 0;padding:0;columns:2;column-gap:2.2rem}
+.toc li{break-inside:avoid;margin:0 0 .1rem}
+.toc button{
+  display:flex; gap:.6rem; align-items:baseline; text-align:left; width:100%;
+  font-size:.92rem; line-height:1.35; color:var(--ink-2); padding:.12rem 0; transition:color .15s;
+}
+.toc button:hover{color:var(--red)}
+.toc .n{font-family:var(--disp);font-style:italic;color:var(--red);flex:0 0 1.5rem;font-size:.98rem}
+.toc .todo button,.toc .todo .n{color:var(--ink-3)}
 
 .block{position:relative;margin:0 0 1.05rem;scroll-margin-top:calc(var(--head) + 1.2rem)}
 .block[data-kind="heading"]{margin:2.7rem 0 .9rem}
@@ -228,12 +304,23 @@ main{padding:1.2rem 1.6rem 10rem}
 .body .katex-display{margin:1.1rem 0;overflow-x:auto;overflow-y:hidden;padding:.2rem 0}
 .body .katex{font-size:1.04em}
 
-.block[data-kind="figure"] .body{padding:.4rem 0 .6rem}
-.block[data-kind="figure"] figure{margin:0}
+.block[data-kind="figure"] .body,.block[data-kind="image"] .body{padding:.4rem 0 .6rem}
+.block[data-kind="figure"] figure,.block[data-kind="image"] figure{margin:0}
 .block[data-kind="figure"] svg{max-width:100%;height:auto;display:block;color:var(--ink)}
-.block[data-kind="figure"] figcaption{margin-top:.6rem;font-size:.88rem;line-height:1.5;color:var(--ink-2);font-style:italic;text-wrap:pretty}
+.block[data-kind="figure"] figcaption,.block[data-kind="image"] figcaption{margin-top:.6rem;font-size:.88rem;line-height:1.5;color:var(--ink-2);font-style:italic;text-wrap:pretty}
 .block[data-kind="figure"] svg [stroke="#A23B2A"],.block[data-kind="figure"] svg [stroke="#2C6B60"]{stroke:var(--red)}
 .block[data-kind="figure"] svg [fill="#A23B2A"],.block[data-kind="figure"] svg [fill="#2C6B60"]{fill:var(--red)}
+.block[data-kind="image"] img{display:block;max-width:100%;height:auto;border-radius:3px;background:var(--paper-2)}
+.block[data-kind="image"] .credit{
+  display:block; font-style:normal; font-size:.74rem; color:var(--ink-3); margin-top:.2rem;
+  font-variant-caps:all-small-caps; letter-spacing:.08em;
+}
+
+/* ── citations: a small italic numeral after the claim ── */
+.cite{font-family:var(--disp);font-style:italic;font-size:.66em;line-height:0;vertical-align:super;margin-left:.12em;white-space:nowrap}
+.body .cite a{color:var(--red);text-decoration:none;padding:0 .12em;border-radius:2px;transition:.15s}
+.body .cite a:hover{background:var(--red-tint)}
+body[data-sources="off"] .cite{display:none}
 
 /* ── marginalia ───────────────────────────── */
 .marg{
@@ -244,6 +331,13 @@ main{padding:1.2rem 1.6rem 10rem}
 .mark{pointer-events:auto;font-style:italic;color:var(--red);transition:color .2s;padding:0 0 .1rem;text-align:right}
 .mark:hover{color:var(--red-2)}
 .mark[aria-expanded="true"]{color:var(--red-2)}
+.mark.quiet{color:var(--ink-3)}
+.mark.quiet:hover{color:var(--red)}
+/* Off: no words in the margin and no red rule beside a changed block. The
+   status words while a block is being made are progress, not annotation,
+   and stay. */
+body[data-marks="off"] .mark,
+body[data-marks="off"] .block.edited::before{display:none}
 .block.edited::before{
   content:""; position:absolute; top:.28em; bottom:.08em; right:calc(100% + .72rem); width:2px;
   background:var(--red); opacity:.85; border-radius:1px; transition:opacity .2s;
@@ -276,8 +370,8 @@ main{padding:1.2rem 1.6rem 10rem}
   font-family:var(--mono); font-size:.68em; line-height:calc(1.62em / .68);
   color:var(--ink-2); white-space:pre-wrap; word-break:break-word; hyphens:none;
 }
-.block.pending[data-kind="figure"] .live{padding:.5rem .8rem;line-height:1.5}
-.block.pending[data-kind="figure"] .body{
+.block.pending[data-kind="figure"] .live,.block.pending[data-kind="image"] .live{padding:.5rem .8rem;line-height:1.5}
+.block.pending[data-kind="figure"] .body,.block.pending[data-kind="image"] .body{
   background:none; min-height:8.5rem; border:1px dashed var(--rule-2); border-radius:3px; opacity:.6;
 }
 .block.fresh{animation:settle .7s var(--ease) both;animation-delay:calc(var(--i,0) * 70ms)}
@@ -285,6 +379,10 @@ main{padding:1.2rem 1.6rem 10rem}
 
 .err{border-left:2px solid var(--red);padding:.45rem .9rem;color:var(--red);font-size:.93rem;font-style:italic;line-height:1.5}
 .err button{font-style:normal;font-size:.8rem;font-variant-caps:all-small-caps;letter-spacing:.1em;margin-left:.7rem;border-bottom:1px solid currentColor;color:var(--red)}
+.err.soft{color:var(--ink-3);border-left-color:var(--rule-2)}
+.err.soft button{color:var(--ink-2)}
+.err.soft button:first-of-type{color:var(--red)}
+.block[data-kind="heading"] .err{margin-top:.55rem;font-size:.86rem}
 
 /* ── notes: inline aside, or sidenote on wide screens ── */
 .block[data-kind="note"]{margin:.3rem 0 1.3rem;padding:.1rem 0 .1rem 1rem;border-left:2px solid var(--red-soft)}
@@ -350,9 +448,15 @@ main{padding:1.2rem 1.6rem 10rem}
 }
 .pop .k time{color:var(--ink-3);font-variant-caps:normal;letter-spacing:0;font-style:italic;font-size:.8rem;font-weight:400}
 .pop .q{color:var(--ink-2);font-style:italic;margin-bottom:.75rem}
-.pop .row{display:flex;gap:1.3rem}
-.pop .row button{font-size:.8rem;font-variant-caps:all-small-caps;letter-spacing:.1em;color:var(--ink-2);border-bottom:1px solid transparent}
-.pop .row button:hover{color:var(--red);border-bottom-color:currentColor}
+.pop .t{color:var(--ink);margin-bottom:.2rem}
+.pop .s{color:var(--ink-2);font-size:.86rem;margin-bottom:.6rem}
+.pop .row{display:flex;gap:1.3rem;flex-wrap:wrap}
+.pop .row button,.pop .row a{
+  font-size:.8rem; font-variant-caps:all-small-caps; letter-spacing:.1em; color:var(--ink-2);
+  border-bottom:1px solid transparent; text-decoration:none; font-style:normal;
+}
+.pop .row button:hover,.pop .row a:hover{color:var(--red);border-bottom-color:currentColor}
+.pop .row .host{color:var(--ink-3);font-variant-caps:normal;letter-spacing:0;font-family:var(--mono);font-size:.72rem;margin-left:.4em}
 
 .outline{width:min(24rem,90vw);padding:.5rem .4rem}
 .outline button{
@@ -365,6 +469,15 @@ main{padding:1.2rem 1.6rem 10rem}
 .outline button.cur .n::after{content:"";display:inline-block;width:.32em;height:.32em;border-radius:50%;background:var(--red);margin-left:.4em;vertical-align:middle}
 .outline .foot{border-top:1px solid var(--rule);margin:.4rem .3rem 0;padding-top:.45rem;display:flex;gap:.2rem}
 .outline .foot button{width:auto;font-size:.8rem;font-variant-caps:all-small-caps;letter-spacing:.1em;padding:.3rem .5rem}
+.outline .hint{display:block;padding:.35rem .7rem .2rem;font-size:.78rem;font-variant-caps:all-small-caps;letter-spacing:.13em;color:var(--ink-3)}
+.outline form{display:flex;gap:.4rem;align-items:baseline;padding:.3rem .7rem .2rem;border-top:1px solid var(--rule);margin-top:.35rem}
+.outline form input{
+  flex:1; min-width:0; background:none; border:0; border-bottom:1px solid var(--rule-2);
+  padding:.3rem .1rem .35rem; font-size:.95rem; color:var(--ink); border-radius:0;
+}
+.outline form input:focus{outline:none;border-bottom-color:var(--red)}
+.outline form button{width:auto;flex:0 0 auto;color:var(--red);font-size:.82rem;font-variant-caps:all-small-caps;letter-spacing:.1em;padding:.3rem .4rem}
+.menu{width:12rem}
 
 /* ══ toast ════════════════════════════════════════════════════ */
 .toast{
@@ -379,13 +492,51 @@ main{padding:1.2rem 1.6rem 10rem}
 .toast.err{background:var(--red);color:#fff}
 .toast.err button{color:#fff}
 
+/* ══ the desk: who is working, and what went wrong ════════════ */
+.desk{
+  position:fixed; left:1.2rem; bottom:calc(1.2rem + env(safe-area-inset-bottom)); z-index:50;
+  width:min(19.5rem,calc(100vw - 2.4rem)); background:var(--card); border:1px solid var(--rule-2);
+  border-radius:7px; box-shadow:var(--shadow); font-size:.84rem; line-height:1.4;
+}
+.desk-head{display:flex;width:100%;justify-content:space-between;align-items:baseline;gap:1rem;padding:.55rem .9rem .45rem;text-align:left}
+.desk-head .lab{margin:0;color:var(--ink-2)}
+.desk-head .tog{font-size:.72rem;font-variant-caps:all-small-caps;letter-spacing:.1em;color:var(--ink-3)}
+.desk ul{list-style:none;margin:0;padding:0 .9rem .55rem}
+.desk.min ul{display:none}
+.desk li{display:flex;gap:.55rem;align-items:baseline;padding:.2rem 0;flex-wrap:wrap}
+.desk .dot{
+  display:inline-block; width:.42em; height:.42em; border-radius:50%; background:var(--red);
+  vertical-align:middle; position:relative; top:-.08em; animation:breathe 1.5s ease-in-out infinite; flex:0 0 auto;
+}
+.desk .what{color:var(--ink);font-style:italic}
+.desk .note{
+  flex-basis:100%; padding-left:1.05rem; color:var(--ink-3); font-size:.78rem; font-family:var(--mono);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.desk .grp{
+  display:flex; justify-content:space-between; align-items:baseline; gap:1rem; margin:.4rem 0 .05rem;
+  font-size:.74rem; font-variant-caps:all-small-caps; letter-spacing:.12em; color:var(--ink-3);
+}
+.desk .grp span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.desk .grp button{color:var(--ink-3);border-bottom:1px solid transparent;flex:0 0 auto}
+.desk .grp button:hover{color:var(--red);border-bottom-color:currentColor}
+.desk .grp button.stop{color:var(--red)}
+.desk .grp button.open{color:var(--ink-2)}
+.desk-issues{border-top:1px solid var(--rule);padding-top:.45rem!important}
+.desk-issues li{color:var(--red);font-size:.82rem;flex-wrap:nowrap}
+.desk-issues .msg{flex:1;min-width:0;font-style:italic}
+.desk-issues button{
+  flex:0 0 auto; font-size:.72rem; font-variant-caps:all-small-caps; letter-spacing:.1em; color:var(--ink-3);
+  border-bottom:1px solid transparent;
+}
+.desk-issues button:hover{color:var(--red);border-bottom-color:currentColor}
+
 /* ══ raw response inspector ═══════════════════════════════════ */
 .raw{
   position:fixed; z-index:80; left:50%; top:50%; transform:translate(-50%,-50%);
   width:min(46rem,94vw); max-height:72vh; display:flex; flex-direction:column;
   background:var(--card); border:1px solid var(--rule-2); border-radius:7px; box-shadow:var(--shadow);
 }
-.raw[hidden]{display:none}
 .raw-head{display:flex;align-items:baseline;gap:1.2rem;padding:.7rem 1rem .5rem;border-bottom:1px solid var(--rule)}
 .raw-head .lab{margin:0;flex:1}
 .raw pre{
@@ -414,6 +565,56 @@ main{padding:1.2rem 1.6rem 10rem}
 }
 .p-text:focus{outline:none;border-left-color:var(--red);color:var(--ink)}
 
+/* ══ settings page ════════════════════════════════════════════ */
+.srow{display:flex;justify-content:space-between;gap:2rem;align-items:flex-start;padding:1.1rem 0;border-bottom:1px solid var(--rule)}
+.srow:first-of-type{border-top:1px solid var(--rule)}
+.srow .lab{font-size:1.02rem;font-variant-caps:normal;letter-spacing:0;color:var(--ink);font-weight:500;margin:0}
+.srow .help{margin:.25rem 0 0;font-size:.9rem;line-height:1.5;color:var(--ink-2);max-width:32rem;text-wrap:pretty}
+.switch{flex:0 0 auto;width:2.7rem;height:1.55rem;border-radius:999px;background:var(--rule-2);position:relative;transition:.2s var(--ease);margin-top:.15rem}
+.switch i{
+  position:absolute; top:.2rem; left:.2rem; width:1.15rem; height:1.15rem; border-radius:50%;
+  background:var(--card); transition:.2s var(--ease); box-shadow:0 1px 2px rgba(0,0,0,.25);
+}
+.switch[aria-checked="true"]{background:var(--red)}
+.switch[aria-checked="true"] i{left:1.35rem}
+.seg{display:flex;border:1px solid var(--rule-2);border-radius:4px;overflow:hidden;flex:0 0 auto}
+.seg button{padding:.3rem .75rem .35rem;font-size:.82rem;font-variant-caps:all-small-caps;letter-spacing:.1em;color:var(--ink-2)}
+.seg button+button{border-left:1px solid var(--rule-2)}
+.seg button.on{background:var(--ink);color:var(--on-ink)}
+.sfield{
+  flex:0 1 18rem; background:none; border:0; border-bottom:1px solid var(--rule-2); padding:.2rem .1rem .3rem;
+  font-size:.98rem; color:var(--ink); border-radius:0;
+}
+.sfield:focus{outline:none;border-bottom-color:var(--red)}
+
+/* ══ raw page ═════════════════════════════════════════════════ */
+.empty{font-style:italic;color:var(--ink-3)}
+.call{border-top:1px solid var(--rule)}
+.call:last-of-type{border-bottom:1px solid var(--rule)}
+.call summary{display:flex;gap:1rem;align-items:baseline;padding:.7rem 0;cursor:pointer;list-style:none;font-size:.95rem}
+.call summary::-webkit-details-marker{display:none}
+.call .n{font-family:var(--disp);font-style:italic;color:var(--red);flex:0 0 2rem}
+.call .what{color:var(--ink);flex:1;min-width:0}
+.call .who{font-family:var(--mono);font-size:.72rem;color:var(--ink-3);white-space:nowrap}
+.call .st{font-size:.8rem;font-style:italic;color:var(--ink-3);white-space:nowrap;max-width:14rem;overflow:hidden;text-overflow:ellipsis}
+.call.err .st{color:var(--red)}
+.call.running .st::before{
+  content:""; display:inline-block; width:.42em; height:.42em; border-radius:50%; background:var(--red);
+  margin-right:.45em; vertical-align:middle; position:relative; top:-.08em; animation:breathe 1.5s ease-in-out infinite;
+}
+.call-body{padding:0 0 1.3rem}
+.call-body h4{font-size:.76rem;font-variant-caps:all-small-caps;letter-spacing:.13em;color:var(--ink-3);margin:.9rem 0 .3rem;display:flex;justify-content:space-between;align-items:baseline}
+.call-body h4 button{font-size:.76rem;color:var(--ink-3);border-bottom:1px solid transparent}
+.call-body h4 button:hover{color:var(--red);border-bottom-color:currentColor}
+.call-body pre{
+  margin:0; padding:.7rem .9rem; background:var(--paper-2); border-left:2px solid var(--rule-2); border-radius:0 4px 4px 0;
+  font-family:var(--mono); font-size:.76rem; line-height:1.6; white-space:pre-wrap; word-break:break-word; max-height:28rem; overflow:auto; tab-size:2;
+}
+.call .events{list-style:none;margin:0;padding:0;font-family:var(--mono);font-size:.75rem;line-height:1.6;color:var(--ink-2)}
+.call .events li{padding:.15rem 0;border-bottom:1px dashed var(--rule);white-space:pre-wrap;word-break:break-word}
+.call .events .k{color:var(--red);margin-right:.6em}
+.call .events .bad .k{color:var(--ink-3)}
+
 /* ══ wide: sidenotes in the right margin ══════════════════════ */
 @media (min-width:1240px){
   .block[data-kind="note"]{
@@ -428,6 +629,15 @@ main{padding:1.2rem 1.6rem 10rem}
   .block[data-kind="note"] .body p{margin-bottom:.6rem;hyphens:none}
   .side-q{font-size:.84rem;margin-bottom:.35rem;padding-top:.05rem}
   .block[data-kind="note"].busy::before{display:none}
+}
+
+/* ══ the book closes: one page under the other ════════════════ */
+@media (max-width:1000px){
+  .cover{max-width:var(--col);margin-top:5vh}
+  .spread{grid-template-columns:1fr;min-height:0}
+  .spread .page{padding:0}
+  .gutter{display:none}
+  .spread .page:last-child{margin-top:3.4rem;padding-top:1.7rem;border-top:1px solid var(--rule)}
 }
 
 /* ══ compact marginalia (no room for words) ═══════════════════ */
@@ -453,7 +663,7 @@ main{padding:1.2rem 1.6rem 10rem}
   .wordmark,.runhead{grid-area:1/1}
   .runhead{justify-self:start;max-width:100%;font-size:.9rem;padding-left:0;text-align:left}
   .head:has(.runhead.show) .wordmark{opacity:0;pointer-events:none}
-  .acts{gap:1rem}
+  .acts{gap:.9rem}
   main{padding:.8rem 1.1rem 9rem 1.5rem}
   .cover{margin-top:5vh}
   .masthead{margin-bottom:2.4rem}
@@ -461,8 +671,15 @@ main{padding:1.2rem 1.6rem 10rem}
   .doc{margin-top:1.4rem}
   .meta{grid-template-columns:1fr;gap:.05rem}
   .meta dt{margin-top:.4rem}
+  .toc ol{columns:1}
+  .cover-head .logo{font-size:2rem}
   .shelf .x{opacity:1}
+  .shelf .state{display:none}
   .body .katex-display{margin:.9rem 0}
+  .desk{left:.6rem;right:.6rem;bottom:auto;top:calc(var(--head) + .4rem);width:auto}
+  .srow{flex-direction:column;gap:.7rem}
+  .call summary{flex-wrap:wrap}
+  .call .st{max-width:none}
 }
 
 /* ══ the pen docks to the bottom on touch screens ═════════════ */
@@ -482,7 +699,7 @@ main{padding:1.2rem 1.6rem 10rem}
 }
 
 @media print{
-  .head,.pen,.pop,.toast,.colophon button{display:none!important}
+  .head,.pen,.pop,.toast,.desk,.colophon button,.meta .lnk{display:none!important}
   body{background:#fff;color:#000;font-size:11pt}
   main{padding:0}
   .doc{max-width:none}
@@ -493,12 +710,16 @@ main{padding:1.2rem 1.6rem 10rem}
 </style>
 
 <header class="head">
-  <button class="wordmark" id="homeBtn" aria-label="Library">Primer</button>
+  <button class="wordmark" id="homeBtn" aria-label="Library"><span>Primer</span></button>
   <button class="runhead" id="runhead" aria-haspopup="true" aria-expanded="false"></button>
   <nav class="acts">
     <button class="act hide" id="undoBtn">Undo</button>
-    <button class="act" id="promptsBtn">Prompts</button>
+    <button class="act hide stop" id="stopBtn">Stop</button>
+    <button class="act hide" id="rewriteBtn" aria-haspopup="true">Rewrite</button>
     <button class="act prime" id="newBtn">New</button>
+    <button class="glyph" id="menuBtn" aria-label="Pages" aria-haspopup="true">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="13" cy="8" r="1.4" fill="currentColor"/></svg>
+    </button>
     <button class="glyph" id="themeBtn" aria-label="Theme">
       <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg>
     </button>
@@ -525,7 +746,14 @@ main{padding:1.2rem 1.6rem 10rem}
 
 <div class="pop" id="pop" role="dialog"></div>
 <div class="pop outline" id="outline" role="menu"></div>
+<div class="pop outline menu" id="menu" role="menu"></div>
+<div class="pop outline" id="rewrite" role="menu"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<aside class="desk" id="desk" aria-live="polite" hidden>
+  <button class="desk-head" id="deskHead" type="button"><span class="lab"></span><span class="tog"></span></button>
+  <ul class="desk-jobs" id="deskJobs"></ul>
+  <ul class="desk-issues" id="deskIssues"></ul>
+</aside>
 <div class="raw" id="raw" role="dialog" aria-label="Raw response" hidden>
   <div class="raw-head"><span class="lab">Raw response</span><button class="act" id="rawCopy">Copy</button><button class="act" id="rawClose">Close</button></div>
   <pre id="rawText"></pre>
@@ -533,8 +761,9 @@ main{padding:1.2rem 1.6rem 10rem}
 
 <script>
 /* ══ storage ══════════════════════════════════════════════════
-   localStorage: primer:index, primer:doc:<id>, primer:prompts.
-   Async so a disk-backed store can replace it without touching callers. */
+   localStorage: primer:index, primer:doc:<id>, primer:raw:<id>,
+   primer:prompts, primer:settings. Async so a disk-backed store can
+   replace it without touching callers.                              */
 let quotaWarned = false;
 const store = {
   async get(k){ try{ const v = localStorage.getItem(k); return v == null ? null : JSON.parse(v); }catch(e){ return null; } },
@@ -545,22 +774,57 @@ const store = {
   async del(k){ try{ localStorage.removeItem(k); }catch(e){} }
 };
 
+/* ══ settings ═════════════════════════════════════════════════
+   One entry per setting; the Settings page is drawn from this table.
+   type is "bool", "select" (with options:[{value,label}]) or "text".
+   A setting with `attr` is a display switch: it puts on/off in
+   body[data-<attr>], and CSS does the rest, so showing or hiding a part
+   of the page needs no code beyond one rule. Only values that differ
+   from def are stored.                                               */
+const SETTINGS = {
+  research: { type:"bool", def:true, label:"Research after writing",
+    help:"When a primer is finished, a research agent checks its key claims on the web, cites the ones it can confirm, and corrects the ones that turn out to be wrong." },
+  showSources: { type:"bool", def:true, attr:"sources", label:"Show sources",
+    help:"Mark cited claims in the text with a small numeral. Hover one to see the source." },
+  showMarks: { type:"bool", def:true, attr:"marks", label:"Show margin annotations",
+    help:"Note revisions, research corrections, and found images in the margin, with the red rule beside the blocks they changed. Turn this off to read the primer clean; nothing is lost, and the Raw page still has every call." }
+};
+let settings = {};
+const setting = k => (k in settings) ? settings[k] : SETTINGS[k].def;
+async function setSetting(k, v){
+  if(v === SETTINGS[k].def) delete settings[k]; else settings[k] = v;
+  await store.set("primer:settings", settings);
+  applySettings();
+}
+function applySettings(){
+  Object.keys(SETTINGS).forEach(k => {
+    const a = SETTINGS[k].attr;
+    if(a) document.body.dataset[a] = setting(k) ? "on" : "off";
+  });
+}
+
 /* ══ model ════════════════════════════════════════════════════
    server.mjs answers POST /api/complete {system, user, role} with a stream
-   of newline-delimited JSON frames: {delta} as text arrives, then {done,text}
-   or {error}. role picks the model server-side. onDelta(soFar, delta) fires
-   per frame; the promise resolves with the final text.               */
+   of newline-delimited JSON frames: {start} first, {delta} as text arrives,
+   {event} when an agent uses a tool, then {done,text} or {error}. role
+   picks the model and tools server-side. o.onDelta(soFar, delta) fires per
+   text frame, o.onEvent(event) per start/tool/result frame; o.signal aborts,
+   which the server turns into a stopped model call.                   */
 const ENDPOINT = "/api/complete";
 const RETRIES = 4;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+function stopped(partial){ const e = new Error("Stopped."); e.name = "AbortError"; e.stopped = true; if(partial) e.partial = partial; return e; }
 
-async function claude(system, user, role, onDelta){
+async function claude(system, user, role, o){
+  o = o || {};
   for(let attempt = 0; ; attempt++){
+    if(o.signal && o.signal.aborted) throw stopped();
     let r;
     try{
       r = await fetch(ENDPOINT, { method:"POST", headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ system, user, role }) });
+        body: JSON.stringify({ system, user, role }), signal: o.signal });
     }catch(e){
+      if(e.name === "AbortError") throw stopped();
       if(attempt >= RETRIES) throw new Error("Network error. "+e.message);
       await sleep(800 * Math.pow(2, attempt));
       continue;
@@ -575,29 +839,34 @@ async function claude(system, user, role, onDelta){
       const d = await r.json().catch(() => ({}));
       throw new Error("Request failed ("+r.status+")" + (d.error && d.error.message ? ": "+d.error.message : ""));
     }
-    return readFrames(r, onDelta);
+    return readFrames(r, o);
   }
 }
 
 /* Once bytes have flowed there is no retry; the server's client already
    retried rate limits before the first delta. A dropped connection throws
    with what arrived on e.partial so the inspector can show it. */
-async function readFrames(r, onDelta){
+async function readFrames(r, o){
   const reader = r.body.getReader(), dec = new TextDecoder();
   let buf = "", acc = "";
-  for(;;){
-    const { value, done } = await reader.read();
-    buf += done ? dec.decode() : dec.decode(value, { stream:true });
-    const lines = buf.split("\n"); buf = lines.pop();
-    for(const line of lines){
-      if(!line.trim()) continue;
-      const f = JSON.parse(line);
-      if(f.delta != null){ acc += f.delta; if(onDelta) onDelta(acc, f.delta); }
-      if(f.error){ const e = new Error(f.error.message || "Request failed."); e.partial = acc; throw e; }
-      if(f.done) return String(f.text != null ? f.text : acc);
+  try{
+    for(;;){
+      const { value, done } = await reader.read();
+      buf += done ? dec.decode() : dec.decode(value, { stream:true });
+      const lines = buf.split("\n"); buf = lines.pop();
+      for(const line of lines){
+        if(!line.trim()) continue;
+        const f = JSON.parse(line);
+        if(f.start && o.onEvent) o.onEvent({ kind:"start", ...f.start });
+        if(f.event && o.onEvent) o.onEvent(f.event);
+        if(f.delta != null){ acc += f.delta; if(o.onDelta) o.onDelta(acc, f.delta); }
+        if(f.error){ const e = new Error(f.error.message || "Request failed."); e.partial = acc; throw e; }
+        if(f.done) return String(f.text != null ? f.text : acc);
+      }
+      if(done) break;
     }
-    if(done) break;
-  }
+  }catch(e){ if(e.name === "AbortError") throw stopped(acc); throw e; }
+  if(o.signal && o.signal.aborted) throw stopped(acc);
   const e = new Error("Connection dropped mid-response."); e.partial = acc; throw e;
 }
 
@@ -623,15 +892,19 @@ function parseJSON(txt){
 
 /* Ask and parse; if the answer will not parse, ask once more. Returns
    {value, raws}: every raw response is kept so a failure can be inspected. */
-async function askJSON(system, user, role, onDelta){
+async function askJSON(system, user, role, o){
+  o = o || {};
   const raws = [];
   for(let attempt = 0; attempt < 2; attempt++){
     let text;
-    try{ text = await claude(system, user, role, onDelta); }
+    try{ text = await claude(system, user, role, o); }
     catch(e){ if(e.partial) raws.push(e.partial); e.raws = raws; throw e; }
     raws.push(text);
     try{ return { value: parseJSON(text), raws }; }
-    catch(e){ if(attempt === 1){ e.raws = raws; throw e; } }
+    catch(e){
+      if(attempt === 1 || (o.signal && o.signal.aborted)){ e.raws = raws; throw e; }
+      if(o.onEvent) o.onEvent({ kind:"retry", reason:e.message, output:text });
+    }
   }
 }
 /* The raw text behind a failure, for the inspector. */
@@ -674,22 +947,30 @@ function repairJSON(s){
    stored as overrides and Reset returns to the file. {{PLACEHOLDERS}}
    are filled in at call time.                                        */
 const PROMPTS = {
-  house:         { label:"House style" },
-  reader:        { label:"Reader" },
-  outline:       { label:"Outline · system" },
-  outline_user:  { label:"Outline · user" },
-  section:       { label:"Section · system" },
-  section_user:  { label:"Section · user" },
-  edit:          { label:"Edit · system" },
-  edit_user:     { label:"Edit · user" },
-  figure:        { label:"Diagram · system" },
-  figure_user:   { label:"Diagram · user" },
-  simpler:       { label:"Action · Simpler" },
-  example:       { label:"Action · Example" },
-  derive:        { label:"Action · Derive" },
-  tighter:       { label:"Action · Tighter" },
-  ask:           { label:"Action · Ask" },
-  figure_action: { label:"Action · Diagram" }
+  house:                { label:"House style" },
+  reader:               { label:"Reader" },
+  instruction:          { label:"Instructions wrapper" },
+  outline:              { label:"Outline · system" },
+  outline_user:         { label:"Outline · user" },
+  section:              { label:"Section · system" },
+  section_user:         { label:"Section · user" },
+  edit:                 { label:"Edit · system" },
+  edit_user:            { label:"Edit · user" },
+  figure:               { label:"Diagram · system" },
+  figure_user:          { label:"Diagram · user" },
+  finder:               { label:"Image finder · system" },
+  finder_user:          { label:"Image finder · user" },
+  research:             { label:"Research · system" },
+  research_user:        { label:"Research · user" },
+  rewrite_outline:      { label:"Rewrite outline · system" },
+  rewrite_outline_user: { label:"Rewrite outline · user" },
+  rewrite_section_user: { label:"Rewrite section · user" },
+  simpler:              { label:"Action · Simpler" },
+  example:              { label:"Action · Example" },
+  derive:               { label:"Action · Derive" },
+  tighter:              { label:"Action · Tighter" },
+  ask:                  { label:"Action · Ask" },
+  figure_action:        { label:"Action · Diagram" }
 };
 
 /* Fetch prompts/<key>.txt for every entry. Returns the keys that failed.
@@ -723,6 +1004,13 @@ function readerText(known){
   const base = rawPrompt("reader").trim();
   return (known && known.trim()) ? base + "\n" + known.trim() : base;
 }
+/* The reader's own instructions for this primer, wrapped so the model reads
+   them as instructions rather than as part of the topic. Empty when there
+   are none, and the {{INSTRUCTION}} line then collapses away. */
+function instrText(d){
+  const t = String(d.instruction || "").trim();
+  return t ? usr("instruction", { INSTRUCTION: t }) : "";
+}
 
 /* label is stamped on each revised block and shown in the margin in
    lowercase; key is the pen's keyboard shortcut.                     */
@@ -736,19 +1024,54 @@ const ACTIONS = {
 };
 const word = edit => String(edit && edit.label || "").toLowerCase();
 
+/* Common ways to ask for a primer. Each becomes a chip under the
+   Instructions field on the cover; clicking one writes its text into the
+   field, where it can be edited or added to. */
+const BRIEFS = [
+  { label:"Short",           text:"Keep it short: the fewest sections that cover the subject, and no more than a few paragraphs in each." },
+  { label:"A few paragraphs",text:"Write it as a single section of three or four paragraphs. No diagrams and no images." },
+  { label:"Minimal",         text:"A minimal primer: the central idea, what it is for, and nothing else." },
+  { label:"With derivations",text:"Derive every result step by step instead of stating it, saying what justifies each step." },
+  { label:"Worked examples", text:"Give every idea a concrete worked example with real numbers." },
+  { label:"Rigorous",        text:"Be precise: exact definitions, stated assumptions, and proofs or proof sketches for the central results." },
+  { label:"No pictures",     text:"Text only. Do not request any diagrams or images." }
+];
+
+/* Ways to rewrite a primer as a new one. Each becomes a row in the
+   Rewrite menu; text is the instruction the planner and writer follow. */
+const REWRITES = [
+  { label:"Three-paragraph summary", text:"Rewrite the whole explainer as a summary of exactly three paragraphs: one section, three prose elements, no diagrams or images." },
+  { label:"One-page overview",       text:"Rewrite it as a one-page overview: two or three short sections that give the reader the shape of the subject and its central result, with no derivations." },
+  { label:"More derivations",        text:"Keep the same scope and order, but derive every result step by step instead of stating it, saying what justifies each step." },
+  { label:"More worked examples",    text:"Keep the same scope and order, but add a concrete worked example, with real numbers, to every idea that lacks one." },
+  { label:"Simpler",                 text:"Rewrite it for a reader with less background: plainer words, smaller steps, every term defined on first use, the same ideas." },
+  { label:"Half the length",         text:"Rewrite it at half the length. Keep every idea, cut every repetition and every sentence that does not carry one." },
+  { label:"More rigorous",           text:"Rewrite it with full rigour: precise definitions, stated assumptions, and proofs or proof sketches for the central results." }
+];
+
+/* The mark, defined once and inlined wherever it is drawn, so it takes the
+   ink colour of its surroundings and the red of the current theme. The same
+   drawing, on a paper ground, is favicon.svg. */
+const LOGO = '<svg class="logo" viewBox="0 0 32 32" aria-hidden="true" focusable="false">' +
+  '<g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round">' +
+  '<path d="M16 9.4C13.2 7.4 9.4 6.8 5.2 7.4v16.2c4.2-.6 8 0 10.8 2z"/>' +
+  '<path d="M16 9.4c2.8-2 6.6-2.6 10.8-2v16.2c-4.2-.6-8 0-10.8 2z"/></g>' +
+  '<path class="nib" d="M20.4 12.8v7.6" fill="none" stroke-width="1.9" stroke-linecap="round"/></svg>';
+
 /* ══ state ════════════════════════════════════════════════════ */
-let doc = null;            // {id,title,topic,known,created,blocks:[...]}
-let index = [];            // [{id,title,updated}]
-let route = "cover";       // "cover" | "doc" | "prompts"
+let doc = null;            // the document on screen: {id,title,topic,known,created,status,blocks:[...],rewrite?}
+let index = [];            // [{id,title,updated,status}]
+let route = "cover";       // "cover" | "doc" | "prompts" | "settings" | "raw"
 let undoStack = [];
 let sel = null;            // {blockId, text, rect}
+const docs = new Map();    // id → the one live object for each document this session
 const uid = () => Math.random().toString(36).slice(2,9);
 
 const $ = s => document.querySelector(s);
-const main=$("#main"), pen=$("#tools"), pop=$("#pop"), outline=$("#outline"),
-      toastEl=$("#toast"), runhead=$("#runhead"), undoBtn=$("#undoBtn"),
-      promptsBtn=$("#promptsBtn"), newBtn=$("#newBtn"), themeBtn=$("#themeBtn"),
-      askInput=$("#askInput");
+const main=$("#main"), pen=$("#tools"), pop=$("#pop"), outline=$("#outline"), menu=$("#menu"), rewriteMenu=$("#rewrite"),
+      toastEl=$("#toast"), runhead=$("#runhead"), undoBtn=$("#undoBtn"), stopBtn=$("#stopBtn"), rewriteBtn=$("#rewriteBtn"),
+      newBtn=$("#newBtn"), menuBtn=$("#menuBtn"), themeBtn=$("#themeBtn"), askInput=$("#askInput"),
+      desk=$("#desk"), deskHead=$("#deskHead"), deskJobs=$("#deskJobs"), deskIssues=$("#deskIssues");
 
 function el(tag, cls, text){
   const e = document.createElement(tag);
@@ -756,6 +1079,7 @@ function el(tag, cls, text){
   if(text != null) e.textContent = text;
   return e;
 }
+function btn(cls, text, onclick){ const b = el("button", cls, text); b.type = "button"; if(onclick) b.onclick = onclick; return b; }
 function timeAgo(ts){
   const d = Date.now()-ts, m = Math.round(d/6e4), h = Math.round(d/36e5), dd = Math.round(d/864e5);
   if(m < 1) return "just now";
@@ -769,8 +1093,10 @@ function shortDate(ts){
   if(d.getFullYear() !== new Date().getFullYear()) o.year = "numeric";
   return d.toLocaleDateString(undefined, o);
 }
+const host = u => { try{ return new URL(u).host.replace(/^www\./,""); }catch(e){ return String(u||""); } };
 function grow(ta){ ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; }
 const docked = () => matchMedia("(pointer:coarse)").matches || innerWidth <= 700;
+const headingTitle = b => String(b.md || "").replace(/^#+\s*/,"");
 
 /* ══ markdown + math ══════════════════════════════════════════ */
 marked.setOptions({breaks:false, gfm:true});
@@ -798,61 +1124,274 @@ function typeset(el){
   }catch(e){}
 }
 
+/* ══ trace ════════════════════════════════════════════════════
+   Every model call made for a document, in order, with the prompts that
+   went out, the tools the agent used, and the text that came back. Kept
+   under primer:raw:<id> and shown on the Raw page.                     */
+const traces = new Map();          // docId → [record]
+const traceSaveT = new Map();
+const TRACE_MAX = 150, TRACE_TEXT = 60000;
+const clip = s => (s && s.length > TRACE_TEXT) ? s.slice(0, TRACE_TEXT) + "\n…[" + (s.length - TRACE_TEXT) + " more characters]" : s;
+async function traceOf(id){
+  if(!traces.has(id)) traces.set(id, (await store.get("primer:raw:"+id)) || []);
+  return traces.get(id);
+}
+function saveTrace(id){
+  clearTimeout(traceSaveT.get(id));
+  traceSaveT.set(id, setTimeout(() => {
+    const t = traces.get(id); if(!t) return;
+    if(t.length > TRACE_MAX) t.splice(0, t.length - TRACE_MAX);
+    store.set("primer:raw:"+id, t.map(c => ({ ...c, output:clip(c.output), system:clip(c.system), user:clip(c.user) })));
+  }, 600));
+}
+
+/* ══ runs and jobs ════════════════════════════════════════════
+   A run is everything in flight for one document: its jobs (one per model
+   call) and the switch that stops them. Generation never touches the global
+   `doc`; it works on the document it was given, and the page redraws only
+   when that document is the one on screen. So a second primer can be
+   started, or the library opened, while the first is still being written. */
+const runs = new Map();   // docId → {doc, jobs:Set<job>, cancelled, active, side}
+function runOf(d){
+  let r = runs.get(d.id);
+  if(!r){ r = { doc:d, jobs:new Set(), cancelled:false, active:false, side:Promise.resolve() }; runs.set(d.id, r); }
+  return r;
+}
+const running = d => { const r = d && runs.get(d.id); return !!(r && (r.jobs.size || r.active)); };
+function stopRun(d){
+  const r = runs.get(d.id);
+  if(!r || !(r.jobs.size || r.active)) return;
+  r.cancelled = true;
+  r.jobs.forEach(j => j.ctrl.abort());
+}
+function tidyRun(d){ const r = runs.get(d.id); if(r && !r.jobs.size && !r.active) runs.delete(d.id); }
+const allJobs = () => [...runs.values()].flatMap(r => [...r.jobs]);
+
+/* One model call on a document's behalf. While it runs it is a job the desk
+   shows; its text streams into `block`; every prompt, tool call and reply
+   lands in the document's trace. Throws with e.stopped when the run was
+   stopped. s: {role, label, sec, block, system, user}.                  */
+async function agent(d, s){
+  const run = runOf(d);
+  const job = { id:uid(), doc:d, role:s.role, label:s.label, sec:s.sec, blockId:s.block && s.block.id,
+                ctrl:new AbortController(), started:Date.now(), note:"" };
+  run.jobs.add(job);
+  const trace = await traceOf(d.id);
+  const rec = { id:job.id, docId:d.id, role:s.role, label:s.label, sec:s.sec, blockId:job.blockId, started:job.started,
+                status:"running", system:s.system, user:s.user, output:"", events:[] };
+  trace.push(rec); saveTrace(d.id);
+  const live = s.block ? liveInto(d, s.block) : null;
+  deskRender();
+  try{
+    const out = await askJSON(s.system, s.user, s.role, {
+      signal: job.ctrl.signal,
+      onDelta: soFar => { rec.output = soFar; if(live) live(soFar); rawLive(rec); },
+      onEvent: ev => {
+        rec.events.push({ t:Date.now(), ...ev });
+        if(ev.kind === "start") rec.model = ev.model;
+        if(ev.kind === "tool") job.note = toolNote(ev);
+        if(ev.kind === "result") job.note = ev.ok ? job.note : "tool failed, trying another way";
+        if(ev.kind === "retry"){ rec.output = ""; job.note = "answer didn't parse, asking again"; }
+        deskRender(); rawLive(rec);
+      }
+    });
+    rec.output = out.raws[out.raws.length - 1] || rec.output;
+    rec.status = "ok";
+    return out;
+  }catch(e){
+    rec.status = e.stopped ? "stopped" : "error";
+    rec.error = e.message;
+    if(e.partial) rec.output = e.partial;
+    if(!e.stopped) issue(d, cap(s.label || "a call") + " failed: " + e.message, rec);
+    throw e;
+  }finally{
+    rec.ended = Date.now(); saveTrace(d.id);
+    run.jobs.delete(job); deskRender(); rawLive(rec);
+  }
+}
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+function toolNote(ev){
+  const i = ev.input || {};
+  if(ev.name === "WebSearch") return "searching “" + (i.query || "") + "”";
+  if(ev.name === "WebFetch") return "reading " + host(i.url);
+  if(/look_at_image$/.test(ev.name)) return "looking at " + host(i.url);
+  return ev.name;
+}
+
+/* ══ issues ═══════════════════════════════════════════════════
+   Everything that went wrong this session, newest first, on the desk.
+   Each one also lives on in its block's error and in the trace.      */
+const issues = [];
+function issue(d, msg, rec){
+  issues.unshift({ id:uid(), ts:Date.now(), docId:d.id, title:d.title, msg, rec });
+  if(issues.length > 8) issues.pop();
+  toast(msg, { err:true, raw: rec && rec.output });
+  deskRender();
+}
+
+/* ══ the desk ═════════════════════════════════════════════════
+   A small card that lists every agent at work, grouped by document, with
+   what each is doing right now, and the recent issues. Hidden when idle. */
+let deskT = 0, deskMin = false, shelfSig = null;
+function deskRender(){
+  if(deskT) return;
+  deskT = requestAnimationFrame(() => { deskT = 0; deskPaint(); statusPaint(); paintHeader(); if(route === "cover") renderLibrary(); });
+}
+function deskPaint(){
+  const jobs = allJobs();
+  desk.hidden = !jobs.length && !issues.length;
+  if(desk.hidden) return;
+  desk.classList.toggle("min", deskMin);
+  deskHead.querySelector(".lab").textContent =
+    jobs.length ? (jobs.length === 1 ? "One agent working" : jobs.length + " agents working")
+                : (issues.length === 1 ? "One issue" : issues.length + " issues");
+  deskHead.querySelector(".tog").textContent = deskMin ? "show" : "hide";
+
+  const groups = new Map();
+  jobs.forEach(j => { if(!groups.has(j.doc)) groups.set(j.doc, []); groups.get(j.doc).push(j); });
+  deskJobs.replaceChildren();
+  groups.forEach((list, d) => {
+    const g = el("li", "grp");
+    g.append(el("span", null, d === doc && route === "doc" ? "this primer" : d.title));
+    if(d !== doc || route !== "doc") g.append(btn("open", "open", () => openDoc(d.id)));
+    g.append(btn("stop", "stop", () => stopRun(d)));
+    deskJobs.append(g);
+    list.forEach(j => {
+      const li = el("li");
+      li.append(el("i", "dot"), el("span", "what", j.label));
+      if(j.note) li.append(el("span", "note", j.note));
+      deskJobs.append(li);
+    });
+  });
+  deskIssues.hidden = !issues.length;
+  deskIssues.replaceChildren(...issues.map(x => {
+    const li = el("li");
+    const m = el("span", "msg", (x.docId !== (doc && doc.id) ? x.title + ": " : "") + x.msg);
+    m.title = timeAgo(x.ts);
+    li.append(m);
+    if(x.rec) li.append(btn(null, "raw", () => openRaw(x.docId, x.rec.id)));
+    li.append(btn(null, "dismiss", () => { const i = issues.indexOf(x); if(i > -1) issues.splice(i, 1); deskRender(); }));
+    return li;
+  }));
+}
+deskHead.onclick = () => { deskMin = !deskMin; deskPaint(); };
+if(matchMedia("(max-width:700px)").matches) deskMin = true;
+
 /* ══ render ═══════════════════════════════════════════════════ */
 function render(){
   document.body.dataset.route = route;
-  undoBtn.classList.toggle("hide", !(route==="doc" && undoStack.length));
-  promptsBtn.classList.toggle("on", route==="prompts");
   closePops(); hideTools();
   if(route === "prompts") renderPrompts();
+  else if(route === "settings") renderSettings();
+  else if(route === "raw") renderRaw();
   else if(route === "doc" && doc) renderDoc();
   else { route = "cover"; document.body.dataset.route = route; renderCover(); }
+  paintHeader();
   updateRunhead();
 }
+function paintHeader(){
+  undoBtn.classList.toggle("hide", !(route === "doc" && undoStack.length));
+  const busy = route === "doc" && doc && running(doc);
+  stopBtn.classList.toggle("hide", !busy);
+  rewriteBtn.classList.toggle("hide", !(route === "doc" && doc && !busy && doc.blocks.some(b => b.md && b.kind !== "heading")));
+  menuBtn.classList.toggle("on", route === "prompts" || route === "settings" || route === "raw");
+}
+/* Redraw or patch only when the document is the one on screen. */
+function rerender(d){ if(doc === d && route === "doc") render(); }
 
 /* ── cover: composer + library ────────────── */
 function renderCover(){
   const c = el("section", "cover");
-  c.innerHTML = `<h1 class="masthead">Primer<i>.</i></h1>
+  c.innerHTML = `<header class="cover-head">${LOGO}<h1 class="masthead">Primer<i>.</i></h1></header>
+    <div class="spread">
+    <div class="page">
     <form class="composer" id="composer">
       <label class="lab" for="cTopic">Topic</label>
       <textarea id="cTopic" class="topic" rows="1" autocomplete="off"></textarea>
       <label class="lab" for="cKnown">Already know</label>
       <textarea id="cKnown" class="known" rows="1"></textarea>
+      <label class="lab" for="cInstr">Instructions</label>
+      <textarea id="cInstr" class="known" rows="1" placeholder="Optional. How it should be written: shorter, deeper, no pictures…"></textarea>
+      <div class="chips" id="cChips"></div>
       <div class="composer-foot"><button class="go" type="submit">Write it</button></div>
     </form>
-    <section class="library" id="library"></section>`;
+    </div>
+    <div class="gutter" aria-hidden="true"></div>
+    <div class="page"><section class="library" id="library"></section></div>
+    </div>`;
   main.replaceChildren(c);
 
-  const form = $("#composer"), topic = $("#cTopic"), known = $("#cKnown");
-  topic.oninput = () => grow(topic);
-  known.oninput = () => grow(known);
+  const form = $("#composer"), topic = $("#cTopic"), known = $("#cKnown"), instr = $("#cInstr");
+  const fields = [topic, known, instr];
+  fields.forEach(f => { f.oninput = () => grow(f); });
   topic.onkeydown = e => { if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); form.requestSubmit(); } };
-  known.onkeydown = e => { if(e.key==="Enter" && (e.metaKey||e.ctrlKey)){ e.preventDefault(); form.requestSubmit(); } };
+  [known, instr].forEach(f => {
+    f.onkeydown = e => { if(e.key==="Enter" && (e.metaKey||e.ctrlKey)){ e.preventDefault(); form.requestSubmit(); } };
+  });
+
+  /* A chip appends its instruction, so several can be combined, and clicking
+     one again takes it back off. */
+  const chips = $("#cChips");
+  BRIEFS.forEach(p => {
+    const b = btn("chip", p.label, () => {
+      const has = instr.value.includes(p.text);
+      const rest = instr.value.split(/\n+/).map(s => s.trim()).filter(s => s && s !== p.text);
+      instr.value = (has ? rest : rest.concat(p.text)).join("\n");
+      instr.dispatchEvent(new Event("input"));
+      instr.focus();
+    });
+    b.dataset.text = p.text; b.title = p.text;
+    chips.append(b);
+  });
+  instr.addEventListener("input", () =>
+    chips.querySelectorAll(".chip").forEach(c => c.classList.toggle("on", instr.value.includes(c.dataset.text))));
+
   form.onsubmit = e => {
     e.preventDefault();
     const t = topic.value.trim(); if(!t){ topic.focus(); return; }
-    const k = known.value.trim();
-    undoStack = []; route = "doc";
-    build(t, k);
-    scrollTo(0, 0);
+    startDoc({ topic:t, known:known.value.trim(), instruction:instr.value.trim() });
   };
+  shelfSig = null;
   renderLibrary();
-  requestAnimationFrame(() => { grow(topic); grow(known); });
+  requestAnimationFrame(() => fields.forEach(grow));
 }
 
+/* What the library says about a document: nothing when it is finished,
+   otherwise where it is, live if it is being written right now. */
+function shelfState(it){
+  const d = docs.get(it.id);
+  if(d && running(d)) return { live:true, text: docState(d).text };
+  if(d) { const st = docState(d); return st.kind === "done" ? null : { failed: st.kind === "failed", text: st.kind === "short" ? st.text : st.text.split(",")[0] }; }
+  const s = it.status || "done";
+  if(s === "done") return it.short ? { text: it.short === 1 ? "one piece missing" : it.short + " pieces missing" } : null;
+  if(s === "failed") return { failed:true, text:"failed" };
+  return { text: s === "stopped" ? "stopped" : "unfinished" };
+}
 function renderLibrary(){
   const lib = $("#library");
   if(!lib) return;
-  if(!index.length){ lib.replaceChildren(); return; }
+  const states = index.map(it => { const s = shelfState(it); return s ? (s.live ? "·" : "") + s.text : ""; });
+  const sig = index.map((it, i) => it.id + it.title + states[i]).join("|");
+  if(sig === shelfSig) return;
+  shelfSig = sig;
+  if(!index.length){
+    lib.replaceChildren(el("h2", "lab", "Library"), el("p", "empty", "Nothing on the shelf yet. What you write is kept here."));
+    return;
+  }
   const list = el("ol", "shelf");
-  index.forEach(it => {
+  index.forEach((it, i) => {
     const li = el("li");
-    const open = el("button", "open"); open.type = "button";
-    open.append(el("span", null, it.title), el("time", null, shortDate(it.updated)));
-    open.onclick = () => openDoc(it.id);
-    const x = el("button", "x", "Delete"); x.type = "button";
-    x.onclick = () => confirmRow(li, it.title, () => deleteDoc(it.id), () => { li.replaceChildren(open, x); });
+    const open = btn("open", null, () => openDoc(it.id));
+    open.append(el("span", null, it.title));
+    const s = shelfState(it);
+    if(s){ const st = el("span", "state" + (s.live ? " live" : "") + (s.failed ? " failed" : ""), s.text); open.append(st); }
+    open.append(el("time", null, shortDate(it.updated)));
+    let x;
+    if(s && s.live) x = btn("x stop", "Stop", () => stopRun(docs.get(it.id)));
+    else{
+      x = btn("x", "Delete");
+      x.onclick = () => confirmRow(li, it.title, () => deleteDoc(it.id), () => { li.replaceChildren(open, x); });
+    }
     li.append(open, x);
     list.appendChild(li);
   });
@@ -860,8 +1399,8 @@ function renderLibrary(){
 }
 function confirmRow(host, title, yes, no){
   const c = el("div", "confirm");
-  const y = el("button", "danger", "Delete"); y.type = "button"; y.onclick = yes;
-  const n = el("button", null, "Keep"); n.type = "button"; n.onclick = no;
+  const y = btn("danger", "Delete", yes);
+  const n = btn(null, "Keep", no);
   c.append(el("span", null, "Delete “"+title+"”?"), y, n);
   host.replaceChildren(c);
   n.focus();
@@ -870,15 +1409,25 @@ function confirmRow(host, title, yes, no){
 /* ── document ─────────────────────────────── */
 function renderDoc(){
   const a = el("article", "doc");
-  a.innerHTML = `<header class="doc-head"><h1 class="title"></h1>
-    <dl class="meta">
-      <dt>Asked for</dt><dd class="m-topic"></dd>
-      <dt class="m-kl">Already knew</dt><dd class="m-known"></dd>
-    </dl></header>`;
+  a.innerHTML = `<header class="doc-head"><h1 class="title"></h1><dl class="meta"></dl></header>`;
   a.querySelector(".title").textContent = doc.title;
-  a.querySelector(".m-topic").textContent = doc.topic || doc.title;
-  if(doc.known) a.querySelector(".m-known").textContent = doc.known;
-  else { a.querySelector(".m-kl").remove(); a.querySelector(".m-known").remove(); }
+  const meta = a.querySelector(".meta");
+  const row = (k, v, cls) => {
+    const dt = el("dt", null, k), dd = el("dd", cls);
+    if(typeof v === "string") dd.textContent = v; else dd.append(v);
+    meta.append(dt, dd);
+    return dd;
+  };
+  row("Asked for", doc.topic || doc.title);
+  if(doc.known) row("Already knew", doc.known);
+  if(doc.instruction) row("Asked to", doc.instruction);
+  if(doc.rewrite){
+    const v = el("span");
+    v.append(btn("link", doc.rewrite.ofTitle, () => openDoc(doc.rewrite.of)), " · “" + doc.rewrite.instruction + "”");
+    row("Rewrite of", v);
+  }
+  row("Status", statusNode(doc), "m-status");
+  a.querySelector(".doc-head").append(tocNode(doc));
 
   let n = 0, fi = 0;
   doc.blocks.forEach(b => {
@@ -892,12 +1441,92 @@ function renderDoc(){
   typeset(a);
   layoutSidenotes();
   rehighlight();
+  statusPaint();
 }
 function rehighlight(){
   const b = doc && doc.blocks.find(x => x.busy && x.hl);
   if(!b) return;
   const e = main.querySelector(`[data-block-id="${b.id}"] .body`);
   if(e) highlightIn(e, b.hl);
+}
+
+/* A piece that was asked for and never arrived: a section that was not
+   written, a diagram never drawn, an image never found. Each one keeps its
+   brief, so each can be filled in on its own. */
+const unfilled = b => !b.md && !b.src && (b.slot || ((b.kind === "figure" || b.kind === "image") && b.brief));
+const gaps = d => d.blocks.filter(unfilled);
+
+/* Where a document stands: {kind:"busy"|"stopped"|"failed"|"short"|"done", text}. */
+function docState(d){
+  const secs = d.blocks.filter(b => b.kind === "heading").length;
+  if(running(d)){
+    const jobs = [...runOf(d).jobs];
+    const w = jobs.find(j => j.role === "section") || jobs.find(j => j.role === "research") || jobs[0];
+    let text = !w ? (d.status === "researching" ? "checking sources" : "working")
+             : w.role === "section" || w.role === "research" ? w.label + " of " + secs
+             : w.label;
+    if(jobs.length > 1) text += ", and " + (jobs.length - 1) + " more";
+    return { kind:"busy", text };
+  }
+  if(d.status === "failed") return { kind:"failed", text:"failed" + (d.statusNote ? ": " + d.statusNote : "") };
+  if(d.status && d.status !== "done"){
+    const written = new Set(d.blocks.filter(b => b.sec != null && b.kind !== "heading" && (b.md || b.src)).map(b => b.sec)).size;
+    const why = d.status === "stopped" ? "stopped" : "interrupted";
+    return { kind:"stopped", text: why + (written ? " after §" + written + " of " + secs : secs ? " before §1" : "") + (d.statusNote ? ", " + d.statusNote : "") };
+  }
+  /* Finished, but something it asked for never arrived. Say so: the block
+     itself carries the error, and this is what makes it findable. */
+  const n = gaps(d).length;
+  if(n) return { kind:"short", text: n === 1 ? "one piece missing" : n + " pieces missing" };
+  return { kind:"done", text:"" };
+}
+function statusNode(d){
+  const s = docState(d), span = el("span");
+  if(s.kind === "busy"){ span.append(el("i", "dot"), s.text, btn("lnk", "Stop", () => stopRun(d))); }
+  else if(s.kind === "stopped"){ span.append(s.text, btn("lnk", "Resume", () => resume(d))); }
+  else if(s.kind === "failed"){ span.append(s.text, btn("lnk", "Retry", () => resume(d))); }
+  else if(s.kind === "short"){ span.append(s.text, btn("lnk", "Fill in", () => resume(d))); }
+  return span;
+}
+/* Refresh the status row of the document on screen without a full redraw. */
+function statusPaint(){
+  if(route !== "doc" || !doc) return;
+  const dd = main.querySelector(".m-status");
+  if(!dd) return;
+  const done = docState(doc).kind === "done";
+  dd.hidden = done; dd.previousElementSibling.hidden = done;
+  dd.classList.toggle("failed", docState(doc).kind === "failed");
+  dd.replaceChildren(statusNode(doc));
+}
+
+/* A short table of contents under the title: one line per section,
+   greyed until that section has been written. */
+function tocNode(d){
+  const nav = el("nav", "toc"); nav.setAttribute("aria-label", "Contents");
+  const hs = d.blocks.filter(b => b.kind === "heading");
+  if(hs.length < 2){ nav.hidden = true; return nav; }
+  nav.append(el("span", "lab", "Contents"));
+  const ol = el("ol");
+  hs.forEach((h, i) => {
+    const li = el("li");
+    const written = d.blocks.some(b => b.sec === h.sec && b.kind !== "heading" && (b.md || b.src));
+    if(!written) li.classList.add("todo");
+    const b = btn(null, null, () => { const e = main.querySelector(`[data-block-id="${h.id}"]`); if(e) e.scrollIntoView({ behavior:"smooth", block:"start" }); });
+    b.append(el("span", "n", String(i+1)), headingTitle(h));
+    li.append(b); ol.append(li);
+  });
+  nav.append(ol);
+  return nav;
+}
+
+/* The word in the margin while a block is being made. */
+function statusWord(b){
+  if(b.busy) return word(ACTIONS[b.busy] || { label:"revising" });
+  if(b.status) return b.status;
+  if(b.plan) return "planning";
+  if(b.kind === "figure") return "drawing";
+  if(b.kind === "image") return "finding";
+  return "writing";
 }
 
 function blockEl(b, n){
@@ -914,23 +1543,28 @@ function blockEl(b, n){
     e.appendChild(el("span", "marg num", "§ " + (n || "")));
   }
   if(b.queued) e.classList.add("queued");
-  if((b.pending && !b.queued) || b.busy){
+  if((b.pending && !b.queued) || b.busy || b.status){
     const s = el("span", "marg status");
     s.appendChild(el("i", "dot"));
-    s.append(b.busy ? word(ACTIONS[b.busy] || {label:"revising"}) : (b.plan ? "planning" : (b.kind==="figure" ? "drawing" : "writing")));
+    s.append(statusWord(b));
     e.appendChild(s);
   }else if(b.edit && b.kind !== "note"){
-    const m = el("button", "marg mark", word(b.edit));
-    m.type = "button";
+    const m = btn("marg mark", word(b.edit));
     m.setAttribute("aria-label", b.edit.label + ", revision");
-    m.onclick = ev => { ev.stopPropagation(); showProv(m, b); };
+    m.onclick = ev => { ev.stopPropagation(); showPop(m, provNodes(b)); };
+    if(b.edit.by === "research") hoverable(m, () => provNodes(b));
+    e.appendChild(m);
+  }else if(b.kind === "image" && b.src && !b.error){
+    const m = btn("marg mark quiet", "found");
+    m.setAttribute("aria-label", "Image source");
+    m.onclick = ev => { ev.stopPropagation(); showPop(m, sourceNodes(b)); };
+    hoverable(m, () => sourceNodes(b));
     e.appendChild(m);
   }
   if(b.kind === "note"){
-    const q = el("button", "side-q");
-    q.type = "button";
+    const q = btn("side-q");
     q.textContent = b.edit ? "“" + (b.edit.note || b.edit.quote) + "”" : "";
-    q.onclick = ev => { ev.stopPropagation(); if(b.edit) showProv(q, b); };
+    q.onclick = ev => { ev.stopPropagation(); if(b.edit) showPop(q, provNodes(b)); };
     e.appendChild(q);
   }
 
@@ -939,13 +1573,7 @@ function blockEl(b, n){
     /* ruled lines, waiting; the raw output so far once any has arrived */
     if(b.live) body.appendChild(el("pre", "live", liveTail(b.live)));
   }else if(b.error){
-    const x = el("div", "err", b.error);
-    const r = el("button", null, "Retry"); r.type = "button";
-    r.onclick = () => b.retry && b.retry();
-    x.appendChild(r);
-    if(b.remove){ const rm = el("button", null, "Remove"); rm.type = "button"; rm.onclick = () => b.remove(); x.appendChild(rm); }
-    if(b.raw){ const rw = el("button", null, "Raw"); rw.type = "button"; rw.onclick = () => showRaw(b.raw); x.appendChild(rw); }
-    body.appendChild(x);
+    body.appendChild(errNode(b));
   }else if(b.kind === "figure"){
     const fig = el("figure");
     fig.innerHTML = String(b.md).replace(/<script[\s\S]*?<\/script>/gi,"");
@@ -955,37 +1583,93 @@ function blockEl(b, n){
       fig.appendChild(fc);
     }
     body.appendChild(fig);
+  }else if(b.kind === "image"){
+    body.appendChild(imageNode(b));
   }else{
     body.innerHTML = mdToHtml(b.md);
+    if(b.cites && b.cites.length) addCites(body, b.cites);
   }
   e.appendChild(body);
+  if(b.kind === "heading" && b.fail){
+    const x = el("div", "err", b.fail);
+    x.appendChild(btn(null, "Retry", () => researchSection(doc, b.sec)));
+    e.appendChild(x);
+  }
   return e;
+}
+function errNode(b){
+  const x = el("div", "err" + (b.stopped ? " soft" : ""), b.error);
+  if(b.retry) x.appendChild(btn(null, "Retry", () => b.retry()));
+  if(b.remove) x.appendChild(btn(null, "Remove", () => b.remove()));
+  if(b.raw) x.appendChild(btn(null, "Raw", () => showRaw(b.raw)));
+  return x;
+}
+function imageNode(b){
+  const fig = el("figure");
+  const img = el("img");
+  img.src = b.src; img.alt = b.title || b.caption || ""; img.loading = "lazy";
+  img.onerror = () => {
+    const d = doc;
+    fig.replaceChildren(errNode({ error:"The image file is missing.", retry:() => retryVisual(d, b), remove:() => { swapBlock(d, b.id, []); save(d); } }));
+  };
+  fig.appendChild(img);
+  const fc = el("figcaption");
+  if(b.caption) fc.innerHTML = mdInline(b.caption);
+  if(b.credit || b.page){
+    const c = el("span", "credit");
+    if(b.page){ const a = el("a", null, b.credit || host(b.page)); a.href = b.page; a.target = "_blank"; a.rel = "noopener"; c.appendChild(a); }
+    else c.textContent = b.credit;
+    fc.appendChild(c);
+  }
+  if(fc.childNodes.length) fig.appendChild(fc);
+  hoverable(fig, () => sourceNodes(b));
+  return fig;
+}
+/* A small numeral after each cited claim; hover it for the source. */
+function addCites(body, cites){
+  cites.forEach((c, k) => {
+    const sup = el("sup", "cite");
+    const a = el("a", null, String(k+1)); a.href = c.url; a.target = "_blank"; a.rel = "noopener";
+    a.setAttribute("aria-label", "Source " + (k+1) + (c.title ? ": " + c.title : ""));
+    sup.appendChild(a);
+    hoverable(sup, () => citeNodes(c, k+1));
+    const r = c.claim && (locate(body, c.claim) || locate(body, c.claim.replace(/[*_`]/g, "")));
+    if(r){ r.collapse(false); r.insertNode(sup); }
+    else (body.lastElementChild || body).appendChild(sup);
+  });
 }
 
 function colophon(){
   const c = el("footer", "colophon");
   const secs = doc.blocks.filter(b => b.kind==="heading").length;
-  const revs = doc.blocks.filter(b => b.edit).length;
+  const revs = doc.blocks.filter(b => b.edit && b.edit.by !== "research").length;
+  const cites = doc.blocks.reduce((n, b) => n + (b.cites ? b.cites.length : 0), 0);
+  const fixes = doc.blocks.filter(b => b.edit && b.edit.by === "research").length;
   const stats = [secs + (secs===1 ? " section" : " sections")];
   if(revs) stats.push(revs + (revs===1 ? " revision" : " revisions"));
+  if(cites) stats.push(cites + (cites===1 ? " source" : " sources"));
+  if(fixes) stats.push(fixes + (fixes===1 ? " correction" : " corrections"));
   c.appendChild(el("span", "fill", stats.join(" · ")));
-  const ex = el("button", null, "Export"); ex.type = "button"; ex.onclick = exportDoc;
-  const del = el("button", null, "Delete"); del.type = "button";
+  const d = doc;
+  c.append(btn(null, doc.researched ? "Research again" : "Research", () => researchAll(d)));
+  c.append(btn(null, "Export", exportDoc));
+  const del = btn(null, "Delete");
   del.onclick = () => {
     const wrap = el("span", "confirm");
-    const y = el("button", "danger", "Delete"); y.type = "button"; y.onclick = () => deleteDoc(doc.id);
-    const k = el("button", null, "Keep"); k.type = "button"; k.onclick = () => wrap.replaceWith(del);
+    const y = btn("danger", "Delete", () => deleteDoc(d.id));
+    const k = btn(null, "Keep", () => wrap.replaceWith(del));
     wrap.append(y, k); del.replaceWith(wrap); k.focus();
   };
-  c.append(ex, del);
+  c.append(del);
   return c;
 }
 
-function patch(b){
+function patch(d, b){
+  if(doc !== d || route !== "doc") return;
   const old = main.querySelector(`[data-block-id="${b.id}"]`);
   if(!old) return render();
   let n = 0;
-  for(const x of doc.blocks){ if(x.kind==="heading") n++; if(x.id===b.id) break; }
+  for(const x of d.blocks){ if(x.kind==="heading") n++; if(x.id===b.id) break; }
   const fresh = blockEl(b, n);
   old.replaceWith(fresh);
   typeset(fresh);
@@ -1018,74 +1702,84 @@ let rsT = null;
 addEventListener("resize", () => { cancelAnimationFrame(rsT); rsT = requestAnimationFrame(layoutSidenotes); });
 if(document.fonts && document.fonts.ready) document.fonts.ready.then(layoutSidenotes);
 
-/* ══ persistence ══════════════════════════════════════════════ */
-let saveT = null;
-function save(){
-  if(!doc) return;
-  clearTimeout(saveT);
-  saveT = setTimeout(async () => {
-    const clean = { ...doc, blocks: doc.blocks.map(({busy,hl,pending,queued,error,retry,remove,fresh,plan,draw,live,...r}) => r) };
-    await store.set("primer:doc:"+doc.id, clean);
-    const i = index.findIndex(x => x.id===doc.id);
-    const entry = { id:doc.id, title:doc.title, updated:Date.now() };
-    if(i>-1) index[i] = entry; else index.unshift(entry);
-    await store.set("primer:index", index);
-    if(route === "cover") renderLibrary();
-  }, 400);
+/* ══ persistence ══════════════════════════════════════════════
+   A document is saved the moment it is created, and after every change,
+   so nothing that was asked for can vanish: a primer stopped, or closed,
+   mid-way is in the library with its state, and can be resumed.       */
+const TRANSIENT = ["busy","hl","pending","queued","error","stopped","retry","remove","fresh","plan","draw","find","live","status","raw"];
+function cleanBlock(b){ const r = { ...b }; TRANSIENT.forEach(k => delete r[k]); return r; }
+const saveT = new Map();
+async function persist(d){
+  await store.set("primer:doc:"+d.id, { ...d, blocks: d.blocks.map(cleanBlock) });
+  const i = index.findIndex(x => x.id===d.id);
+  const entry = { id:d.id, title:d.title, updated:Date.now(), status:d.status || "done", short:gaps(d).length };
+  if(i>-1) index[i] = entry; else index.unshift(entry);
+  await store.set("primer:index", index);
+  if(route === "cover") renderLibrary();
+}
+function save(d, now){
+  d = d || doc; if(!d) return;
+  clearTimeout(saveT.get(d.id));
+  if(now) return persist(d);
+  saveT.set(d.id, setTimeout(() => persist(d), 400));
+}
+async function loadDoc(id){
+  if(docs.has(id)) return docs.get(id);
+  const d = await store.get("primer:doc:"+id);
+  if(!d) return null;
+  docs.set(id, d);
+  resumable(d);
+  return d;
 }
 async function openDoc(id){
-  const d = await store.get("primer:doc:"+id);
+  const d = await loadDoc(id);
   if(!d) return;
   doc = d; undoStack = []; route = "doc";
-  resumable();
   render();
   scrollTo(0, 0);
 }
 
-/* A section that never landed, or a diagram that was never drawn, comes back
-   from storage as an empty block. Give it its error, its raw text, its Retry. */
-function resumable(){
-  doc.blocks.forEach(b => {
-    if(b.md || b.error) return;
+/* A document back from storage: give every unfinished piece its error,
+   its Retry, and a state the status row can explain. */
+function resumable(d){
+  if(!d.blocks.some(b => b.kind === "heading")){
+    d.blocks = [{ id:uid(), kind:"prose", md:"", stopped: d.status !== "failed", retry:() => build(d),
+      error: d.status === "failed" ? "Couldn't plan this explainer." + (d.statusNote ? " " + d.statusNote : "") : "The outline was never planned." }];
+  }
+  d.blocks.forEach(b => {
+    if(b.md || b.src || b.error) return;
     if(b.slot){
-      b.error = "Section " + (b.sec+1) + " wasn't written.";
-      b.retry = () => retrySection(b.sec);
-    }else if(b.kind === "figure" && b.brief){
-      b.error = "Diagram wasn't drawn.";
-      b.retry = () => retryFigure(b);
-      b.remove = () => { swapBlock(b.id, []); save(); };
+      b.error = "Section " + (b.sec+1) + " wasn't written."; b.stopped = true;
+      b.retry = () => retrySection(d, b.sec);
+    }else if((b.kind === "figure" || b.kind === "image") && b.brief){
+      b.error = b.kind === "figure" ? "Diagram wasn't drawn." : "Image wasn't found."; b.stopped = true;
+      b.retry = () => retryVisual(d, b);
+      b.remove = () => { swapBlock(d, b.id, []); save(d); };
     }
   });
+  if(d.status === "planning" || d.status === "writing" || d.status === "researching"){
+    d.status = "stopped"; d.statusNote = "the page was closed";
+  }
 }
-/* What genSection / genFigure need, derived from the document itself. */
-function docContext(){
-  const titles = doc.blocks.filter(b => b.kind==="heading").map(b => b.md.replace(/^#+\s*/,""));
-  return { titles, outline: titles.map((s,i) => (i+1)+". "+s).join("\n"), reader: readerText(doc.known) };
-}
-function retrySection(i){
-  const { titles, outline, reader } = docContext();
-  const at = doc.blocks.findIndex(b => b.slot && b.sec===i);
-  if(at < 0) return;
-  doc.blocks.splice(at, 1, { id:uid(), kind:"prose", md:"", sec:i, slot:true, pending:true });
-  if(route === "doc") render();
-  genSection(i, titles[i] || "", outline, reader);
-}
-function retryFigure(b){
-  const { titles, outline, reader } = docContext();
-  const p = { id:uid(), kind:"figure", md:"", sec:b.sec, brief:b.brief, pending:true, draw:true };
-  swapBlock(b.id, [p]);
-  drawLater(p, titles[b.sec] || "", outline, reader);
+/* What the writers need, derived from the document itself. */
+function docContext(d){
+  const titles = d.blocks.filter(b => b.kind==="heading").map(headingTitle);
+  return { titles, outline: titles.map((s,i) => (i+1)+". "+s).join("\n"), reader: readerText(d.known) };
 }
 async function deleteDoc(id){
+  const d = docs.get(id);
+  if(d) stopRun(d);
   index = index.filter(x => x.id !== id);
   await store.set("primer:index", index);
   await store.del("primer:doc:"+id);
+  await store.del("primer:raw:"+id);
+  docs.delete(id); traces.delete(id); runs.delete(id);
+  shelfSig = null;
   if(doc && doc.id === id){ doc = null; undoStack = []; route = "cover"; render(); scrollTo(0,0); }
   else renderLibrary();
 }
 function snapshot(){
-  undoStack.push(JSON.parse(JSON.stringify(
-    doc.blocks.map(({busy,hl,pending,queued,error,retry,remove,fresh,plan,draw,live,...r}) => r))));
+  undoStack.push(JSON.parse(JSON.stringify(doc.blocks.map(cleanBlock))));
   if(undoStack.length > 30) undoStack.shift();
   undoBtn.classList.remove("hide");
 }
@@ -1102,14 +1796,14 @@ function doUndo(){
    it; DOM updates are batched per frame and stop once the block is gone. */
 const LIVE_TAIL = 1400;
 function liveTail(s){ return s.length > LIVE_TAIL ? "…" + s.slice(-LIVE_TAIL) : s; }
-function liveInto(b){
+function liveInto(d, b){
   let t = 0;
   return soFar => {
     b.live = soFar;
     if(t) return;
     t = requestAnimationFrame(() => {
       t = 0;
-      if(route !== "doc" || !doc || !doc.blocks.includes(b)) return;
+      if(route !== "doc" || doc !== d || !d.blocks.includes(b)) return;
       const body = main.querySelector(`[data-block-id="${b.id}"] .body`);
       if(!body) return;
       let pre = body.querySelector(".live");
@@ -1119,144 +1813,332 @@ function liveInto(b){
   };
 }
 
-async function build(topic, known){
-  const reader = readerText(known);
-  doc = { id:uid(), title:topic, topic, known:known||"", created:Date.now(), blocks:[
-    { id:uid(), kind:"prose", pending:true, plan:true, md:"" } ] };
-  render();
+/* A new document, on screen and in the library at once, then written. */
+function startDoc(o){
+  const d = { id:uid(), title:o.topic, topic:o.topic, known:o.known || "", instruction:o.instruction || "",
+              created:Date.now(), status:"planning", blocks:[] };
+  if(o.rewrite) d.rewrite = o.rewrite;
+  docs.set(d.id, d);
+  undoStack = []; doc = d; route = "doc";
+  build(d);
+  scrollTo(0, 0);
+  return d;
+}
 
+/* Plan the outline, lay out the sections, then write them. */
+async function build(d){
+  const run = runOf(d); run.cancelled = false; run.active = true;
+  d.status = "planning"; d.statusNote = "";
+  d.blocks = [{ id:uid(), kind:"prose", pending:true, plan:true, md:"" }];
+  rerender(d); save(d, true);
+
+  const reader = readerText(d.known), rw = d.rewrite;
   let plan;
   try{
-    plan = (await askJSON(sys("outline"), usr("outline_user", { READER: reader, TOPIC: topic }), "outline",
-      liveInto(doc.blocks[0]))).value;
+    plan = (await agent(d, { role:"outline", label:"planning", block:d.blocks[0],
+      system: sys(rw ? "rewrite_outline" : "outline"),
+      user: rw ? usr("rewrite_outline_user", { READER:reader, TOPIC:d.topic, INSTRUCTION:rw.instruction, SOURCE:rw.source })
+               : usr("outline_user", { READER:reader, TOPIC:d.topic, INSTRUCTION:instrText(d) }) })).value;
+    if(!plan || !Array.isArray(plan.sections) || !plan.sections.length) throw new Error("The outline came back empty.");
   }catch(e){
-    doc.blocks = [{ id:uid(), kind:"prose", md:"", error:"Couldn't plan this explainer. "+e.message,
-      raw: rawOf(e), retry:()=>build(topic,known) }];
-    return render();
+    d.status = e.stopped ? "stopped" : "failed"; d.statusNote = e.stopped ? "" : e.message;
+    d.blocks = [{ id:uid(), kind:"prose", md:"", stopped:!!e.stopped, raw:rawOf(e), retry:() => build(d),
+      error: e.stopped ? "Stopped before the outline was planned." : "Couldn't plan this explainer. " + e.message }];
+    run.active = false;
+    rerender(d); save(d); tidyRun(d);
+    return;
   }
-  doc.title = plan.title || topic;
-
-  const sections = plan.sections || [];
-  const outline = sections.map((s,i)=>(i+1)+". "+s).join("\n");
-  doc.blocks = [];
-  sections.forEach((title,i) => {
-    doc.blocks.push({ id:uid(), kind:"heading", md:"## "+title, sec:i, fresh:true });
-    doc.blocks.push({ id:uid(), kind:"prose", pending:true, queued:true, md:"", sec:i, slot:true });
+  d.title = String(plan.title || d.topic);
+  d.blocks = [];
+  plan.sections.map(String).forEach((title, i) => {
+    d.blocks.push({ id:uid(), kind:"heading", md:"## "+title, sec:i, fresh:true });
+    d.blocks.push({ id:uid(), kind:"prose", pending:true, queued:true, md:"", sec:i, slot:true });
   });
-  render();
-  save();
+  d.status = "writing";
+  rerender(d); save(d);
+  await writeAll(d);
+}
 
-  /* Sections are written in order so each can build on the ones before it.
-     Diagrams are drawn on a side queue and overlap with the next section. */
-  const d = doc;
-  for(let i = 0; i < sections.length; i++){
-    if(doc !== d) return;
-    const slot = doc.blocks.find(b => b.slot && b.sec===i);
-    if(slot){ slot.queued = false; if(route === "doc") patch(slot); }
-    await genSection(i, sections[i], outline, reader);
+/* Resume after a stop, a failure, or a reload: plan if there is no outline,
+   otherwise write whatever is still unwritten. */
+function resume(d){
+  if(running(d)) return;
+  if(!d.blocks.some(b => b.kind === "heading")) return build(d);
+  return writeAll(d);
+}
+
+/* Sections are written in order so each can build on the ones before it.
+   Diagrams and images are made on a side queue and overlap with the next
+   section. Then the research agent checks the text, if it is turned on. */
+async function writeAll(d){
+  const run = runOf(d); run.cancelled = false; run.active = true;
+  const { titles, outline, reader } = docContext(d);
+  d.status = "writing"; d.statusNote = "";
+  save(d); deskRender();
+  for(let i = 0; i < titles.length; i++){
+    if(run.cancelled) break;
+    const slot = d.blocks.find(b => b.slot && b.sec===i);
+    if(!slot || slot.md) continue;
+    Object.assign(slot, { pending:true, queued:false, error:"", stopped:false, retry:null, raw:"", live:"" });
+    patch(d, slot);
+    await genSection(d, i, titles[i], outline, reader);
   }
-  save();
+  if(!run.cancelled){
+    d.blocks.filter(b => (b.kind==="figure" || b.kind==="image") && b.brief && !b.md && !b.src && !b.pending)
+      .forEach(b => retryVisual(d, b));
+  }
+  await finish(d);
+}
+async function finish(d){
+  const run = runOf(d);
+  if(!run.cancelled && setting("research") && !d.researched) await research(d);
+  await run.side;
+  if(run.cancelled){
+    d.blocks.filter(b => b.pending).forEach(b => markStopped(d, b));
+    d.status = "stopped";
+  }else d.status = "done";
+  d.statusNote = "";
+  run.active = false;
+  rerender(d); save(d); tidyRun(d);
+}
+/* A pending block whose call will never come: shown stopped, with Retry. */
+function markStopped(d, b){
+  b.pending = false; b.queued = false; b.stopped = true; b.live = "";
+  b.error = "Stopped.";
+  if(b.slot) b.retry = () => retrySection(d, b.sec);
+  else if(b.brief){ b.retry = () => retryVisual(d, b); b.remove = () => { swapBlock(d, b.id, []); save(d); }; }
+  else b.retry = () => build(d);
+  patch(d, b);
 }
 
 /* Everything already on the page before section i: headings, prose, and for
-   each diagram its brief, plus its caption once it has been drawn. */
-function priorText(i){
+   each diagram or image its brief, plus its caption once it exists. */
+function priorText(d, i){
   const parts = [];
-  for(const b of doc.blocks){
+  for(const b of d.blocks){
     if(b.sec == null || b.sec >= i) continue;
     if(b.kind === "heading" || b.kind === "prose" || b.kind === "note"){ if(b.md) parts.push(b.md); }
-    else if(b.kind === "figure" && (b.brief || b.caption)){
-      parts.push("[Diagram]" + (b.brief ? "\nBrief: " + b.brief : "") + (b.caption ? "\nCaption: " + b.caption : ""));
+    else if((b.kind === "figure" || b.kind === "image") && (b.brief || b.caption)){
+      parts.push((b.kind === "figure" ? "[Diagram]" : "[Image]") + (b.brief ? "\nBrief: " + b.brief : "") + (b.caption ? "\nCaption: " + b.caption : ""));
     }
   }
   return parts.join("\n\n");
 }
 
-async function genSection(i, title, outline, reader){
-  const user = usr("section_user", {
-    READER: reader, TITLE: doc.title, OUTLINE: outline, N: i+1, SECTION: title,
-    PRIOR: priorText(i) || "(none yet)" });
+async function genSection(d, i, title, outline, reader){
+  const slot = d.blocks.find(b => b.slot && b.sec===i);
+  if(!slot) return;
+  const vars = { READER:reader, TITLE:d.title, OUTLINE:outline, N:i+1, SECTION:title,
+                 PRIOR: priorText(d, i) || "(none yet)", INSTRUCTION: instrText(d) };
+  const user = d.rewrite ? usr("rewrite_section_user", { ...vars, INSTRUCTION:d.rewrite.instruction, SOURCE:d.rewrite.source })
+                         : usr("section_user", vars);
   try{
-    const slot = doc.blocks.find(b => b.slot && b.sec===i);
-    const { value:arr, raws } = await askJSON(sys("section"), user, "section", slot && liveInto(slot));
-    const made = (Array.isArray(arr)?arr:[])
-      .filter(x => x && (x.md || (x.kind==="figure" && x.brief)))
-      .map(x => x.kind==="figure" && x.brief
-        ? { id:uid(), kind:"figure", md:"", sec:i, brief:String(x.brief).trim(), pending:true, draw:true }
-        : { id:uid(), kind:"prose", md:x.md, sec:i, fresh:true });
+    const { value:arr, raws } = await agent(d, { role:"section", label:"writing §"+(i+1), sec:i, block:slot, system:sys("section"), user });
+    const made = (Array.isArray(arr) ? arr : [])
+      .filter(x => x && (x.md || ((x.kind==="figure" || x.kind==="image") && x.brief)))
+      .map(x => {
+        if(x.kind==="figure" && x.brief) return { id:uid(), kind:"figure", md:"", sec:i, brief:String(x.brief).trim(), pending:true, draw:true };
+        if(x.kind==="image"  && x.brief) return { id:uid(), kind:"image",  md:"", sec:i, brief:String(x.brief).trim(), pending:true, find:true };
+        return { id:uid(), kind:"prose", md:String(x.md), sec:i, fresh:true };
+      });
     if(!made.some(b => b.md)){ const e = new Error("Empty section."); e.raws = raws; throw e; }
-    replaceSlot(i, made);
-    save();
-    made.filter(b => b.draw).forEach(f => drawLater(f, title, outline, reader));
+    replaceSlot(d, i, made);
+    save(d);
+    made.filter(b => b.draw || b.find).forEach(b =>
+      sideLater(d, b, () => b.draw ? genFigure(d, b, title, outline, reader) : genImage(d, b, title)));
   }catch(e){
-    replaceSlot(i, [{ id:uid(), kind:"prose", md:"", sec:i, slot:true,
-      error:"Section "+(i+1)+" didn't come back. "+e.message, raw: rawOf(e),
-      retry:() => retrySection(i) }]);
-    save();
+    replaceSlot(d, i, [{ id:uid(), kind:"prose", md:"", sec:i, slot:true, stopped:!!e.stopped, raw:rawOf(e),
+      error: e.stopped ? "Stopped." : "Section "+(i+1)+" didn't come back. "+e.message,
+      retry:() => retrySection(d, i) }]);
+    save(d);
   }
 }
-function replaceSlot(i, blocks){
-  const at = doc.blocks.findIndex(b => b.slot && b.sec===i);
-  if(at<0) return;
-  doc.blocks.splice(at, 1, ...blocks);
-  if(route === "doc") render();
+function retrySection(d, i){
+  const { titles, outline, reader } = docContext(d);
+  const at = d.blocks.findIndex(b => b.slot && b.sec===i);
+  if(at < 0) return;
+  d.blocks.splice(at, 1, { id:uid(), kind:"prose", md:"", sec:i, slot:true, pending:true });
+  rerender(d);
+  runOf(d).cancelled = false;
+  genSection(d, i, titles[i] || "", outline, reader).then(() => { save(d); deskRender(); tidyRun(d); });
 }
-function swapBlock(id, blocks){
-  const at = doc.blocks.findIndex(b => b.id===id);
+function replaceSlot(d, i, blocks){
+  const at = d.blocks.findIndex(b => b.slot && b.sec===i);
   if(at<0) return;
-  doc.blocks.splice(at, 1, ...blocks);
-  if(route === "doc") render();
+  d.blocks.splice(at, 1, ...blocks);
+  rerender(d);
+}
+function swapBlock(d, id, blocks){
+  const at = d.blocks.findIndex(b => b.id===id);
+  if(at<0) return;
+  d.blocks.splice(at, 1, ...blocks);
+  rerender(d);
 }
 
-/* Diagrams are drawn one at a time, alongside the section being written. */
-let drawChain = Promise.resolve();
-function drawLater(f, sectionTitle, outline, reader){
-  drawChain = drawChain.then(() => genFigure(f, sectionTitle, outline, reader)).catch(() => {});
+/* Diagrams and images are made one at a time, alongside the section being
+   written. A stopped run marks what it never got to. */
+function sideLater(d, b, fn){
+  const run = runOf(d);
+  run.side = run.side.then(async () => {
+    if(run.cancelled){ markStopped(d, b); return; }
+    await fn();
+  }).catch(e => console.error(e));
+}
+function failedVisual(d, f, e){
+  const b = { id:uid(), kind:f.kind, md:"", sec:f.sec, brief:f.brief, stopped:!!e.stopped, raw:rawOf(e),
+    error: e.stopped ? "Stopped."
+         : (f.kind === "figure" ? "Diagram didn't come back. " : e.notFound ? "No suitable image was found. " : "The image search didn't come back. ") + e.message };
+  b.retry = () => retryVisual(d, b);
+  b.remove = () => { swapBlock(d, b.id, []); save(d); };
+  return b;
+}
+function retryVisual(d, b){
+  const { titles, outline, reader } = docContext(d);
+  const p = { id:uid(), kind:b.kind, md:"", sec:b.sec, brief:b.brief, pending:true };
+  p[b.kind === "figure" ? "draw" : "find"] = true;
+  swapBlock(d, b.id, [p]);
+  runOf(d).cancelled = false;
+  sideLater(d, p, () => (b.kind === "figure" ? genFigure(d, p, titles[b.sec] || "", outline, reader) : genImage(d, p, titles[b.sec] || ""))
+    .then(() => { deskRender(); tidyRun(d); }));
+}
+/* The section's prose on either side of a visual's slot. */
+function around(d, f){
+  const idx = d.blocks.findIndex(b => b.id===f.id);
+  const prose = b => b.kind==="prose" && b.md && b.sec===f.sec;
+  return { idx,
+    before: d.blocks.slice(0, idx).filter(prose).map(b=>b.md).join("\n\n"),
+    after:  d.blocks.slice(idx+1).filter(prose).map(b=>b.md).join("\n\n") };
 }
 
 /* A figure the section writer asked for, queued as soon as that section's
    prose has landed. The illustrator sees the brief, the outline, and the
    whole section's prose, split at the slot. */
-async function genFigure(f, sectionTitle, outline, reader){
-  const idx = doc.blocks.findIndex(b => b.id===f.id);
+async function genFigure(d, f, sectionTitle, outline, reader){
+  const { idx, before, after } = around(d, f);
   if(idx<0) return;
-  const prose = b => b.kind==="prose" && b.md && b.sec===f.sec;
-  const before = doc.blocks.slice(0, idx).filter(prose).map(b=>b.md).join("\n\n");
-  const after  = doc.blocks.slice(idx+1).filter(prose).map(b=>b.md).join("\n\n");
   const user = usr("figure_user", {
-    READER: reader, TITLE: doc.title, OUTLINE: outline, SECTION: sectionTitle,
+    READER: reader, TITLE: d.title, OUTLINE: outline, SECTION: sectionTitle,
     BEFORE: before || "(none)", AFTER: after || "(none)", BRIEF: f.brief
   });
   try{
-    const { value:out, raws } = await askJSON(sys("figure"), user, "figure", liveInto(f));
+    const { value:out, raws } = await agent(d, { role:"figure", label:"drawing §"+(f.sec+1), sec:f.sec, block:f, system:sys("figure"), user });
     const x = ((out && out.blocks)||[]).find(b => b && b.md);
     if(!x){ const e = new Error("Empty response."); e.raws = raws; throw e; }
     const made = { id:uid(), kind:"figure", md:x.md, sec:f.sec, brief:f.brief, fresh:true };
     if(x.caption) made.caption = String(x.caption).trim();
-    swapBlock(f.id, [made]);
-    save();
+    swapBlock(d, f.id, [made]);
+    save(d);
   }catch(e){
-    const eb = { id:uid(), kind:"figure", md:"", sec:f.sec, brief:f.brief,
-      error:"Diagram didn't come back. "+e.message, raw: rawOf(e) };
-    eb.retry = () => retryFigure(eb);
-    eb.remove = () => { swapBlock(eb.id, []); save(); };
-    swapBlock(f.id, [eb]);
-    save();
+    swapBlock(d, f.id, [failedVisual(d, f, e)]);
+    save(d);
   }
 }
 
+/* An image the section writer asked for. The finder searches the web,
+   looks at candidates until one passes, and answers with the one it chose;
+   the server then keeps a copy under media/ so the page never hotlinks. */
+async function genImage(d, f, sectionTitle){
+  const { idx, before, after } = around(d, f);
+  if(idx<0) return;
+  const user = usr("finder_user", { TITLE:d.title, SECTION:sectionTitle, BEFORE: before || "(none)", AFTER: after || "(none)", BRIEF:f.brief });
+  try{
+    const { value:out, raws } = await agent(d, { role:"finder", label:"finding image §"+(f.sec+1), sec:f.sec, block:f, system:sys("finder"), user });
+    if(!out || !out.found || !out.url){
+      const e = new Error(out && out.why ? String(out.why) : "Nothing suitable was found."); e.raws = raws; e.notFound = true; throw e;
+    }
+    const m = await saveMedia(String(out.url));
+    const made = { id:uid(), kind:"image", md:"", sec:f.sec, brief:f.brief, fresh:true, src:m.local, url:String(out.url),
+      page: out.page ? String(out.page) : "", title: out.title ? String(out.title).trim() : "",
+      credit: out.credit ? String(out.credit).trim() : "", caption: out.caption ? String(out.caption).trim() : "",
+      why: out.why ? String(out.why).trim() : "" };
+    swapBlock(d, f.id, [made]);
+    save(d);
+  }catch(e){
+    swapBlock(d, f.id, [failedVisual(d, f, e)]);
+    save(d);
+  }
+}
+async function saveMedia(url){
+  const r = await fetch("/api/media", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ url }) });
+  const j = await r.json().catch(() => ({}));
+  if(!r.ok || !j.local) throw new Error("Couldn't fetch the chosen image. " + (j.error && j.error.message || r.status));
+  return j;
+}
+
+/* ── research ─────────────────────────────── */
+/* After the whole primer is written, one agent per section checks the key
+   claims on the web. What it confirms gets a citation; what it refutes is
+   rewritten in place, marked "corrected" in the margin with the reason and
+   the source. The earlier wording is not kept.                          */
+async function research(d){
+  const run = runOf(d);
+  const { titles } = docContext(d);
+  d.status = "researching"; save(d); deskRender();
+  for(let i = 0; i < titles.length; i++){
+    if(run.cancelled) return;
+    await researchSection(d, i);
+  }
+  if(!run.cancelled) d.researched = Date.now();
+}
+async function researchSection(d, i){
+  const heading = d.blocks.find(b => b.kind==="heading" && b.sec===i);
+  const blocks = d.blocks.filter(b => b.sec===i && b.kind==="prose" && b.md && !b.slot);
+  if(!heading || !blocks.length) return;
+  heading.status = "checking"; heading.fail = ""; patch(d, heading);
+  try{
+    const { value } = await agent(d, { role:"research", label:"checking §"+(i+1), sec:i, system:sys("research"),
+      user: usr("research_user", { TITLE:d.title, SECTION:headingTitle(heading),
+        BLOCKS: blocks.map((b,k) => "[" + (k+1) + "]\n" + b.md).join("\n\n") }) });
+    heading.status = "";
+    applyResearch(d, blocks, value || {});
+  }catch(e){
+    heading.status = "";
+    heading.fail = e.stopped ? "" : "Sources weren't checked. " + e.message;
+    patch(d, heading); save(d);
+  }
+}
+function applyResearch(d, blocks, out){
+  blocks.forEach(b => { delete b.cites; });
+  for(const c of (Array.isArray(out.citations) ? out.citations : [])){
+    const b = blocks[(c.block|0) - 1];
+    if(!b || !c.url) continue;
+    (b.cites = b.cites || []).push({ claim:String(c.claim||"").trim(), url:String(c.url), title:String(c.title||"").trim(), note:String(c.note||"").trim() });
+  }
+  for(const c of (Array.isArray(out.corrections) ? out.corrections : [])){
+    const b = blocks[(c.block|0) - 1];
+    if(!b || !c.md) continue;
+    b.md = String(c.md);
+    b.edit = { label:"Corrected", note:String(c.reason||"").trim(), url:String(c.url||""), ts:Date.now(), by:"research" };
+    b.fresh = true;
+  }
+  rerender(d); save(d);
+}
+/* Run, or run again, on demand from the colophon. */
+async function researchAll(d){
+  if(running(d)) return;
+  const run = runOf(d); run.cancelled = false; run.active = true;
+  delete d.researched;
+  rerender(d); deskRender();
+  await research(d);
+  d.status = run.cancelled ? "stopped" : "done";
+  d.statusNote = run.cancelled ? "while checking sources" : "";
+  run.active = false;
+  rerender(d); save(d); tidyRun(d);
+}
+
 /* ══ editing ══════════════════════════════════════════════════ */
-function context(idx){
-  const outline = doc.blocks.filter(b=>b.kind==="heading").map(b=>b.md.replace(/^#+\s*/,"")).join(" · ");
-  const before = doc.blocks.slice(Math.max(0,idx-2), idx).map(b=>b.md).join("\n\n");
-  const after  = doc.blocks.slice(idx+1, idx+3).map(b=>b.md).join("\n\n");
+function context(d, idx){
+  const outline = d.blocks.filter(b=>b.kind==="heading").map(headingTitle).join(" · ");
+  const before = d.blocks.slice(Math.max(0,idx-2), idx).map(b=>b.md).join("\n\n");
+  const after  = d.blocks.slice(idx+1, idx+3).map(b=>b.md).join("\n\n");
   return { outline, before, after };
 }
 
 async function applyEdit(blockId, act, question){
-  const idx = doc.blocks.findIndex(b => b.id===blockId);
+  const d = doc;
+  const idx = d.blocks.findIndex(b => b.id===blockId);
   if(idx<0) return;
-  const target = doc.blocks[idx];
+  const target = d.blocks[idx];
   const a = ACTIONS[act];
   const highlighted = (sel && sel.blockId===blockId && sel.text) ? sel.text : target.md;
 
@@ -1264,12 +2146,12 @@ async function applyEdit(blockId, act, question){
   target.busy = act;
   target.hl = (sel && sel.blockId===blockId && sel.text) ? sel.text : "";
   inFlight++;
-  patch(target);
+  patch(d, target);
 
-  const { outline, before, after } = context(idx);
+  const { outline, before, after } = context(d, idx);
   const user = usr("edit_user", {
-    READER: readerText(doc.known),
-    TITLE: doc.title,
+    READER: readerText(d.known),
+    TITLE: d.title,
     OUTLINE: outline,
     BEFORE: before || "(none)",
     TARGET: target.md,
@@ -1278,9 +2160,11 @@ async function applyEdit(blockId, act, question){
     QUESTION: question || "(nothing)",
     ACTION: rawPrompt(act==="figure" ? "figure_action" : act)
   });
+  const role = act==="figure" ? "figure" : "edit";
+  const secLabel = target.sec != null ? " §" + (target.sec+1) : "";
 
   try{
-    const { value:out, raws } = await askJSON(sys(act==="figure" ? "figure" : "edit"), user, act==="figure" ? "figure" : "edit");
+    const { value:out, raws } = await agent(d, { role, label: word(a) + secLabel, sec:target.sec, system:sys(role), user });
     const blocks = ((out && out.blocks)||[]).filter(x => x && x.md);
     if(!blocks.length){ const e = new Error("Empty response."); e.raws = raws; throw e; }
     const stamp = { label:a.label, note:question||"", quote:highlighted.slice(0,220), ts:Date.now() };
@@ -1291,22 +2175,25 @@ async function applyEdit(blockId, act, question){
       return b;
     });
     target.busy = false; delete target.hl; inFlight--; clearHighlight();
+    const at = d.blocks.indexOf(target);
     const replaced = act!=="figure" && out.mode==="replace";
-    if(replaced) doc.blocks.splice(idx, 1, ...made);
-    else doc.blocks.splice(idx+1, 0, ...made);
-    if(route === "doc"){
+    if(at < 0) d.blocks.push(...made);
+    else if(replaced) d.blocks.splice(at, 1, ...made);
+    else d.blocks.splice(at+1, 0, ...made);
+    if(doc === d && route === "doc"){
       render();
       const first = main.querySelector(`[data-block-id="${made[0].id}"]`);
       if(first) first.scrollIntoView({block:"nearest", behavior:"smooth"});
     }
-    save();
+    save(d);
     toast(replaced ? "Replaced" : "Added", { undo:true });
   }catch(e){
     target.busy = false; delete target.hl; inFlight--; clearHighlight();
-    undoStack.pop();
-    if(route === "doc") patch(target);
+    if(doc === d) undoStack.pop();
+    patch(d, target);
     undoBtn.classList.toggle("hide", !undoStack.length);
-    toast("That edit didn't come back: " + e.message, { err:true, raw: rawOf(e) });
+  }finally{
+    tidyRun(d); deskRender();
   }
 }
 
@@ -1318,8 +2205,9 @@ async function applyEdit(blockId, act, question){
 const canHighlight = typeof CSS !== "undefined" && CSS.highlights && typeof Highlight === "function";
 function clearHighlight(){ if(canHighlight) CSS.highlights.delete("pen"); }
 function highlightRange(range){ if(canHighlight && range) CSS.highlights.set("pen", new Highlight(range)); }
-function highlightIn(root, text){
-  if(!canHighlight || !root || !text) return;
+/* Find `text` in root's text nodes, tolerant of whitespace; a Range or null. */
+function locate(root, text){
+  if(!root || !text) return null;
   const nodes = [], walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let n, all = "";
   while((n = walker.nextNode())){ nodes.push({ n, start: all.length }); all += n.textContent; }
@@ -1332,17 +2220,20 @@ function highlightIn(root, text){
       if(c === " " && sq.endsWith(" ")) continue;
       map.push(k); sq += c;
     }
-    const j = sq.indexOf(squash(text).trim());
-    if(j < 0) return;
+    const want = squash(text).trim();
+    const j = want ? sq.indexOf(want) : -1;
+    if(j < 0) return null;
     i = map[j];
-    text = all.slice(i, map[j + squash(text).trim().length - 1] + 1);
+    text = all.slice(i, map[j + want.length - 1] + 1);
   }
   const at = pos => { let last = nodes[0]; for(const x of nodes){ if(x.start > pos) break; last = x; } return last; };
   const a = at(i), b = at(i + text.length - 1);
+  if(!a || !b) return null;
   const r = document.createRange();
   r.setStart(a.n, i - a.start); r.setEnd(b.n, i + text.length - b.start);
-  highlightRange(r);
+  return r;
 }
+function highlightIn(root, text){ if(canHighlight) highlightRange(locate(root, text)); }
 function readSelection(){
   const s = window.getSelection();
   if(!s || s.isCollapsed || !s.rangeCount) return null;
@@ -1352,6 +2243,7 @@ function readSelection(){
   if(n && n.nodeType===3) n = n.parentElement;
   const block = n && n.closest ? n.closest("[data-block-id]") : null;
   if(!block || block.classList.contains("pending") || block.classList.contains("busy")) return null;
+  if(block.dataset.kind === "image") return null;
   return { blockId: block.dataset.blockId, text, rect: s.getRangeAt(0).getBoundingClientRect() };
 }
 function placeTools(rect){
@@ -1389,8 +2281,10 @@ document.addEventListener("selectionchange", () => {
 document.addEventListener("mousedown", e => {
   if(!rawEl.hidden && !rawEl.contains(e.target)) hideRaw();
   if(!pen.contains(e.target) && !pen.classList.contains("asking")) hideTools();
-  if(!pop.contains(e.target)) pop.classList.remove("show");
+  if(!pop.contains(e.target)) closePop();
   if(!outline.contains(e.target) && !runhead.contains(e.target)) closeOutline();
+  if(!menu.contains(e.target) && !menuBtn.contains(e.target)) closeMenu(menu, menuBtn);
+  if(!rewriteMenu.contains(e.target) && !rewriteBtn.contains(e.target)) closeMenu(rewriteMenu, rewriteBtn);
 });
 function trigger(act){
   if(!sel) return;
@@ -1419,23 +2313,14 @@ askInput.onkeydown = e => {
   if(e.key==="Escape"){ e.preventDefault(); e.stopPropagation(); pen.classList.remove("asking"); askInput.value=""; clearHighlight(); }
 };
 
-/* ══ provenance popover ═══════════════════════════════════════ */
-function showProv(anchor, b){
+/* ══ popovers ═════════════════════════════════════════════════
+   One card, many contents: the provenance of a revision, the source of an
+   image, the source behind a citation. Click pins it; hover shows it while
+   the pointer is on the anchor or the card.                           */
+function showPop(anchor, nodes, o){
   closePops();
-  pop.replaceChildren();
-  const k = el("div", "k", b.edit.label);
-  if(b.edit.ts){ const t = el("time", null, timeAgo(b.edit.ts)); t.dateTime = new Date(b.edit.ts).toISOString(); k.appendChild(t); }
-  const q = el("div", "q", b.edit.note ? b.edit.note : "“" + b.edit.quote + "”");
-  const row = el("div", "row");
-  const rm = el("button", null, "Remove"); rm.type = "button";
-  rm.onclick = () => {
-    snapshot();
-    doc.blocks = doc.blocks.filter(x => x.id!==b.id);
-    closePops(); render(); save();
-    toast("Removed", { undo:true });
-  };
-  row.appendChild(rm);
-  pop.append(k, q, row);
+  pop.replaceChildren(...nodes);
+  pop.dataset.hover = (o && o.hover) ? "1" : "";
   pop.classList.add("show");
   anchor.setAttribute("aria-expanded", "true");
   pop._anchor = anchor;
@@ -1445,10 +2330,147 @@ function showProv(anchor, b){
   pop.style.left = x + "px";
   pop.style.top  = (r.bottom + window.scrollY + 8) + "px";
 }
-function closePops(){
+function closePop(){
   if(pop._anchor){ pop._anchor.removeAttribute("aria-expanded"); pop._anchor = null; }
   pop.classList.remove("show");
+  pop.dataset.hover = "";
+}
+let hoverT = null;
+function hoverable(anchor, build){
+  anchor.addEventListener("mouseenter", () => {
+    clearTimeout(hoverT);
+    hoverT = setTimeout(() => { if(pop._anchor !== anchor) showPop(anchor, build(), { hover:true }); }, 140);
+  });
+  anchor.addEventListener("mouseleave", leavePop);
+}
+function leavePop(){
+  clearTimeout(hoverT);
+  hoverT = setTimeout(() => { if(pop.dataset.hover && !pop.matches(":hover")) closePop(); }, 220);
+}
+pop.addEventListener("mouseenter", () => clearTimeout(hoverT));
+pop.addEventListener("mouseleave", () => { if(pop.dataset.hover) leavePop(); });
+
+function linkRow(items){
+  const row = el("div", "row");
+  items.forEach(x => {
+    if(!x) return;
+    if(x.href){ const a = el("a", null, x.label); a.href = x.href; a.target = "_blank"; a.rel = "noopener"; a.append(el("span", "host", host(x.href))); row.append(a); }
+    else row.append(btn(null, x.label, x.onclick));
+  });
+  return row;
+}
+function kRow(label, ts){
+  const k = el("div", "k", label);
+  if(ts){ const t = el("time", null, timeAgo(ts)); t.dateTime = new Date(ts).toISOString(); k.appendChild(t); }
+  return k;
+}
+/* A revision: who asked for it and why; a research correction: the reason and its source. */
+function provNodes(b){
+  const e = b.edit, nodes = [kRow(e.label, e.ts)];
+  if(e.by === "research"){
+    nodes.push(el("div", "s", e.note || "The research agent corrected this block."));
+    nodes.push(linkRow([ e.url && { label:"Source", href:e.url } ]));
+  }else{
+    nodes.push(el("div", "q", e.note ? e.note : "“" + e.quote + "”"));
+    nodes.push(linkRow([{ label:"Remove", onclick:() => {
+      snapshot();
+      doc.blocks = doc.blocks.filter(x => x.id!==b.id);
+      closePops(); render(); save();
+      toast("Removed", { undo:true });
+    } }]));
+  }
+  return nodes;
+}
+/* An image the finder chose: what it is, where it came from, why it passed. */
+function sourceNodes(b){
+  const nodes = [kRow("Found online")];
+  if(b.title) nodes.push(el("div", "t", b.title));
+  if(b.credit) nodes.push(el("div", "s", b.credit));
+  if(b.why) nodes.push(el("div", "q", b.why));
+  nodes.push(linkRow([ b.page && { label:"Page", href:b.page }, b.url && { label:"Image", href:b.url } ]));
+  return nodes;
+}
+/* A citation: the source and what it says about the claim. */
+function citeNodes(c, n){
+  const nodes = [kRow("Source " + n)];
+  if(c.title) nodes.push(el("div", "t", c.title));
+  if(c.note) nodes.push(el("div", "s", c.note));
+  if(c.claim) nodes.push(el("div", "q", "“" + c.claim + "”"));
+  nodes.push(linkRow([{ label:"Open", href:c.url }]));
+  return nodes;
+}
+function closePops(){
+  closePop();
   closeOutline();
+  closeMenu(menu, menuBtn);
+  closeMenu(rewriteMenu, rewriteBtn);
+}
+
+/* ══ menus ════════════════════════════════════════════════════ */
+function openMenu(m, anchor, nodes){
+  closePops();
+  m.replaceChildren(...nodes);
+  m.classList.add("show");
+  anchor.setAttribute("aria-expanded", "true");
+  const r = anchor.getBoundingClientRect(), w = m.offsetWidth;
+  let x = r.right - w;
+  x = Math.max(8, Math.min(x, document.documentElement.clientWidth - w - 8));
+  m.style.left = (x + window.scrollX) + "px";
+  m.style.top  = (r.bottom + window.scrollY + 6) + "px";
+}
+function closeMenu(m, anchor){ m.classList.remove("show"); anchor.setAttribute("aria-expanded", "false"); }
+
+/* Pages that are not documents: Prompts, Settings, Raw. */
+const PAGES = [
+  { route:"prompts",  label:"Prompts" },
+  { route:"settings", label:"Settings" },
+  { route:"raw",      label:"Raw" }
+];
+function goto(r){
+  route = (route === r) ? (doc ? "doc" : "cover") : r;
+  render(); scrollTo(0, 0);
+}
+menuBtn.onclick = () => {
+  if(menu.classList.contains("show")) return closeMenu(menu, menuBtn);
+  openMenu(menu, menuBtn, PAGES.map(p => {
+    const b = btn(route === p.route ? "cur" : "", p.label, () => { closeMenu(menu, menuBtn); goto(p.route); });
+    b.setAttribute("role", "menuitem");
+    return b;
+  }));
+};
+
+/* Rewrite: this primer, read in full by the planner and the writer, as a
+   new one that follows an instruction. Presets, or your own words. */
+rewriteBtn.onclick = () => {
+  if(rewriteMenu.classList.contains("show")) return closeMenu(rewriteMenu, rewriteBtn);
+  const src = doc;
+  const nodes = [el("span", "hint", "Rewrite as a new primer")];
+  REWRITES.forEach(r => {
+    const b = btn(null, r.label, () => startRewrite(src, r.text));
+    b.setAttribute("role", "menuitem"); b.title = r.text;
+    nodes.push(b);
+  });
+  const form = el("form");
+  const input = el("input"); input.placeholder = "Or say what should change…"; input.setAttribute("aria-label", "Rewrite instruction");
+  const go = btn(null, "Rewrite"); go.type = "submit";
+  form.append(input, go);
+  form.onsubmit = e => { e.preventDefault(); const t = input.value.trim(); if(t) startRewrite(src, t); };
+  nodes.push(form);
+  openMenu(rewriteMenu, rewriteBtn, nodes);
+  input.focus();
+};
+function startRewrite(src, instruction){
+  closePops();
+  startDoc({ topic: src.topic || src.title, known: src.known,
+    rewrite:{ of:src.id, ofTitle:src.title, instruction, source:docText(src) } });
+}
+/* The whole primer as text, for the rewrite prompts. */
+function docText(d){
+  return "# " + d.title + "\n\n" + d.blocks.map(b => {
+    if(b.kind === "figure") return "[Diagram" + (b.caption ? ": " + b.caption : b.brief ? ": " + b.brief : "") + "]";
+    if(b.kind === "image")  return "[Image" + (b.caption ? ": " + b.caption : b.brief ? ": " + b.brief : "") + "]";
+    return b.md || "";
+  }).filter(Boolean).join("\n\n");
 }
 
 /* ══ running head + outline ═══════════════════════════════════ */
@@ -1459,13 +2481,14 @@ function currentHeading(){
   hs.forEach((h,i) => { if(h.getBoundingClientRect().top <= 120){ cur = h; n = i+1; } });
   return { cur, n };
 }
+const PAGE_TITLES = { prompts:"Prompts", settings:"Settings", raw:"Raw" };
 function updateRunhead(){
   runhead.replaceChildren();
   let show = false;
   const title = main.querySelector(".title");
   const past = title ? title.getBoundingClientRect().bottom < 40 : false;
-  if(route === "prompts"){
-    runhead.textContent = "Prompts"; show = past;
+  if(PAGE_TITLES[route]){
+    runhead.textContent = PAGE_TITLES[route] + (route === "raw" && doc ? " · " + doc.title : ""); show = past;
   }else if(route === "doc" && doc){
     const { cur, n } = currentHeading();
     if(cur){ runhead.append(el("span","n","§ "+n), headingText(cur)); }
@@ -1484,20 +2507,18 @@ function openOutline(){
     const { n:curN } = currentHeading();
     const hs = main.querySelectorAll('.block[data-kind="heading"]');
     hs.forEach((h,i) => {
-      const b = el("button", i+1===curN ? "cur" : ""); b.type = "button"; b.setAttribute("role","menuitem");
+      const b = btn(i+1===curN ? "cur" : "", null, () => { closeOutline(); h.scrollIntoView({behavior:"smooth", block:"start"}); });
+      b.setAttribute("role","menuitem");
       b.append(el("span","n","§ "+(i+1)), headingText(h));
-      b.onclick = () => { closeOutline(); h.scrollIntoView({behavior:"smooth", block:"start"}); };
       outline.appendChild(b);
     });
     const foot = el("div", "foot");
-    const ex = el("button", null, "Export"); ex.type = "button"; ex.onclick = () => { closeOutline(); exportDoc(); };
-    foot.appendChild(ex);
+    foot.appendChild(btn(null, "Export", () => { closeOutline(); exportDoc(); }));
     outline.appendChild(foot);
   }else if(route === "prompts"){
     Object.keys(PROMPTS).forEach(k => {
-      const b = el("button"); b.type = "button"; b.setAttribute("role","menuitem");
-      b.append(PROMPTS[k].label);
-      b.onclick = () => { closeOutline(); const r = main.querySelector(`.prow[data-key="${k}"]`); if(r) r.scrollIntoView({behavior:"smooth", block:"start"}); };
+      const b = btn(null, PROMPTS[k].label, () => { closeOutline(); const r = main.querySelector(`.prow[data-key="${k}"]`); if(r) r.scrollIntoView({behavior:"smooth", block:"start"}); });
+      b.setAttribute("role","menuitem");
       outline.appendChild(b);
     });
   }
@@ -1520,14 +2541,10 @@ function toast(msg, o){
   toastEl.replaceChildren(el("span", null, msg));
   toastEl.classList.toggle("err", !!o.err);
   if(o.undo){
-    const b = el("button", null, "Undo"); b.type = "button";
-    b.onclick = () => { hideToast(); doUndo(); };
-    toastEl.appendChild(b);
+    toastEl.appendChild(btn(null, "Undo", () => { hideToast(); doUndo(); }));
   }
   if(o.raw){
-    const b = el("button", null, "Raw"); b.type = "button";
-    b.onclick = () => { hideToast(); showRaw(o.raw); };
-    toastEl.appendChild(b);
+    toastEl.appendChild(btn(null, "Raw", () => { hideToast(); showRaw(o.raw); }));
   }
   toastEl.classList.add("show");
   clearTimeout(toastT);
@@ -1540,10 +2557,11 @@ const rawEl = $("#raw"), rawText = $("#rawText");
 function showRaw(text){ rawText.textContent = text; rawEl.hidden = false; $("#rawClose").focus(); }
 function hideRaw(){ rawEl.hidden = true; }
 $("#rawClose").onclick = hideRaw;
-$("#rawCopy").onclick = async () => {
-  try{ await navigator.clipboard.writeText(rawText.textContent); toast("Copied"); }
-  catch(e){ const r = document.createRange(); r.selectNodeContents(rawText); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
-};
+$("#rawCopy").onclick = () => copyText(rawText.textContent, rawText);
+async function copyText(text, node){
+  try{ await navigator.clipboard.writeText(text); toast("Copied"); }
+  catch(e){ if(node){ const r = document.createRange(); r.selectNodeContents(node); const s = getSelection(); s.removeAllRanges(); s.addRange(r); } }
+}
 
 /* ══ prompts page ═════════════════════════════════════════════ */
 function renderPrompts(){
@@ -1554,7 +2572,7 @@ function renderPrompts(){
     const row = el("section", "prow"); row.dataset.key = k;
     const head = el("div", "prow-head");
     const lab = el("span", "lab", PROMPTS[k].label);
-    const rst = el("button", "reset", "Reset"); rst.type = "button";
+    const rst = btn("reset", "Reset");
     const ta = el("textarea", "p-text"); ta.spellcheck = false; ta.value = rawPrompt(k);
     ta.setAttribute("aria-label", PROMPTS[k].label);
 
@@ -1582,13 +2600,143 @@ function renderPrompts(){
   main.replaceChildren(page);
 }
 
+/* ══ settings page ════════════════════════════════════════════
+   Drawn from SETTINGS. One control per type; add a type here to use it. */
+const CONTROLS = {
+  bool(k, s, onChange){
+    const b = btn("switch"); b.setAttribute("role", "switch"); b.setAttribute("aria-label", s.label);
+    const paint = () => b.setAttribute("aria-checked", String(!!setting(k)));
+    b.onclick = () => { onChange(!setting(k)); paint(); };
+    b.append(el("i")); paint();
+    return b;
+  },
+  select(k, s, onChange){
+    const g = el("div", "seg"); g.setAttribute("role", "radiogroup"); g.setAttribute("aria-label", s.label);
+    const paint = () => g.querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.value === String(setting(k))));
+    (s.options || []).forEach(o => { const b = btn(null, o.label, () => { onChange(o.value); paint(); }); b.dataset.value = String(o.value); g.append(b); });
+    paint();
+    return g;
+  },
+  text(k, s, onChange){
+    const i = el("input", "sfield"); i.value = setting(k) || ""; i.placeholder = s.placeholder || ""; i.setAttribute("aria-label", s.label);
+    let t = null;
+    i.oninput = () => { clearTimeout(t); t = setTimeout(() => onChange(i.value), 300); };
+    return i;
+  }
+};
+function renderSettings(){
+  const page = el("article", "doc settings");
+  page.innerHTML = `<header class="doc-head"><h1 class="title">Settings</h1></header>`;
+  Object.keys(SETTINGS).forEach(k => {
+    const s = SETTINGS[k], row = el("section", "srow"); row.dataset.key = k;
+    const text = el("div", "stext");
+    text.append(el("span", "lab", s.label));
+    if(s.help) text.append(el("p", "help", s.help));
+    row.append(text, CONTROLS[s.type](k, s, v => setSetting(k, v)));
+    page.appendChild(row);
+  });
+  main.replaceChildren(page);
+}
+
+/* ══ raw page ═════════════════════════════════════════════════
+   Every call made for the open primer, in order: what went out, what the
+   agent did, what came back. Calls in flight update in place.         */
+async function renderRaw(){
+  const page = el("article", "doc rawpage");
+  page.innerHTML = `<header class="doc-head"><h1 class="title">Raw</h1><dl class="meta"></dl></header>`;
+  main.replaceChildren(page);
+  if(!doc){
+    page.append(el("p", "empty", "Open a primer to see every call made for it: the prompts that went out, the tools the agents used, and the text that came back."));
+    return;
+  }
+  const d = doc, t = await traceOf(d.id);
+  if(route !== "raw" || doc !== d || !main.contains(page)) return;
+  const meta = page.querySelector(".meta");
+  const row = (k, v) => { meta.append(el("dt", null, k), el("dd", null, v)); };
+  row("Primer", d.title);
+  const failed = t.filter(c => c.status === "error").length, live = t.filter(c => c.status === "running").length;
+  row("Calls", t.length + (failed ? " · " + failed + " failed" : "") + (live ? " · " + live + " running" : ""));
+  if(!t.length) page.append(el("p", "empty", "No calls yet."));
+  t.forEach((rec, i) => page.append(callEl(rec, i)));
+}
+function stText(rec){
+  const dur = (((rec.ended || Date.now()) - rec.started) / 1000).toFixed(1) + "s";
+  const s = rec.status === "ok" ? "ok" : rec.status === "running" ? "running" : rec.status === "stopped" ? "stopped" : "failed";
+  return s + " · " + dur + (rec.error && rec.status === "error" ? " · " + rec.error : "");
+}
+function evNode(ev){
+  const li = el("li");
+  if(ev.kind === "start"){ li.append(el("span", "k", "model"), ev.model + (ev.tools && ev.tools.length ? "  tools: " + ev.tools.join(", ") : "  no tools")); }
+  else if(ev.kind === "tool"){ li.append(el("span", "k", "→ " + ev.name), JSON.stringify(ev.input)); }
+  else if(ev.kind === "result"){ li.className = ev.ok ? "" : "bad"; li.append(el("span", "k", ev.ok ? "←" : "← error"), ev.text || ""); }
+  else if(ev.kind === "retry"){ li.append(el("span", "k", "↻ asking again"), ev.reason + "\n" + (ev.output || "")); }
+  else li.append(JSON.stringify(ev));
+  return li;
+}
+function callEl(rec, i){
+  const d = el("details", "call"); d.dataset.callId = rec.id;
+  d.classList.toggle("running", rec.status === "running");
+  d.classList.toggle("err", rec.status === "error");
+  const s = el("summary");
+  s.append(el("span", "n", String(i+1)), el("span", "what", rec.label || rec.role),
+           el("span", "who", rec.role + (rec.model ? " → " + rec.model : "")), el("span", "st", stText(rec)));
+  d.append(s);
+  const body = el("div", "call-body");
+  const part = (title, text, cls) => {
+    const h = el("h4", null, title), pre = el("pre", cls, text || "");
+    h.append(btn(null, "copy", () => copyText(pre.textContent, pre)));
+    body.append(h, pre);
+    return pre;
+  };
+  part("System", rec.system);
+  part("User", rec.user);
+  body.append(el("h4", null, "Events"));
+  const ol = el("ol", "events"); rec.events.forEach(ev => ol.append(evNode(ev))); body.append(ol);
+  part("Output", rec.output, "out");
+  d.append(body);
+  return d;
+}
+/* Keep a running call's row current while the Raw page is open. */
+let rawT = 0;
+function rawLive(rec){
+  if(route !== "raw" || !doc || rec.docId !== doc.id || rawT) return;
+  rawT = requestAnimationFrame(() => {
+    rawT = 0;
+    if(route !== "raw" || !doc || rec.docId !== doc.id) return;
+    const page = main.querySelector(".rawpage");
+    if(!page) return;
+    let d = page.querySelector(`[data-call-id="${rec.id}"]`);
+    if(!d){ page.querySelector(".empty")?.remove(); d = callEl(rec, page.querySelectorAll(".call").length); page.append(d); return; }
+    d.classList.toggle("running", rec.status === "running");
+    d.classList.toggle("err", rec.status === "error");
+    d.querySelector(".st").textContent = stText(rec);
+    d.querySelector(".out").textContent = rec.output || "";
+    const ol = d.querySelector(".events");
+    while(ol.children.length < rec.events.length) ol.append(evNode(rec.events[ol.children.length]));
+  });
+}
+/* Jump to one call, from an issue on the desk. */
+async function openRaw(docId, callId){
+  const d = await loadDoc(docId);
+  if(!d) return;
+  doc = d; route = "raw";
+  await renderRaw();
+  paintHeader(); updateRunhead();
+  const c = main.querySelector(`[data-call-id="${callId}"]`);
+  if(c){ c.open = true; c.scrollIntoView({ block:"start", behavior:"smooth" }); }
+}
+
 /* ══ export ═══════════════════════════════════════════════════ */
 function exportDoc(){
   if(!doc) return;
-  const md = "# " + doc.title + "\n\n" + doc.blocks.map(b =>
-    b.kind==="figure"
-      ? "<!-- diagram -->\n" + b.md + (b.caption ? "\n\n*" + b.caption + "*" : "")
-      : b.md).join("\n\n") + "\n";
+  const sources = [];
+  const md = "# " + doc.title + "\n\n" + doc.blocks.map(b => {
+    if(b.kind==="figure") return "<!-- diagram -->\n" + b.md + (b.caption ? "\n\n*" + b.caption + "*" : "");
+    if(b.kind==="image")  return "![" + (b.title || b.caption || "") + "](" + (b.url || b.src) + ")" + (b.caption ? "\n\n*" + b.caption + "*" : "");
+    let t = b.md;
+    (b.cites || []).forEach(c => { sources.push(c); t += " [" + sources.length + "]"; });
+    return t;
+  }).join("\n\n") + (sources.length ? "\n\n## Sources\n\n" + sources.map((c,i) => (i+1) + ". " + (c.title ? c.title + " · " : "") + c.url).join("\n") : "") + "\n";
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([md], {type:"text/markdown"}));
   a.download = doc.title.replace(/[^\w\s-]/g,"").trim().replace(/\s+/g,"-").toLowerCase() + ".md";
@@ -1611,10 +2759,7 @@ try{
 /* ══ header + keys ════════════════════════════════════════════ */
 $("#homeBtn").onclick = () => { route = "cover"; render(); scrollTo(0,0); };
 newBtn.onclick = () => { route = "cover"; render(); scrollTo(0,0); const t = $("#cTopic"); if(t) t.focus(); };
-promptsBtn.onclick = () => {
-  if(route === "prompts") route = doc ? "doc" : "cover"; else route = "prompts";
-  render(); scrollTo(0,0);
-};
+stopBtn.onclick = () => { if(doc) stopRun(doc); };
 undoBtn.onclick = doUndo;
 
 document.addEventListener("keydown", e => {
@@ -1623,7 +2768,9 @@ document.addEventListener("keydown", e => {
   if(e.key === "Escape"){
     if(!rawEl.hidden){ hideRaw(); return; }
     if(outline.classList.contains("show")){ closeOutline(); return; }
-    if(pop.classList.contains("show")){ closePops(); return; }
+    if(menu.classList.contains("show")){ closeMenu(menu, menuBtn); return; }
+    if(rewriteMenu.classList.contains("show")){ closeMenu(rewriteMenu, rewriteBtn); return; }
+    if(pop.classList.contains("show")){ closePop(); return; }
     if(pen.classList.contains("show")){ hideTools(); return; }
     return;
   }
@@ -1640,10 +2787,13 @@ document.addEventListener("keydown", e => {
 
 /* ══ boot ═════════════════════════════════════════════════════ */
 (async function boot(){
+  $("#homeBtn").insertAdjacentHTML("afterbegin", LOGO);
   setTheme(document.documentElement.dataset.theme || "light", false);
   const missing = await loadPrompts();
   index = (await store.get("primer:index")) || [];
   overrides = (await store.get("primer:prompts")) || {};
+  settings = (await store.get("primer:settings")) || {};
+  applySettings();
   render();
   if(missing.length) toast("Couldn't read " + (missing.length===1 ? "prompts/"+missing[0]+".txt" : missing.length+" files in prompts/") +
     ". Primer has to be served over http, e.g. npm start", { err:true });

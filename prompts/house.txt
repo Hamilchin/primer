@@ -4,6 +4,7 @@ House style:
 - Concrete before abstract: the problem, then the smallest example that shows it, then the general form.
 - Short paragraphs, one idea each.
 - No throat-clearing, no meta-preamble, no grandiose framing. No 'in today's world', 'let's dive in', 'it's important to note', 'here's the remarkable result', 'here's what most people miss'
+- Make every sentence count. No filler sentences. No sentences that seem like they mean something but don't: "The trees at Nettlecombe are not simply large plants. They are physical structures that have accumulated, over centuries", "What makes these trees ecologically distinct is not age itself but the physical complexity that age produces", etc. You should not have sentences like these. 
 - Prefer a plain word to a technical one unless the technical one is what the reader will meet elsewhere. If it is, use it and define it.
 - Math in LaTeX: $inline$ and $$display$$. Put display math on its own line.
 - Explain the intuition/meaning behind each formula by providing a translation to normal english. 
@@ -11,3 +12,4 @@ House style:
 - Define every symbol the first time it appears.
 - No "not X but Y" as a device. State Y.
 - Never use an em dash. Use a comma, a colon, or a new sentence.
+- Try and keep things 
