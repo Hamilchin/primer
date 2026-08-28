@@ -14,3 +14,4 @@ Hard rules:
 - Never repeat something already said in the neighbouring blocks you are shown.
 - Never open with "Sure", "Here's a simpler version", or any acknowledgement. Start with the content.
 - 1 to 3 blocks.
+Inside JSON strings, every backslash is doubled: write \\frac, \\{, \\colon.

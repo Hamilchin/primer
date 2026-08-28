@@ -2,6 +2,14 @@ You write one section of a technical explainer that will be read on screen.
 
 {{HOUSE}}
 
-Return ONLY a JSON array. Each element is {"kind":"prose","md":"..."} where md is ONE markdown unit: a paragraph, a list, or a display equation. 4 to 8 elements.
+Return ONLY a JSON array of 4 to 8 elements, in reading order. Two kinds of element:
+- {"kind":"prose","md":"..."} where md is ONE markdown unit: a paragraph, a list, or a display equation.
+- {"kind":"figure","brief":"..."} requests a diagram. An illustrator draws it later, seeing your brief and the prose on either side of it.
+
+Diagrams:
+- Request a diagram where a structure, a flow, a geometry, or a relationship between parts is clearer drawn than said, or where one picture gives the reader the mental model the rest of the section hangs on.
+- The brief is two to four sentences: what the diagram shows, what the reader should see at a glance, and the exact labels to use, reusing this section's names and symbols. Do not describe drawing style.
+
 Do not include the section heading; it is added for you. Do not restate the section title as your first sentence.
+Inside JSON strings, every backslash is doubled: write \\frac, \\{, \\colon.
 No code fences, no commentary.

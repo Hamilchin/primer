@@ -27,7 +27,7 @@
   --sel:rgba(162,59,42,.18);
   --on-ink:#F5F0E6; --on-ink-act:#F2B09E;
   --shadow:0 12px 32px rgba(50,35,20,.14),0 1px 2px rgba(50,35,20,.10);
-  --col:36rem; --marg:8rem; --gap:1.25rem; --side:13rem; --sgap:2.25rem;
+  --col:44rem; --marg:8rem; --gap:1.25rem; --side:13rem; --sgap:2.25rem;
   --head:3.6rem;
   --disp:"Fraunces","Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
   --body:"Literata","Charter","Iowan Old Style",Georgia,serif;
@@ -51,7 +51,7 @@
 html{background:var(--paper)}
 body{
   margin:0; min-height:100dvh; background:var(--paper); color:var(--ink);
-  font-family:var(--body); font-size:17px; line-height:1.62;
+  font-family:var(--body); font-size:18px; line-height:1.6;
   font-optical-sizing:auto; font-kerning:normal;
   font-variant-numeric:oldstyle-nums proportional-nums;
   -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
@@ -61,7 +61,6 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 input,textarea{font:inherit;color:inherit}
 ::selection{background:var(--sel)}
 :focus-visible{outline:2px solid var(--red);outline-offset:3px;border-radius:2px}
-.sc{font-variant-caps:all-small-caps;letter-spacing:.09em}
 
 /* ══ header ═══════════════════════════════════════════════════ */
 .head{
@@ -183,7 +182,7 @@ main{padding:1.2rem 1.6rem 10rem}
 .shelf .confirm button.danger{color:var(--red)}
 
 /* ══ document ═════════════════════════════════════════════════ */
-.doc{position:relative;max-width:var(--col);margin:2.2rem auto 0}
+.doc{position:relative;max-width:var(--col);margin:1.6rem auto 0}
 .doc-head{margin:0 0 2.8rem;position:relative}
 .title{
   font-family:var(--disp); font-weight:400; margin:0 0 1rem; text-wrap:balance;
@@ -232,11 +231,7 @@ main{padding:1.2rem 1.6rem 10rem}
 .block[data-kind="figure"] .body{padding:.4rem 0 .6rem}
 .block[data-kind="figure"] figure{margin:0}
 .block[data-kind="figure"] svg{max-width:100%;height:auto;display:block;color:var(--ink)}
-.block[data-kind="figure"] figcaption{margin-top:.6rem;font-size:.88rem;line-height:1.5;color:var(--ink-2);text-wrap:pretty}
-.block[data-kind="figure"] .cap{display:block;font-style:italic}
-.block[data-kind="figure"] .exp{display:block;margin-top:.3rem}
-.block[data-kind="figure"] .exp p{margin:0 0 .4rem}
-.block[data-kind="figure"] .exp p:last-child{margin-bottom:0}
+.block[data-kind="figure"] figcaption{margin-top:.6rem;font-size:.88rem;line-height:1.5;color:var(--ink-2);font-style:italic;text-wrap:pretty}
 .block[data-kind="figure"] svg [stroke="#A23B2A"],.block[data-kind="figure"] svg [stroke="#2C6B60"]{stroke:var(--red)}
 .block[data-kind="figure"] svg [fill="#A23B2A"],.block[data-kind="figure"] svg [fill="#2C6B60"]{fill:var(--red)}
 
@@ -262,7 +257,8 @@ main{padding:1.2rem 1.6rem 10rem}
 }
 @keyframes breathe{0%,100%{opacity:.25;transform:scale(.75)}50%{opacity:1;transform:scale(1)}}
 
-.block.busy .body{opacity:.42;transition:opacity .3s}
+.block.busy .body{opacity:.72;transition:opacity .3s}
+::highlight(pen){background-color:var(--sel);color:var(--ink)}
 .block.busy::before{
   content:""; position:absolute; top:.28em; bottom:.08em; right:calc(100% + .72rem); width:2px;
   background:var(--red); border-radius:1px; animation:breathe 1.5s ease-in-out infinite;
@@ -271,6 +267,18 @@ main{padding:1.2rem 1.6rem 10rem}
   min-height:calc(1.62em * 4); opacity:.55;
   background:repeating-linear-gradient(to bottom,transparent 0 calc(1.62em - 1px),var(--rule) calc(1.62em - 1px) 1.62em);
   background-size:100% 1.62em; background-position:0 .2em;
+}
+.block.pending.queued .body{opacity:.3}
+/* The model's raw output so far, written onto the ruled lines while we wait.
+   Font is .68 of the body, line-height scaled back up so it sits on the rules. */
+.block.pending .live{
+  margin:0; padding:0; background:none; border:0; border-radius:0; overflow:visible;
+  font-family:var(--mono); font-size:.68em; line-height:calc(1.62em / .68);
+  color:var(--ink-2); white-space:pre-wrap; word-break:break-word; hyphens:none;
+}
+.block.pending[data-kind="figure"] .live{padding:.5rem .8rem;line-height:1.5}
+.block.pending[data-kind="figure"] .body{
+  background:none; min-height:8.5rem; border:1px dashed var(--rule-2); border-radius:3px; opacity:.6;
 }
 .block.fresh{animation:settle .7s var(--ease) both;animation-delay:calc(var(--i,0) * 70ms)}
 @keyframes settle{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
@@ -371,6 +379,20 @@ main{padding:1.2rem 1.6rem 10rem}
 .toast.err{background:var(--red);color:#fff}
 .toast.err button{color:#fff}
 
+/* ══ raw response inspector ═══════════════════════════════════ */
+.raw{
+  position:fixed; z-index:80; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:min(46rem,94vw); max-height:72vh; display:flex; flex-direction:column;
+  background:var(--card); border:1px solid var(--rule-2); border-radius:7px; box-shadow:var(--shadow);
+}
+.raw[hidden]{display:none}
+.raw-head{display:flex;align-items:baseline;gap:1.2rem;padding:.7rem 1rem .5rem;border-bottom:1px solid var(--rule)}
+.raw-head .lab{margin:0;flex:1}
+.raw pre{
+  margin:0; padding:.9rem 1rem 1rem; overflow:auto; font-family:var(--mono); font-size:.78rem; line-height:1.6;
+  color:var(--ink); white-space:pre-wrap; word-break:break-word; tab-size:2;
+}
+
 /* ══ prompts page ═════════════════════════════════════════════ */
 .prow{position:relative;margin:0 0 2.2rem}
 .prow-head{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;margin-bottom:.4rem}
@@ -393,7 +415,7 @@ main{padding:1.2rem 1.6rem 10rem}
 .p-text:focus{outline:none;border-left-color:var(--red);color:var(--ink)}
 
 /* ══ wide: sidenotes in the right margin ══════════════════════ */
-@media (min-width:1180px){
+@media (min-width:1240px){
   .block[data-kind="note"]{
     position:absolute; left:calc(100% + var(--sgap)); width:var(--side); margin:0; padding:0; border:0;
     font-size:.84rem; line-height:1.5; scroll-margin-top:calc(var(--head) + 1.2rem);
@@ -409,7 +431,7 @@ main{padding:1.2rem 1.6rem 10rem}
 }
 
 /* ══ compact marginalia (no room for words) ═══════════════════ */
-@media (max-width:979px){
+@media (max-width:1049px){
   main{padding-left:2rem;padding-right:1.6rem}
   .marg{display:none}
   .num{display:block;position:static;width:auto;text-align:left;font-size:.95rem;margin:0 0 .15rem;color:var(--red)}
@@ -504,89 +526,121 @@ main{padding:1.2rem 1.6rem 10rem}
 <div class="pop" id="pop" role="dialog"></div>
 <div class="pop outline" id="outline" role="menu"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="raw" id="raw" role="dialog" aria-label="Raw response" hidden>
+  <div class="raw-head"><span class="lab">Raw response</span><button class="act" id="rawCopy">Copy</button><button class="act" id="rawClose">Close</button></div>
+  <pre id="rawText"></pre>
+</div>
 
 <script>
-/* ══ storage ══════════════════════════════════════════════════ */
-const mem = {};
+/* ══ storage ══════════════════════════════════════════════════
+   localStorage: primer:index, primer:doc:<id>, primer:prompts.
+   Async so a disk-backed store can replace it without touching callers. */
+let quotaWarned = false;
 const store = {
-  async get(k){ try{ const r = await window.storage.get(k); return r ? JSON.parse(r.value) : null; }
-                catch(e){ return k in mem ? mem[k] : null; } },
-  async set(k,v){ mem[k]=v; try{ await window.storage.set(k, JSON.stringify(v)); }catch(e){} },
-  async del(k){ delete mem[k]; try{ await window.storage.delete(k); }catch(e){} }
+  async get(k){ try{ const v = localStorage.getItem(k); return v == null ? null : JSON.parse(v); }catch(e){ return null; } },
+  async set(k,v){
+    try{ localStorage.setItem(k, JSON.stringify(v)); }
+    catch(e){ if(!quotaWarned){ quotaWarned = true; toast("Browser storage is full; changes are not being saved", { err:true }); } }
+  },
+  async del(k){ try{ localStorage.removeItem(k); }catch(e){} }
 };
 
-/* ══ config ═══════════════════════════════════════════════════
-   Running inside a Claude artifact: leave KEY empty. Auth is handled.
-   Running from your own browser: paste your key below and serve the
-   file over http (see notes at the bottom of this script).           */
-const API = "https://api.anthropic.com/v1/messages";
-const CFG = {
-  ENDPOINT: "/v1/messages",  // API to call Anthropic directly (then set KEY)
-  KEY: "",              // "sk-ant-..." only when calling Anthropic directly
-  CONCURRENCY: 2,       // parallel section requests. 7 at once will 429 you.
-  RETRIES: 4
-};
-const MODEL = "claude-sonnet-4-6";
-const maxTokens = () => (CFG.KEY || CFG.ENDPOINT !== API) ? 4000 : 1000;
+/* ══ model ════════════════════════════════════════════════════
+   server.mjs answers POST /api/complete {system, user, role} with a stream
+   of newline-delimited JSON frames: {delta} as text arrives, then {done,text}
+   or {error}. role picks the model server-side. onDelta(soFar, delta) fires
+   per frame; the promise resolves with the final text.               */
+const ENDPOINT = "/api/complete";
+const RETRIES = 4;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function claude(system, user, attempt){
-  attempt = attempt || 0;
-  if(CFG.ENDPOINT === API && !CFG.KEY)
-    throw new Error("No way to reach the model: set CFG.ENDPOINT to \"/v1/messages\" and run npm start, or set CFG.KEY.");
-  const headers = { "Content-Type":"application/json" };
-  if(CFG.KEY){
-    headers["x-api-key"] = CFG.KEY;
-    headers["anthropic-version"] = "2023-06-01";
-    headers["anthropic-dangerous-direct-browser-access"] = "true";
+async function claude(system, user, role, onDelta){
+  for(let attempt = 0; ; attempt++){
+    let r;
+    try{
+      r = await fetch(ENDPOINT, { method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ system, user, role }) });
+    }catch(e){
+      if(attempt >= RETRIES) throw new Error("Network error. "+e.message);
+      await sleep(800 * Math.pow(2, attempt));
+      continue;
+    }
+    if(r.status===429 || r.status===529 || r.status>=500){
+      if(attempt >= RETRIES) throw new Error("Rate limited after "+(RETRIES+1)+" tries.");
+      const ra = parseFloat(r.headers.get("retry-after"));
+      await sleep(ra ? ra*1000 : 900*Math.pow(2,attempt) + Math.random()*400);
+      continue;
+    }
+    if(!r.ok){
+      const d = await r.json().catch(() => ({}));
+      throw new Error("Request failed ("+r.status+")" + (d.error && d.error.message ? ": "+d.error.message : ""));
+    }
+    return readFrames(r, onDelta);
   }
-  let r;
-  try{
-    r = await fetch(CFG.ENDPOINT,{
-      method:"POST", headers,
-      body: JSON.stringify({ model:MODEL, max_tokens:maxTokens(), system,
-        messages:[{role:"user",content:user}] })
-    });
-  }catch(e){
-    if(attempt >= CFG.RETRIES) throw new Error("Network error. "+e.message);
-    await sleep(800 * Math.pow(2, attempt));
-    return claude(system, user, attempt+1);
-  }
-  if(r.status===429 || r.status===529 || r.status>=500){
-    if(attempt >= CFG.RETRIES)
-      throw new Error("Rate limited after "+(CFG.RETRIES+1)+" tries. Lower CFG.CONCURRENCY.");
-    const ra = parseFloat(r.headers.get("retry-after"));
-    await sleep(ra ? ra*1000 : 900*Math.pow(2,attempt) + Math.random()*400);
-    return claude(system, user, attempt+1);
-  }
-  if(!r.ok){
-    let detail = "";
-    try{ const j = await r.json(); detail = j.error && j.error.message ? ": "+j.error.message : ""; }catch(e){}
-    throw new Error("Request failed ("+r.status+")"+detail);
-  }
-  const d = await r.json();
-  const text = (d.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("\n");
-  if(d.stop_reason === "max_tokens") text.__truncated = true;
-  return text;
 }
 
-/* run thunks with a concurrency cap instead of all at once */
-async function pool(n, jobs){
-  let i = 0;
-  await Promise.all(Array.from({length:Math.min(n, jobs.length)}, async () => {
-    while(i < jobs.length){ const job = jobs[i++]; await job(); }
-  }));
+/* Once bytes have flowed there is no retry; the server's client already
+   retried rate limits before the first delta. A dropped connection throws
+   with what arrived on e.partial so the inspector can show it. */
+async function readFrames(r, onDelta){
+  const reader = r.body.getReader(), dec = new TextDecoder();
+  let buf = "", acc = "";
+  for(;;){
+    const { value, done } = await reader.read();
+    buf += done ? dec.decode() : dec.decode(value, { stream:true });
+    const lines = buf.split("\n"); buf = lines.pop();
+    for(const line of lines){
+      if(!line.trim()) continue;
+      const f = JSON.parse(line);
+      if(f.delta != null){ acc += f.delta; if(onDelta) onDelta(acc, f.delta); }
+      if(f.error){ const e = new Error(f.error.message || "Request failed."); e.partial = acc; throw e; }
+      if(f.done) return String(f.text != null ? f.text : acc);
+    }
+    if(done) break;
+  }
+  const e = new Error("Connection dropped mid-response."); e.partial = acc; throw e;
 }
 
+/* Models write LaTeX inside JSON strings and sometimes forget to double the
+   backslash: \{ or \alpha instead of \\{ and \\alpha. A backslash that does
+   not start a valid JSON escape is doubled; valid JSON passes untouched. */
+const TEX_AMBIG = /^(?:t(?:au|heta|o|imes|ext(?:bf|it|rm|sf|tt)?|op|an|anh|ilde|riangle|frac|herefore)|b(?:eta|ar|f|egin|inom|oldsymbol|matrix|ig[lrg]*|ackslash|ot|ullet|mod)|f(?:rac|orall|lat|box)|r(?:ho|ight|angle|m|floor|ceil|ightarrow|ightleftharpoons)|n(?:abla|eq|e|u|ot|otin|onumber|ewline|atural|mid|leq|geq|i))(?![A-Za-z])/;
+function fixEscapes(s){
+  return s.replace(/\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4})|\\/g, (m, at) => {
+    if(m.length === 1) return "\\\\";
+    if(m.length === 2 && "tbfrn".includes(m[1]) && TEX_AMBIG.test(s.slice(at+1))) return "\\\\" + m[1];
+    return m;
+  });
+}
 function parseJSON(txt){
   let s = String(txt).trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
   const a = s.indexOf("["), o = s.indexOf("{");
   const start = (a<0)?o : (o<0)?a : Math.min(a,o);
   if(start>0) s = s.slice(start);
+  s = fixEscapes(s);
   try{ return JSON.parse(s); }catch(e){ return repairJSON(s); }
 }
 
-/* A response cut off at max_tokens leaves a half-written element.
+/* Ask and parse; if the answer will not parse, ask once more. Returns
+   {value, raws}: every raw response is kept so a failure can be inspected. */
+async function askJSON(system, user, role, onDelta){
+  const raws = [];
+  for(let attempt = 0; attempt < 2; attempt++){
+    let text;
+    try{ text = await claude(system, user, role, onDelta); }
+    catch(e){ if(e.partial) raws.push(e.partial); e.raws = raws; throw e; }
+    raws.push(text);
+    try{ return { value: parseJSON(text), raws }; }
+    catch(e){ if(attempt === 1){ e.raws = raws; throw e; } }
+  }
+}
+/* The raw text behind a failure, for the inspector. */
+function rawOf(e){
+  const r = (e && e.raws || []).filter(x => x != null);
+  return r.length ? r.map((x,i) => (r.length > 1 ? "──── attempt " + (i+1) + " ────\n\n" : "") + x).join("\n\n") : "";
+}
+
+/* A response cut off mid-way leaves a half-written element.
    Walk to the last element that closed cleanly and discard the rest. */
 function repairJSON(s){
   const root = s[0];
@@ -629,6 +683,7 @@ const PROMPTS = {
   edit:          { label:"Edit · system" },
   edit_user:     { label:"Edit · user" },
   figure:        { label:"Diagram · system" },
+  figure_user:   { label:"Diagram · user" },
   simpler:       { label:"Action · Simpler" },
   example:       { label:"Action · Example" },
   derive:        { label:"Action · Derive" },
@@ -669,15 +724,15 @@ function readerText(known){
   return (known && known.trim()) ? base + "\n" + known.trim() : base;
 }
 
-/* sigil/label are stored on each revised block; the margin shows the
-   label in lowercase. key is the pen's keyboard shortcut.           */
+/* label is stamped on each revised block and shown in the margin in
+   lowercase; key is the pen's keyboard shortcut.                     */
 const ACTIONS = {
-  simpler: { sigil:"SMP", label:"Simpler",    key:"1" },
-  example: { sigil:"EX",  label:"Example",    key:"2" },
-  derive:  { sigil:"DRV", label:"Derivation", key:"3" },
-  figure:  { sigil:"FIG", label:"Diagram",    key:"4" },
-  tighter: { sigil:"CUT", label:"Tighter",    key:"5" },
-  ask:     { sigil:"Q",   label:"Question",   key:"6" }
+  simpler: { label:"Simpler",    key:"1" },
+  example: { label:"Example",    key:"2" },
+  derive:  { label:"Derivation", key:"3" },
+  figure:  { label:"Diagram",    key:"4" },
+  tighter: { label:"Tighter",    key:"5" },
+  ask:     { label:"Question",   key:"6" }
 };
 const word = edit => String(edit && edit.label || "").toLowerCase();
 
@@ -836,6 +891,13 @@ function renderDoc(){
   main.replaceChildren(a);
   typeset(a);
   layoutSidenotes();
+  rehighlight();
+}
+function rehighlight(){
+  const b = doc && doc.blocks.find(x => x.busy && x.hl);
+  if(!b) return;
+  const e = main.querySelector(`[data-block-id="${b.id}"] .body`);
+  if(e) highlightIn(e, b.hl);
 }
 
 function blockEl(b, n){
@@ -851,10 +913,11 @@ function blockEl(b, n){
   if(b.kind === "heading"){
     e.appendChild(el("span", "marg num", "§ " + (n || "")));
   }
-  if(b.pending || b.busy){
+  if(b.queued) e.classList.add("queued");
+  if((b.pending && !b.queued) || b.busy){
     const s = el("span", "marg status");
     s.appendChild(el("i", "dot"));
-    s.append(b.busy ? word(ACTIONS[b.busy] || {label:"revising"}) : (b.plan ? "planning" : "writing"));
+    s.append(b.busy ? word(ACTIONS[b.busy] || {label:"revising"}) : (b.plan ? "planning" : (b.kind==="figure" ? "drawing" : "writing")));
     e.appendChild(s);
   }else if(b.edit && b.kind !== "note"){
     const m = el("button", "marg mark", word(b.edit));
@@ -873,19 +936,22 @@ function blockEl(b, n){
 
   const body = el("div", "body");
   if(b.pending){
-    /* ruled lines, waiting */
+    /* ruled lines, waiting; the raw output so far once any has arrived */
+    if(b.live) body.appendChild(el("pre", "live", liveTail(b.live)));
   }else if(b.error){
     const x = el("div", "err", b.error);
     const r = el("button", null, "Retry"); r.type = "button";
     r.onclick = () => b.retry && b.retry();
-    x.appendChild(r); body.appendChild(x);
+    x.appendChild(r);
+    if(b.remove){ const rm = el("button", null, "Remove"); rm.type = "button"; rm.onclick = () => b.remove(); x.appendChild(rm); }
+    if(b.raw){ const rw = el("button", null, "Raw"); rw.type = "button"; rw.onclick = () => showRaw(b.raw); x.appendChild(rw); }
+    body.appendChild(x);
   }else if(b.kind === "figure"){
     const fig = el("figure");
     fig.innerHTML = String(b.md).replace(/<script[\s\S]*?<\/script>/gi,"");
-    if(b.caption || b.explanation){
+    if(b.caption){
       const fc = el("figcaption");
-      if(b.caption){ const c = el("span", "cap"); c.innerHTML = mdInline(b.caption); fc.appendChild(c); }
-      if(b.explanation){ const x = el("span", "exp"); x.innerHTML = mdToHtml(b.explanation); fc.appendChild(x); }
+      fc.innerHTML = mdInline(b.caption);
       fig.appendChild(fc);
     }
     body.appendChild(fig);
@@ -924,6 +990,7 @@ function patch(b){
   old.replaceWith(fresh);
   typeset(fresh);
   layoutSidenotes();
+  rehighlight();
 }
 
 /* Sidenotes sit in the right margin, level with the block they answer,
@@ -934,7 +1001,7 @@ function layoutSidenotes(){
   const notes = d.querySelectorAll('.block[data-kind="note"]');
   d.style.paddingBottom = "";
   if(!notes.length) return;
-  if(!matchMedia("(min-width:1180px)").matches){ notes.forEach(x => x.style.top = ""); return; }
+  if(!matchMedia("(min-width:1240px)").matches){ notes.forEach(x => x.style.top = ""); return; }
   let floor = 0, deepest = 0;
   notes.forEach(x => {
     let a = x.previousElementSibling;
@@ -957,7 +1024,7 @@ function save(){
   if(!doc) return;
   clearTimeout(saveT);
   saveT = setTimeout(async () => {
-    const clean = { ...doc, blocks: doc.blocks.map(({busy,pending,error,retry,fresh,slot,plan,...r}) => r) };
+    const clean = { ...doc, blocks: doc.blocks.map(({busy,hl,pending,queued,error,retry,remove,fresh,plan,draw,live,...r}) => r) };
     await store.set("primer:doc:"+doc.id, clean);
     const i = index.findIndex(x => x.id===doc.id);
     const entry = { id:doc.id, title:doc.title, updated:Date.now() };
@@ -969,8 +1036,45 @@ function save(){
 async function openDoc(id){
   const d = await store.get("primer:doc:"+id);
   if(!d) return;
-  doc = d; undoStack = []; route = "doc"; render();
+  doc = d; undoStack = []; route = "doc";
+  resumable();
+  render();
   scrollTo(0, 0);
+}
+
+/* A section that never landed, or a diagram that was never drawn, comes back
+   from storage as an empty block. Give it its error, its raw text, its Retry. */
+function resumable(){
+  doc.blocks.forEach(b => {
+    if(b.md || b.error) return;
+    if(b.slot){
+      b.error = "Section " + (b.sec+1) + " wasn't written.";
+      b.retry = () => retrySection(b.sec);
+    }else if(b.kind === "figure" && b.brief){
+      b.error = "Diagram wasn't drawn.";
+      b.retry = () => retryFigure(b);
+      b.remove = () => { swapBlock(b.id, []); save(); };
+    }
+  });
+}
+/* What genSection / genFigure need, derived from the document itself. */
+function docContext(){
+  const titles = doc.blocks.filter(b => b.kind==="heading").map(b => b.md.replace(/^#+\s*/,""));
+  return { titles, outline: titles.map((s,i) => (i+1)+". "+s).join("\n"), reader: readerText(doc.known) };
+}
+function retrySection(i){
+  const { titles, outline, reader } = docContext();
+  const at = doc.blocks.findIndex(b => b.slot && b.sec===i);
+  if(at < 0) return;
+  doc.blocks.splice(at, 1, { id:uid(), kind:"prose", md:"", sec:i, slot:true, pending:true });
+  if(route === "doc") render();
+  genSection(i, titles[i] || "", outline, reader);
+}
+function retryFigure(b){
+  const { titles, outline, reader } = docContext();
+  const p = { id:uid(), kind:"figure", md:"", sec:b.sec, brief:b.brief, pending:true, draw:true };
+  swapBlock(b.id, [p]);
+  drawLater(p, titles[b.sec] || "", outline, reader);
 }
 async function deleteDoc(id){
   index = index.filter(x => x.id !== id);
@@ -981,7 +1085,7 @@ async function deleteDoc(id){
 }
 function snapshot(){
   undoStack.push(JSON.parse(JSON.stringify(
-    doc.blocks.map(({busy,pending,error,retry,fresh,slot,plan,...r}) => r))));
+    doc.blocks.map(({busy,hl,pending,queued,error,retry,remove,fresh,plan,draw,live,...r}) => r))));
   if(undoStack.length > 30) undoStack.shift();
   undoBtn.classList.remove("hide");
 }
@@ -993,6 +1097,28 @@ function doUndo(){
 }
 
 /* ══ generation ═══════════════════════════════════════════════ */
+/* Cheap progress: while a block is pending, the model's raw output so far is
+   written into its slot. Kept on b.live so a full render() mid-stream keeps
+   it; DOM updates are batched per frame and stop once the block is gone. */
+const LIVE_TAIL = 1400;
+function liveTail(s){ return s.length > LIVE_TAIL ? "…" + s.slice(-LIVE_TAIL) : s; }
+function liveInto(b){
+  let t = 0;
+  return soFar => {
+    b.live = soFar;
+    if(t) return;
+    t = requestAnimationFrame(() => {
+      t = 0;
+      if(route !== "doc" || !doc || !doc.blocks.includes(b)) return;
+      const body = main.querySelector(`[data-block-id="${b.id}"] .body`);
+      if(!body) return;
+      let pre = body.querySelector(".live");
+      if(!pre){ pre = el("pre", "live"); body.appendChild(pre); }
+      pre.textContent = liveTail(b.live);
+    });
+  };
+}
+
 async function build(topic, known){
   const reader = readerText(known);
   doc = { id:uid(), title:topic, topic, known:known||"", created:Date.now(), blocks:[
@@ -1001,46 +1127,72 @@ async function build(topic, known){
 
   let plan;
   try{
-    plan = parseJSON(await claude(sys("outline"),
-      usr("outline_user", { READER: reader, TOPIC: topic })));
+    plan = (await askJSON(sys("outline"), usr("outline_user", { READER: reader, TOPIC: topic }), "outline",
+      liveInto(doc.blocks[0]))).value;
   }catch(e){
     doc.blocks = [{ id:uid(), kind:"prose", md:"", error:"Couldn't plan this explainer. "+e.message,
-      retry:()=>build(topic,known) }];
+      raw: rawOf(e), retry:()=>build(topic,known) }];
     return render();
   }
   doc.title = plan.title || topic;
 
-  const outline = (plan.sections||[]).map((s,i)=>(i+1)+". "+s).join("\n");
+  const sections = plan.sections || [];
+  const outline = sections.map((s,i)=>(i+1)+". "+s).join("\n");
   doc.blocks = [];
-  (plan.sections||[]).forEach((title,i) => {
+  sections.forEach((title,i) => {
     doc.blocks.push({ id:uid(), kind:"heading", md:"## "+title, sec:i, fresh:true });
-    doc.blocks.push({ id:uid(), kind:"prose", pending:true, md:"", sec:i, slot:true });
+    doc.blocks.push({ id:uid(), kind:"prose", pending:true, queued:true, md:"", sec:i, slot:true });
   });
   render();
   save();
 
-  await pool(CFG.CONCURRENCY,
-    (plan.sections||[]).map((title,i) => () => genSection(i, title, outline, reader)));
+  /* Sections are written in order so each can build on the ones before it.
+     Diagrams are drawn on a side queue and overlap with the next section. */
+  const d = doc;
+  for(let i = 0; i < sections.length; i++){
+    if(doc !== d) return;
+    const slot = doc.blocks.find(b => b.slot && b.sec===i);
+    if(slot){ slot.queued = false; if(route === "doc") patch(slot); }
+    await genSection(i, sections[i], outline, reader);
+  }
   save();
+}
+
+/* Everything already on the page before section i: headings, prose, and for
+   each diagram its brief, plus its caption once it has been drawn. */
+function priorText(i){
+  const parts = [];
+  for(const b of doc.blocks){
+    if(b.sec == null || b.sec >= i) continue;
+    if(b.kind === "heading" || b.kind === "prose" || b.kind === "note"){ if(b.md) parts.push(b.md); }
+    else if(b.kind === "figure" && (b.brief || b.caption)){
+      parts.push("[Diagram]" + (b.brief ? "\nBrief: " + b.brief : "") + (b.caption ? "\nCaption: " + b.caption : ""));
+    }
+  }
+  return parts.join("\n\n");
 }
 
 async function genSection(i, title, outline, reader){
   const user = usr("section_user", {
-    READER: reader, TITLE: doc.title, OUTLINE: outline, N: i+1, SECTION: title });
+    READER: reader, TITLE: doc.title, OUTLINE: outline, N: i+1, SECTION: title,
+    PRIOR: priorText(i) || "(none yet)" });
   try{
-    const arr = parseJSON(await claude(sys("section"), user));
-    const made = (Array.isArray(arr)?arr:[]).filter(x=>x&&x.md)
-      .map(x => ({ id:uid(), kind:"prose", md:x.md, sec:i, fresh:true }));
-    if(!made.length) throw new Error("Empty section.");
+    const slot = doc.blocks.find(b => b.slot && b.sec===i);
+    const { value:arr, raws } = await askJSON(sys("section"), user, "section", slot && liveInto(slot));
+    const made = (Array.isArray(arr)?arr:[])
+      .filter(x => x && (x.md || (x.kind==="figure" && x.brief)))
+      .map(x => x.kind==="figure" && x.brief
+        ? { id:uid(), kind:"figure", md:"", sec:i, brief:String(x.brief).trim(), pending:true, draw:true }
+        : { id:uid(), kind:"prose", md:x.md, sec:i, fresh:true });
+    if(!made.some(b => b.md)){ const e = new Error("Empty section."); e.raws = raws; throw e; }
     replaceSlot(i, made);
     save();
+    made.filter(b => b.draw).forEach(f => drawLater(f, title, outline, reader));
   }catch(e){
     replaceSlot(i, [{ id:uid(), kind:"prose", md:"", sec:i, slot:true,
-      error:"Section "+(i+1)+" didn't come back. "+e.message,
-      retry:() => {
-        replaceSlot(i, [{ id:uid(), kind:"prose", md:"", sec:i, slot:true, pending:true }]);
-        genSection(i, title, outline, reader);
-      } }]);
+      error:"Section "+(i+1)+" didn't come back. "+e.message, raw: rawOf(e),
+      retry:() => retrySection(i) }]);
+    save();
   }
 }
 function replaceSlot(i, blocks){
@@ -1048,6 +1200,49 @@ function replaceSlot(i, blocks){
   if(at<0) return;
   doc.blocks.splice(at, 1, ...blocks);
   if(route === "doc") render();
+}
+function swapBlock(id, blocks){
+  const at = doc.blocks.findIndex(b => b.id===id);
+  if(at<0) return;
+  doc.blocks.splice(at, 1, ...blocks);
+  if(route === "doc") render();
+}
+
+/* Diagrams are drawn one at a time, alongside the section being written. */
+let drawChain = Promise.resolve();
+function drawLater(f, sectionTitle, outline, reader){
+  drawChain = drawChain.then(() => genFigure(f, sectionTitle, outline, reader)).catch(() => {});
+}
+
+/* A figure the section writer asked for, queued as soon as that section's
+   prose has landed. The illustrator sees the brief, the outline, and the
+   whole section's prose, split at the slot. */
+async function genFigure(f, sectionTitle, outline, reader){
+  const idx = doc.blocks.findIndex(b => b.id===f.id);
+  if(idx<0) return;
+  const prose = b => b.kind==="prose" && b.md && b.sec===f.sec;
+  const before = doc.blocks.slice(0, idx).filter(prose).map(b=>b.md).join("\n\n");
+  const after  = doc.blocks.slice(idx+1).filter(prose).map(b=>b.md).join("\n\n");
+  const user = usr("figure_user", {
+    READER: reader, TITLE: doc.title, OUTLINE: outline, SECTION: sectionTitle,
+    BEFORE: before || "(none)", AFTER: after || "(none)", BRIEF: f.brief
+  });
+  try{
+    const { value:out, raws } = await askJSON(sys("figure"), user, "figure", liveInto(f));
+    const x = ((out && out.blocks)||[]).find(b => b && b.md);
+    if(!x){ const e = new Error("Empty response."); e.raws = raws; throw e; }
+    const made = { id:uid(), kind:"figure", md:x.md, sec:f.sec, brief:f.brief, fresh:true };
+    if(x.caption) made.caption = String(x.caption).trim();
+    swapBlock(f.id, [made]);
+    save();
+  }catch(e){
+    const eb = { id:uid(), kind:"figure", md:"", sec:f.sec, brief:f.brief,
+      error:"Diagram didn't come back. "+e.message, raw: rawOf(e) };
+    eb.retry = () => retryFigure(eb);
+    eb.remove = () => { swapBlock(eb.id, []); save(); };
+    swapBlock(f.id, [eb]);
+    save();
+  }
 }
 
 /* ══ editing ══════════════════════════════════════════════════ */
@@ -1066,7 +1261,10 @@ async function applyEdit(blockId, act, question){
   const highlighted = (sel && sel.blockId===blockId && sel.text) ? sel.text : target.md;
 
   snapshot();
-  target.busy = act; patch(target);
+  target.busy = act;
+  target.hl = (sel && sel.blockId===blockId && sel.text) ? sel.text : "";
+  inFlight++;
+  patch(target);
 
   const { outline, before, after } = context(idx);
   const user = usr("edit_user", {
@@ -1082,20 +1280,17 @@ async function applyEdit(blockId, act, question){
   });
 
   try{
-    const out = parseJSON(await claude(sys(act==="figure" ? "figure" : "edit"), user));
-    const blocks = (out.blocks||[]).filter(x => x && x.md);
-    if(!blocks.length) throw new Error("Empty response.");
-    const stamp = { sigil:a.sigil, label:a.label, note:question||"", quote:highlighted.slice(0,220), ts:Date.now() };
+    const { value:out, raws } = await askJSON(sys(act==="figure" ? "figure" : "edit"), user, act==="figure" ? "figure" : "edit");
+    const blocks = ((out && out.blocks)||[]).filter(x => x && x.md);
+    if(!blocks.length){ const e = new Error("Empty response."); e.raws = raws; throw e; }
+    const stamp = { label:a.label, note:question||"", quote:highlighted.slice(0,220), ts:Date.now() };
     const made = blocks.map(x => {
       const b = { id:uid(), kind: act==="figure" ? "figure" : (x.kind==="note" ? "note" : "prose"),
         md:x.md, sec:target.sec, edit:stamp, fresh:true };
-      if(act==="figure"){
-        if(x.caption) b.caption = String(x.caption).trim();
-        if(x.explanation) b.explanation = String(x.explanation).trim();
-      }
+      if(act==="figure" && x.caption) b.caption = String(x.caption).trim();
       return b;
     });
-    target.busy = false;
+    target.busy = false; delete target.hl; inFlight--; clearHighlight();
     const replaced = act!=="figure" && out.mode==="replace";
     if(replaced) doc.blocks.splice(idx, 1, ...made);
     else doc.blocks.splice(idx+1, 0, ...made);
@@ -1107,15 +1302,47 @@ async function applyEdit(blockId, act, question){
     save();
     toast(replaced ? "Replaced" : "Added", { undo:true });
   }catch(e){
-    target.busy = false;
+    target.busy = false; delete target.hl; inFlight--; clearHighlight();
     undoStack.pop();
     if(route === "doc") patch(target);
     undoBtn.classList.toggle("hide", !undoStack.length);
-    toast("That edit didn't come back: " + e.message, { err:true });
+    toast("That edit didn't come back: " + e.message, { err:true, raw: rawOf(e) });
   }
 }
 
 /* ══ the pen ══════════════════════════════════════════════════ */
+/* Keep the chosen span visibly marked while its revision is in flight.
+   CSS Custom Highlight API: no DOM changes, so KaTeX and markup are safe.
+   The block is re-rendered when it goes busy, so the span is found again
+   by text inside the fresh element.                                   */
+const canHighlight = typeof CSS !== "undefined" && CSS.highlights && typeof Highlight === "function";
+function clearHighlight(){ if(canHighlight) CSS.highlights.delete("pen"); }
+function highlightRange(range){ if(canHighlight && range) CSS.highlights.set("pen", new Highlight(range)); }
+function highlightIn(root, text){
+  if(!canHighlight || !root || !text) return;
+  const nodes = [], walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let n, all = "";
+  while((n = walker.nextNode())){ nodes.push({ n, start: all.length }); all += n.textContent; }
+  let i = all.indexOf(text);
+  if(i < 0){
+    const squash = s => s.replace(/\s+/g, " ");
+    const map = []; let sq = "";
+    for(let k = 0; k < all.length; k++){
+      const c = /\s/.test(all[k]) ? " " : all[k];
+      if(c === " " && sq.endsWith(" ")) continue;
+      map.push(k); sq += c;
+    }
+    const j = sq.indexOf(squash(text).trim());
+    if(j < 0) return;
+    i = map[j];
+    text = all.slice(i, map[j + squash(text).trim().length - 1] + 1);
+  }
+  const at = pos => { let last = nodes[0]; for(const x of nodes){ if(x.start > pos) break; last = x; } return last; };
+  const a = at(i), b = at(i + text.length - 1);
+  const r = document.createRange();
+  r.setStart(a.n, i - a.start); r.setEnd(b.n, i + text.length - b.start);
+  highlightRange(r);
+}
 function readSelection(){
   const s = window.getSelection();
   if(!s || s.isCollapsed || !s.rangeCount) return null;
@@ -1138,7 +1365,8 @@ function placeTools(rect){
   if(y < window.scrollY + headH + 4) y = rect.bottom + window.scrollY + 10;
   pen.style.left = x+"px"; pen.style.top = y+"px";
 }
-function hideTools(){ pen.classList.remove("show","asking"); askInput.value = ""; }
+function hideTools(){ pen.classList.remove("show","asking"); askInput.value = ""; if(!inFlight) clearHighlight(); }
+let inFlight = 0;
 function showForSelection(){
   const s = readSelection();
   if(!s){ if(!pen.classList.contains("asking")) hideTools(); return; }
@@ -1159,13 +1387,18 @@ document.addEventListener("selectionchange", () => {
   clearTimeout(selT); selT = setTimeout(showForSelection, 350);
 });
 document.addEventListener("mousedown", e => {
+  if(!rawEl.hidden && !rawEl.contains(e.target)) hideRaw();
   if(!pen.contains(e.target) && !pen.classList.contains("asking")) hideTools();
   if(!pop.contains(e.target)) pop.classList.remove("show");
   if(!outline.contains(e.target) && !runhead.contains(e.target)) closeOutline();
 });
 function trigger(act){
   if(!sel) return;
-  if(act==="ask"){ pen.classList.add("asking"); askInput.focus(); return; }
+  if(act==="ask"){
+    const s = window.getSelection();
+    if(s && s.rangeCount) highlightRange(s.getRangeAt(0).cloneRange());
+    pen.classList.add("asking"); askInput.focus(); return;
+  }
   const {blockId} = sel;
   hideTools();
   applyEdit(blockId, act, "");
@@ -1183,7 +1416,7 @@ $("#askForm").onsubmit = e => {
   applyEdit(blockId, "ask", q);
 };
 askInput.onkeydown = e => {
-  if(e.key==="Escape"){ e.preventDefault(); e.stopPropagation(); pen.classList.remove("asking"); askInput.value=""; }
+  if(e.key==="Escape"){ e.preventDefault(); e.stopPropagation(); pen.classList.remove("asking"); askInput.value=""; clearHighlight(); }
 };
 
 /* ══ provenance popover ═══════════════════════════════════════ */
@@ -1291,11 +1524,26 @@ function toast(msg, o){
     b.onclick = () => { hideToast(); doUndo(); };
     toastEl.appendChild(b);
   }
+  if(o.raw){
+    const b = el("button", null, "Raw"); b.type = "button";
+    b.onclick = () => { hideToast(); showRaw(o.raw); };
+    toastEl.appendChild(b);
+  }
   toastEl.classList.add("show");
   clearTimeout(toastT);
-  toastT = setTimeout(hideToast, o.err ? 9000 : 6000);
+  toastT = setTimeout(hideToast, o.raw ? 14000 : o.err ? 9000 : 6000);
 }
 function hideToast(){ toastEl.classList.remove("show"); }
+
+/* ══ raw response inspector ═══════════════════════════════════ */
+const rawEl = $("#raw"), rawText = $("#rawText");
+function showRaw(text){ rawText.textContent = text; rawEl.hidden = false; $("#rawClose").focus(); }
+function hideRaw(){ rawEl.hidden = true; }
+$("#rawClose").onclick = hideRaw;
+$("#rawCopy").onclick = async () => {
+  try{ await navigator.clipboard.writeText(rawText.textContent); toast("Copied"); }
+  catch(e){ const r = document.createRange(); r.selectNodeContents(rawText); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+};
 
 /* ══ prompts page ═════════════════════════════════════════════ */
 function renderPrompts(){
@@ -1339,7 +1587,7 @@ function exportDoc(){
   if(!doc) return;
   const md = "# " + doc.title + "\n\n" + doc.blocks.map(b =>
     b.kind==="figure"
-      ? "<!-- diagram -->\n" + b.md + (b.caption ? "\n\n*" + b.caption + "*" : "") + (b.explanation ? "\n\n" + b.explanation : "")
+      ? "<!-- diagram -->\n" + b.md + (b.caption ? "\n\n*" + b.caption + "*" : "")
       : b.md).join("\n\n") + "\n";
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([md], {type:"text/markdown"}));
@@ -1373,6 +1621,7 @@ document.addEventListener("keydown", e => {
   const tag = document.activeElement && document.activeElement.tagName;
   const inField = tag==="INPUT" || tag==="TEXTAREA";
   if(e.key === "Escape"){
+    if(!rawEl.hidden){ hideRaw(); return; }
     if(outline.classList.contains("show")){ closeOutline(); return; }
     if(pop.classList.contains("show")){ closePops(); return; }
     if(pen.classList.contains("show")){ hideTools(); return; }
@@ -1395,12 +1644,6 @@ document.addEventListener("keydown", e => {
   const missing = await loadPrompts();
   index = (await store.get("primer:index")) || [];
   overrides = (await store.get("primer:prompts")) || {};
-  const legacy = await store.get("primer:profile");
-  if(legacy && !("reader" in overrides)){
-    overrides.reader = legacy;
-    await store.set("primer:prompts", overrides);
-    await store.del("primer:profile");
-  }
   render();
   if(missing.length) toast("Couldn't read " + (missing.length===1 ? "prompts/"+missing[0]+".txt" : missing.length+" files in prompts/") +
     ". Primer has to be served over http, e.g. npm start", { err:true });

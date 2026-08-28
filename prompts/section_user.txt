@@ -6,6 +6,9 @@ TOPIC: {{TITLE}}
 FULL OUTLINE:
 {{OUTLINE}}
 
+SECTIONS ALREADY WRITTEN:
+{{PRIOR}}
+
 WRITE SECTION {{N}}: {{SECTION}}
 
-Cover only this section. Earlier sections already covered what precedes it; later sections will cover what follows. Do not preview or summarise them.
+Later sections will cover what follows; do not preview or summarise them.
