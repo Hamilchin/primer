@@ -10,3 +10,7 @@
 ~~The failing happens twice for some reason: Writing §10 failed: No key to run on. Add one, or link to a shared key, in Settings. InspectDismissWriting §10 failed: No key to run on. Add one, or link to a shared key, in Settings.InspectDismiss~~
 ~~Put the title "Library" before the list of existing primers~~
 ~~Make clear that the instructions and already know are optional in the empty fields.~~
+~~The "Image wasn't found. network error" and similar errors have a left sidebar that is not aligned with the sidebars from user asks. Align them.~~
+~~Whenever a user asks for something, the left colored bar, when hovered over, should highlight the part that the user highlighted when they asked.~~
+~~Make the primer logo/word slightly bigger.~~
+~~Add a word count to the library for each prompt. Add a search bar for the library. Add an arrow that says "more" and hides the rest of the library if more than 15 items.~~
