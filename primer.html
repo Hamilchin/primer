@@ -659,7 +659,7 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited::before{displa
 
 <div class="pen" id="tools" role="toolbar" aria-label="Revise">
   <div class="pen-row">
-    <button data-act="simpler">Simpler<kbd>1</kbd></button>
+    <button data-act="explain">Explain<kbd>1</kbd></button>
     <button data-act="example">Example<kbd>2</kbd></button>
     <button data-act="derive">Derive<kbd>3</kbd></button>
     <button data-act="figure">Diagram<kbd>4</kbd></button>
@@ -946,7 +946,7 @@ const PROMPTS = {
   research_user:        { group:"write",   label:"Research · user" },
   edit:                 { group:"revise",  label:"Edit · system" },
   edit_user:            { group:"revise",  label:"Edit · user" },
-  simpler:              { group:"revise",  label:"Simpler" },
+  explain:              { group:"revise",  label:"Explain" },
   example:              { group:"revise",  label:"Example" },
   derive:               { group:"revise",  label:"Derive" },
   tighter:              { group:"revise",  label:"Tighter" },
@@ -999,7 +999,7 @@ function instrText(d){
 /* label is stamped on each revised block and shown in the margin in
    lowercase; key is the pen's keyboard shortcut.                     */
 const ACTIONS = {
-  simpler: { label:"Simpler",    key:"1" },
+  explain: { label:"Explain",    key:"1" },
   example: { label:"Example",    key:"2" },
   derive:  { label:"Derivation", key:"3" },
   figure:  { label:"Diagram",    key:"4" },
