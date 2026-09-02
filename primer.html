@@ -6,19 +6,23 @@
 <title>primer</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<script>/* theme before first paint */
-(function(){try{var t=localStorage.getItem("primer:theme");if(t!=="dark"&&t!=="light")t=matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light";document.documentElement.dataset.theme=t;}catch(e){}})();
+<script>/* theme and look before first paint */
+(function(){try{var d=document.documentElement,t=localStorage.getItem("primer:theme");if(t!=="dark"&&t!=="light")t=matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light";d.dataset.theme=t;var l=localStorage.getItem("primer:look");if(l)d.dataset.look=l;}catch(e){}})();
 </script>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Literata:ital,opsz,wght@0,7..72,400..700;1,7..72,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 
 <style>
 /* ══ tokens ═══════════════════════════════════════════════════
-   White, black, grey, and one blue for anything that can be followed.
-   Type is the system face: nothing to load, nothing to notice.        */
+   Plain: white, black, grey, and one blue for anything that can be
+   followed, in the system face. Paper: warm paper and ink with an
+   editor's red, in Fraunces, Literata and Plex Mono. Each in light and
+   dark. A look may change the faces as well as the colours.          */
 :root{
   --bg:#fff; --bg-2:#f6f6f6;
   --fg:#1a1a1a; --fg-2:#5c5c5c; --fg-3:#8c8c8c;
@@ -26,8 +30,8 @@
   --accent:#0b47b5; --accent-line:rgba(11,71,181,.35); --accent-bg:rgba(11,71,181,.07);
   --lift:0 1px 2px rgba(0,0,0,.05),0 4px 14px rgba(0,0,0,.07);
   --col:40rem; --gutter:1.5rem; --marg:6rem; --side:13rem; --sgap:2.5rem; --head:2.5rem;
-  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-  --serif:Charter,"Iowan Old Style",Georgia,"Times New Roman",serif;
+  --text:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --disp:Charter,"Iowan Old Style",Georgia,"Times New Roman",serif;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
   color-scheme:light;
 }
@@ -39,13 +43,30 @@
   --lift:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.45);
   color-scheme:dark;
 }
+:root[data-look="paper"]{
+  --bg:#F5F0E6; --bg-2:#ECE5D6;
+  --fg:#1E1A15; --fg-2:#564A3F; --fg-3:#8E8375;
+  --rule:#E0D8C8; --rule-2:#CBC0AC;
+  --accent:#A23B2A; --accent-line:rgba(162,59,42,.35); --accent-bg:rgba(162,59,42,.08);
+  --lift:0 1px 2px rgba(50,35,20,.10),0 4px 14px rgba(50,35,20,.14);
+  --text:"Literata",Charter,"Iowan Old Style",Georgia,serif;
+  --disp:"Fraunces","Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+}
+:root[data-look="paper"][data-theme="dark"]{
+  --bg:#191613; --bg-2:#12100E;
+  --fg:#EAE2D4; --fg-2:#B7AC9D; --fg-3:#7E7468;
+  --rule:#2D2721; --rule-2:#3D352D;
+  --accent:#E2836B; --accent-line:rgba(226,131,107,.4); --accent-bg:rgba(226,131,107,.12);
+  --lift:0 1px 2px rgba(0,0,0,.5),0 4px 14px rgba(0,0,0,.55);
+}
 
 /* ══ base ═════════════════════════════════════════════════════ */
 *{box-sizing:border-box}
-html{background:var(--bg)}
+html{background:var(--bg);overscroll-behavior-y:none}
 body{
   margin:0; min-height:100dvh; background:var(--bg); color:var(--fg);
-  font-family:var(--sans); font-size:17px; line-height:1.55;
+  font-family:var(--text); font-size:17px; line-height:1.55;
   -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
 }
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;text-align:left}
@@ -58,6 +79,7 @@ a:hover{text-decoration-color:currentColor}
 /* Small text, used for everything that is not the reading matter: labels,
    metadata, controls. One size, one colour, no capitals. */
 .lab{display:block;font-size:13px;line-height:1.4;font-weight:400;color:var(--fg-3);margin:0 0 .3rem}
+:root[data-look="paper"] .lab{font-size:14px;font-weight:500;font-variant-caps:all-small-caps;letter-spacing:.12em}
 .empty{font-size:15px;color:var(--fg-3);margin:0}
 
 /* ══ header ═══════════════════════════════════════════════════ */
@@ -68,7 +90,7 @@ a:hover{text-decoration-color:currentColor}
   font-size:13px;
 }
 .head.scrolled{border-bottom-color:var(--rule)}
-.wordmark{display:inline-flex;align-items:center;gap:.5rem;color:var(--fg);font-family:var(--serif);font-size:17px;line-height:1}
+.wordmark{display:inline-flex;align-items:center;gap:.5rem;color:var(--fg);font-family:var(--disp);font-size:17px;line-height:1}
 .wordmark svg{width:16px;height:16px;display:block;flex:0 0 auto}
 .wordmark:hover{color:var(--accent)}
 .acts{display:flex;align-items:center;gap:1.1rem}
@@ -89,6 +111,10 @@ main{padding:1.5rem var(--gutter) 8rem}
    A topic line, then the list. The rest of the form appears once there is
    a topic to write about.                                               */
 .cover{max-width:var(--col);margin:3.5rem auto 0}
+@media (min-width:1100px){
+  .cover:has(.shelf){max-width:72rem;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 3.5rem;align-items:start}
+  .cover:has(.shelf) .library{margin-top:0;padding-left:3.5rem;border-left:1px solid var(--rule)}
+}
 .topic{
   width:100%; display:block; font-size:1.6rem; line-height:1.25; font-weight:500; letter-spacing:-.015em; color:var(--fg);
   background:none; border:0; border-bottom:1px solid var(--fg); padding:.1rem 0 .55rem; resize:none; overflow:hidden; border-radius:0;
@@ -136,6 +162,7 @@ main{padding:1.5rem var(--gutter) 8rem}
 .go:hover{background:var(--accent);color:#fff}
 .go kbd{font-family:inherit;font-size:12px;opacity:.55;margin-left:.7em}
 .library{margin-top:3rem}
+.library .lab{margin-bottom:.45rem}
 .shelf{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
 .shelf li{display:flex;align-items:baseline;gap:1rem;border-bottom:1px solid var(--rule)}
 .shelf .open{
@@ -161,7 +188,7 @@ main{padding:1.5rem var(--gutter) 8rem}
 .doc-head{margin:0 0 2.5rem}
 .title{
   margin:0 0 .8rem; padding-bottom:.55rem; border-bottom:1px solid var(--rule);
-  font-family:var(--serif); font-size:2.3rem; line-height:1.15; font-weight:400; text-wrap:balance;
+  font-family:var(--disp); font-size:2.3rem; line-height:1.15; font-weight:400; text-wrap:balance;
 }
 /* One row under the title: what can be done with this primer, then where
    it stands (who is working on it, what went wrong), then Undo at the end.
@@ -228,7 +255,7 @@ main{padding:1.5rem var(--gutter) 8rem}
 .body p{margin:0 0 1rem;text-wrap:pretty}
 .body h2{
   margin:0; padding-bottom:.3rem; border-bottom:1px solid var(--rule);
-  font-family:var(--serif); font-size:1.55rem; line-height:1.25; font-weight:400; text-wrap:balance;
+  font-family:var(--disp); font-size:1.55rem; line-height:1.25; font-weight:400; text-wrap:balance;
 }
 .body h3{font-size:1.08rem;font-weight:600;margin:1.5rem 0 .4rem}
 .body h4{font-size:1rem;font-weight:600;margin:1.25rem 0 .3rem}
@@ -276,7 +303,7 @@ body[data-sources="off"] .cite{display:none}
 }
 /* The section number sits in the margin at the heading's own size and face,
    greyed, so the two read as one line. */
-.num{top:0;font-family:var(--serif);font-size:1.55rem;line-height:1.25;font-variant-numeric:lining-nums tabular-nums}
+.num{top:0;font-family:var(--disp);font-size:1.55rem;line-height:1.25;font-variant-numeric:lining-nums tabular-nums}
 .block:has(.status) .num{display:none}
 .mark{pointer-events:auto;text-align:right;color:var(--fg-3)}
 .mark:hover,.mark[aria-expanded="true"]{color:var(--accent)}
@@ -300,7 +327,7 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited::before{displa
   font-family:var(--mono); font-size:12.5px; line-height:1.6; color:var(--fg-3);
   white-space:pre-wrap; word-break:break-word;
 }
-.block.pending .live.prose{font-family:var(--sans);font-size:16px;line-height:1.55;color:var(--fg-2);white-space:pre-wrap}
+.block.pending .live.prose{font-family:var(--text);font-size:16px;line-height:1.55;color:var(--fg-2);white-space:pre-wrap}
 .block.pending[data-kind="figure"] .body,.block.pending[data-kind="image"] .body{min-height:3.2em}
 .block.pending .brief{margin:0;font-size:14px;color:var(--fg-3)}
 
@@ -394,7 +421,7 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited::before{displa
 /* A section heading on a page that is not a primer: Settings, the Inspector. */
 .sub{
   margin:2.5rem 0 .6rem; padding-bottom:.3rem; border-bottom:1px solid var(--rule);
-  font-family:var(--serif); font-size:1.55rem; line-height:1.25; font-weight:400;
+  font-family:var(--disp); font-size:1.55rem; line-height:1.25; font-weight:400;
 }
 .sub + .lab{margin-bottom:.6rem}
 /* ══ inspector: usage by agent ════════════════════════════════ */
@@ -437,10 +464,13 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited::before{displa
 .ssec{position:relative;margin:2.6rem 0 0;scroll-margin-top:calc(var(--head) + 1.25rem)}
 .doc-head + .ssec{margin-top:0}
 .ssec .sub{margin-top:0}
-.srow{display:flex;justify-content:space-between;gap:2rem;align-items:flex-start;padding:1rem 0;border-bottom:1px solid var(--rule)}
+.srow{display:flex;justify-content:space-between;gap:2rem;align-items:flex-start;padding:.8rem 0}
 .srow .lab{font-size:16px;color:var(--fg);margin:0}
 .srow .help{margin:.2rem 0 0;font-size:14px;line-height:1.5;color:var(--fg-2);max-width:30rem;text-wrap:pretty}
-.srow input[type="checkbox"]{width:1.05rem;height:1.05rem;margin:.3rem 0 0;accent-color:var(--accent);flex:0 0 auto}
+.switch{flex:0 0 auto;width:2.5rem;height:1.45rem;border-radius:999px;background:var(--rule-2);position:relative;margin-top:.15rem;transition:background .2s}
+.switch i{position:absolute;top:.15rem;left:.15rem;width:1.15rem;height:1.15rem;border-radius:50%;background:var(--bg);box-shadow:0 1px 2px rgba(0,0,0,.25);transition:left .2s}
+.switch[aria-checked="true"]{background:var(--accent)}
+.switch[aria-checked="true"] i{left:1.2rem}
 .seg{display:flex;gap:1rem;flex:0 0 auto;font-size:14px;margin-top:.2rem}
 .seg label{display:flex;gap:.4rem;align-items:center;color:var(--fg-2)}
 .seg input{accent-color:var(--accent);margin:0}
@@ -732,6 +762,8 @@ const SETTINGS = {
     help:"A small numeral after each cited claim. Hover it for the source." },
   showMarks: { type:"bool", section:"display", def:true, attr:"marks", label:"Show margin annotations",
     help:"Revisions, corrections and found images noted in the margin. Off, the primer reads clean; the Inspector still keeps every call." },
+  look: { type:"select", section:"display", def:"plain", label:"Look",
+    options:[{ value:"plain", label:"Plain" }, { value:"paper", label:"Paper" }] },
   theme: { type:"select", section:"display", def:"system", label:"Appearance",
     options:[{ value:"system", label:"System" }, { value:"light", label:"Light" }, { value:"dark", label:"Dark" }] },
   account: { type:"account", section:"account" }
@@ -793,7 +825,9 @@ async function claude(system, user, role, o){
     if(!r.ok){
       const d = await r.json().catch(() => ({}));
       if(r.status === 401){ signedOut(); throw new Error("Signed out."); }
-      throw new Error(d.error && d.error.message || "Request failed ("+r.status+")");
+      const e = new Error(d.error && d.error.message || "Request failed ("+r.status+")");
+      if(d.error && d.error.kind) e.kind = d.error.kind;
+      throw e;
     }
     return readFrames(r, o);
   }
@@ -1203,9 +1237,9 @@ async function agent(d, s){
     if(e.partial) rec.output = e.partial;
     if(e.kind) rec.kind = e.kind;
     if(!e.stopped) issue(d, cap(s.label || "a call") + " failed: " + e.message, rec, e.kind);
-    /* No credit, no login, or a limit reached: nothing else will succeed
-       either, so the run stops here rather than failing piece by piece. */
-    if(e.kind && running(d)){ stopRun(d); d.statusNote = "no credit or login"; }
+    /* No key, no credit, no login, or a limit reached: nothing else will
+       succeed either, so the run stops here rather than failing piece by piece. */
+    if(e.kind && running(d)){ stopRun(d); d.statusNote = e.kind === "no_key" ? "no key in Settings" : "no credit or login"; }
     throw e;
   }finally{
     rec.ended = Date.now(); saveTrace(d.id);
@@ -1227,6 +1261,8 @@ function toolNote(ev){
    Each one also lives on in its block's error and in the trace.      */
 const issues = [];
 function issue(d, msg, rec, kind){
+  const last = issues[0];
+  if(last && last.docId === d.id && last.msg === msg) return;
   issues.unshift({ id:uid(), ts:Date.now(), docId:d.id, title:d.title, msg, rec, kind });
   if(issues.length > 8) issues.pop();
   toast(msg, { err:true, call: rec ? { docId:d.id, id:rec.id } : null });
@@ -1298,7 +1334,7 @@ function toolsPaint(){
   if(old) old.replaceWith(toolsNode(doc));
 }
 function aboutPaint(){
-  const m = main.querySelector(".doc .meta");
+  const m = main.querySelector(".meta");
   if(m) m.hidden = !aboutOpen;
   toolsPaint();
 }
@@ -1360,9 +1396,9 @@ function renderCover(){
       <textarea id="cTopic" class="topic" rows="1" autocomplete="off" placeholder="What do you want to understand?" aria-label="Topic"></textarea>
       <div class="more">
         <label class="lab" for="cKnown">What you already know</label>
-        <textarea id="cKnown" class="known" rows="1"></textarea>
+        <textarea id="cKnown" class="known" rows="1" placeholder="Optional"></textarea>
         <label class="lab" for="cInstr">Instructions</label>
-        <textarea id="cInstr" class="known" rows="1"></textarea>
+        <textarea id="cInstr" class="known" rows="1" placeholder="Optional. Shorter, deeper, no pictures…"></textarea>
         <div class="chips" id="cChips"></div>
         <div class="composer-foot"><button class="go" type="submit">Write<kbd>↵</kbd></button></div>
       </div>
@@ -1449,7 +1485,7 @@ function renderLibrary(){
     li.append(open, x);
     list.appendChild(li);
   });
-  lib.replaceChildren(list);
+  lib.replaceChildren(el("span", "lab", "Library"), list);
 }
 function confirmRow(host, title, yes, no){
   const c = el("div", "confirm");
@@ -1466,32 +1502,7 @@ function renderDoc(){
   a.innerHTML = `<header class="doc-head"><h1 class="title"></h1></header>`;
   a.querySelector(".title").textContent = doc.title;
   const head = a.querySelector(".doc-head");
-  head.append(barNode(doc));
-  const meta = el("dl", "meta"); meta.hidden = !aboutOpen;
-  const row = (k, v) => {
-    const dt = el("dt", null, k), dd = el("dd");
-    if(typeof v === "string") dd.textContent = v; else dd.append(v);
-    meta.append(dt, dd);
-  };
-  row("Asked for", doc.topic || doc.title);
-  if(doc.known) row("Already knew", doc.known);
-  if(doc.instruction) row("Asked to", doc.instruction);
-  if(doc.rewrite){
-    const v = el("span");
-    if(doc.rewrite.of && !readonly()) v.append(btn("link", doc.rewrite.ofTitle, () => openDoc(doc.rewrite.of)));
-    else v.append("“" + doc.rewrite.ofTitle + "”");
-    v.append(" · “" + doc.rewrite.instruction + "”");
-    row("Rewrite of", v);
-  }
-  row("Written", shortDate(doc.created));
-  if(doc.shared){
-    row("Shared by", doc.shared.by + ", " + shortDate(doc.shared.created));
-    if(doc.usage) row("Usage", doc.usage);
-  }else{
-    const use = usageText(usageOf(doc));
-    if(use) row("Usage", use);
-  }
-  head.append(meta, docToc(doc), docToc(doc, true));
+  head.append(barNode(doc), metaNode(doc), docToc(doc), docToc(doc, true));
 
   let n = 0, fi = 0;
   doc.blocks.forEach(b => {
@@ -1514,6 +1525,35 @@ function rehighlight(){
   if(e) highlightIn(e, b.hl);
 }
 
+/* What was asked for, shown when About is on: under a primer's title, and
+   in its Inspector. */
+function metaNode(d){
+  const meta = el("dl", "meta"); meta.hidden = !aboutOpen;
+  const row = (k, v) => {
+    const dt = el("dt", null, k), dd = el("dd");
+    if(typeof v === "string") dd.textContent = v; else dd.append(v);
+    meta.append(dt, dd);
+  };
+  row("Asked for", d.topic || d.title);
+  if(d.known) row("Already knew", d.known);
+  if(d.instruction) row("Asked to", d.instruction);
+  if(d.rewrite){
+    const v = el("span");
+    if(d.rewrite.of && !readonly()) v.append(btn("link", d.rewrite.ofTitle, () => openDoc(d.rewrite.of)));
+    else v.append("“" + d.rewrite.ofTitle + "”");
+    v.append(" · “" + d.rewrite.instruction + "”");
+    row("Rewrite of", v);
+  }
+  row("Written", shortDate(d.created));
+  if(d.shared){
+    row("Shared by", d.shared.by + ", " + shortDate(d.shared.created));
+    if(d.usage) row("Usage", d.usage);
+  }else{
+    const use = usageText(usageOf(d));
+    if(use) row("Usage", use);
+  }
+  return meta;
+}
 /* A piece that was asked for and never arrived: a section that was not
    written, a diagram never drawn, an image never found. Each one keeps its
    brief, so each can be filled in on its own. */
@@ -2103,8 +2143,7 @@ async function finish(d){
   if(run.cancelled){
     d.blocks.filter(b => b.pending).forEach(b => markStopped(d, b));
     d.status = "stopped";
-  }else d.status = "done";
-  d.statusNote = "";
+  }else{ d.status = "done"; d.statusNote = ""; }
   run.active = false;
   rerender(d); save(d); tidyRun(d);
 }
@@ -2889,9 +2928,11 @@ function promptRow(k){
    Drawn from SETTINGS. One control per type; add a type here to use it. */
 const CONTROLS = {
   bool(k, s, onChange){
-    const i = el("input"); i.type = "checkbox"; i.checked = !!setting(k); i.setAttribute("aria-label", s.label);
-    i.onchange = () => onChange(i.checked);
-    return i;
+    const b = btn("switch"); b.setAttribute("role", "switch"); b.setAttribute("aria-label", s.label);
+    const paint = () => b.setAttribute("aria-checked", String(!!setting(k)));
+    b.onclick = () => { onChange(!setting(k)); paint(); };
+    b.append(el("i")); paint();
+    return b;
   },
   select(k, s, onChange){
     const g = el("div", "seg"); g.setAttribute("role", "radiogroup"); g.setAttribute("aria-label", s.label);
@@ -3204,7 +3245,7 @@ async function renderInspector(){
   const page = el("article", "doc inspector");
   page.innerHTML = `<header class="doc-head"><h1 class="title"></h1></header>`;
   page.querySelector(".title").textContent = doc.title;
-  page.querySelector(".doc-head").append(barNode(doc));
+  page.querySelector(".doc-head").append(barNode(doc), metaNode(doc));
   main.replaceChildren(page);
   const d = doc, t = await traceOf(d.id);
   if(route !== "inspector" || doc !== d || !main.contains(page)) return;
@@ -3433,12 +3474,17 @@ addEventListener("afterprint", () => {
 });
 
 /* ══ theme ════════════════════════════════════════════════════
-   The choice is a setting. primer:theme in localStorage is only a copy the
+   Appearance (light or dark) and look (plain or paper) are settings.
+   primer:theme and primer:look in localStorage are only copies the
    pre-paint script reads, so the page never flashes the other colour. */
 function applyTheme(){
-  const t = setting("theme");
-  document.documentElement.dataset.theme = t === "system" ? (matchMedia("(prefers-color-scheme:dark)").matches ? "dark" : "light") : t;
-  try{ if(t === "system") localStorage.removeItem("primer:theme"); else localStorage.setItem("primer:theme", t); }catch(e){}
+  const t = setting("theme"), look = setting("look"), root = document.documentElement;
+  root.dataset.theme = t === "system" ? (matchMedia("(prefers-color-scheme:dark)").matches ? "dark" : "light") : t;
+  if(look === "plain") delete root.dataset.look; else root.dataset.look = look;
+  try{
+    if(t === "system") localStorage.removeItem("primer:theme"); else localStorage.setItem("primer:theme", t);
+    if(look === "plain") localStorage.removeItem("primer:look"); else localStorage.setItem("primer:look", look);
+  }catch(e){}
 }
 try{ matchMedia("(prefers-color-scheme:dark)").addEventListener("change", () => { if(setting("theme") === "system") applyTheme(); }); }catch(e){}
 

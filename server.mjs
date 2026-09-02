@@ -11,6 +11,7 @@
 //   {done:true, text}  or  {error:{message,kind?}}   last; kind names a
 //                                    dead credential: billing_error,
 //                                    authentication_failed, rate_limit
+//                                    (a 400 with kind no_key: no key at all)
 // Closing the request aborts the call. POST /api/media {url} fetches an image
 // the finder chose into DATA_DIR/media and answers {local}.
 //
@@ -285,7 +286,7 @@ function withStderr(e, stderr) {
 
 /* ── credentials ────────────────────────────────────────────────
    An error with a status is an answer: the handler sends it as JSON. */
-const halt = (status, message) => Object.assign(new Error(message), { status });
+const halt = (status, message, kind) => Object.assign(new Error(message), { status, kind });
 
 /* A wrong key or token does not fail: the CLI retries it quietly for
    minutes. So a credential is tried against the API before it is kept, with
@@ -373,7 +374,7 @@ createServer(async (req, res) => {
     if (res.headersSent) return res.end();
     if (!e.status) console.error(e);
     res.writeHead(e.status || 500, { "content-type": "application/json" });
-    res.end(JSON.stringify({ error: { message: e.status ? e.message : "Something went wrong on the server." } }));
+    res.end(JSON.stringify({ error: { message: e.status ? e.message : "Something went wrong on the server.", kind: e.kind } }));
   }
 }).listen(PORT, HOST, () => {
   console.log(`Primer  →  http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}`);
@@ -543,7 +544,7 @@ async function serve(req, res) {
   if (req.method === "POST" && path === "/api/complete") {
     const body = await readBody(req);
     const claude = me ? db.users.claudeEnv(me.id) : guestClaude(body.cred);
-    if (!claude) throw halt(400, "No key to run on. Add one, or link to a shared key, in Settings.");
+    if (!claude) throw halt(400, "No key to run on. Add one, or link to a shared key, in Settings.", "no_key");
     /* Who is calling, on which key: the record of shared use. */
     console.log("  " + (me ? me.name : "guest") + "  " + (body.role || "?") + "  on “" + claude.key.name + "”" + (claude.own ? "" : " (" + claude.key.owner + "’s)"));
     /* Headers go out with the first frame, so a failure before any text can
