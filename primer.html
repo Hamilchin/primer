@@ -7,7 +7,7 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <script>/* theme and look before first paint */
-(function(){try{var d=document.documentElement,t=localStorage.getItem("primer:theme");if(t!=="dark"&&t!=="light")t=matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light";d.dataset.theme=t;var l=localStorage.getItem("primer:look");if(l)d.dataset.look=l;}catch(e){}})();
+(function(){try{var d=document.documentElement,t=localStorage.getItem("primer:theme")||"";d.dataset.theme=t==="dark"||t==="paper-dark"||(!t&&matchMedia("(prefers-color-scheme:dark)").matches)?"dark":"light";if(t.indexOf("paper")===0)d.dataset.look="paper";}catch(e){}})();
 </script>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
@@ -19,10 +19,11 @@
 
 <style>
 /* ══ tokens ═══════════════════════════════════════════════════
-   Plain: white, black, grey, and one blue for anything that can be
-   followed, in the system face. Paper: warm paper and ink with an
-   editor's red, in Fraunces, Literata and Plex Mono. Each in light and
-   dark. A look may change the faces as well as the colours.          */
+   Four themes. Plain: white, black, grey, and one blue for anything that
+   can be followed, in the system face. Paper: warm paper and ink with an
+   editor's red, in Fraunces, Literata and Plex Mono. Each light and
+   dark: data-theme is the palette's side, data-look the family, and a
+   look brings its faces as well as its colours.                      */
 :root{
   --bg:#fff; --bg-2:#f6f6f6;
   --fg:#1a1a1a; --fg-2:#5c5c5c; --fg-3:#8c8c8c;
@@ -762,10 +763,9 @@ const SETTINGS = {
     help:"A small numeral after each cited claim. Hover it for the source." },
   showMarks: { type:"bool", section:"display", def:true, attr:"marks", label:"Show margin annotations",
     help:"Revisions, corrections and found images noted in the margin. Off, the primer reads clean; the Inspector still keeps every call." },
-  look: { type:"select", section:"display", def:"plain", label:"Look",
-    options:[{ value:"plain", label:"Plain" }, { value:"paper", label:"Paper" }] },
-  theme: { type:"select", section:"display", def:"system", label:"Appearance",
-    options:[{ value:"system", label:"System" }, { value:"light", label:"Light" }, { value:"dark", label:"Dark" }] },
+  theme: { type:"select", section:"display", def:"system", label:"Theme",
+    options:[{ value:"system", label:"System" }, { value:"light", label:"Light" }, { value:"dark", label:"Dark" },
+             { value:"paper", label:"Paper" }, { value:"paper-dark", label:"Paper dark" }] },
   account: { type:"account", section:"account" }
 };
 let settings = {};
@@ -3474,17 +3474,16 @@ addEventListener("afterprint", () => {
 });
 
 /* ══ theme ════════════════════════════════════════════════════
-   Appearance (light or dark) and look (plain or paper) are settings.
-   primer:theme and primer:look in localStorage are only copies the
-   pre-paint script reads, so the page never flashes the other colour. */
+   The theme is a setting: system, light, dark, paper or paper-dark. It
+   sets both the palette (data-theme) and the look, which brings the faces
+   (data-look). primer:theme in localStorage is only a copy the pre-paint
+   script reads, so the page never flashes the other colour. */
 function applyTheme(){
-  const t = setting("theme"), look = setting("look"), root = document.documentElement;
-  root.dataset.theme = t === "system" ? (matchMedia("(prefers-color-scheme:dark)").matches ? "dark" : "light") : t;
-  if(look === "plain") delete root.dataset.look; else root.dataset.look = look;
-  try{
-    if(t === "system") localStorage.removeItem("primer:theme"); else localStorage.setItem("primer:theme", t);
-    if(look === "plain") localStorage.removeItem("primer:look"); else localStorage.setItem("primer:look", look);
-  }catch(e){}
+  const t = setting("theme"), root = document.documentElement;
+  const dark = t === "dark" || t === "paper-dark" || (t === "system" && matchMedia("(prefers-color-scheme:dark)").matches);
+  root.dataset.theme = dark ? "dark" : "light";
+  if(t.startsWith("paper")) root.dataset.look = "paper"; else delete root.dataset.look;
+  try{ if(t === "system") localStorage.removeItem("primer:theme"); else localStorage.setItem("primer:theme", t); }catch(e){}
 }
 try{ matchMedia("(prefers-color-scheme:dark)").addEventListener("change", () => { if(setting("theme") === "system") applyTheme(); }); }catch(e){}
 
