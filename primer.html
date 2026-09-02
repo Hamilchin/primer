@@ -91,8 +91,8 @@ a:hover{text-decoration-color:currentColor}
   font-size:13px;
 }
 .head.scrolled{border-bottom-color:var(--rule)}
-.wordmark{display:inline-flex;align-items:center;gap:.5rem;color:var(--fg);font-family:var(--disp);font-size:17px;line-height:1}
-.wordmark svg{width:16px;height:16px;display:block;flex:0 0 auto}
+.wordmark{display:inline-flex;align-items:center;gap:.55rem;color:var(--fg);font-family:var(--disp);font-size:19px;line-height:1}
+.wordmark svg{width:18px;height:18px;display:block;flex:0 0 auto}
 .wordmark:hover{color:var(--accent)}
 .acts{display:flex;align-items:center;gap:1.1rem}
 .act{color:var(--fg-2);white-space:nowrap}
@@ -163,7 +163,17 @@ main{padding:1.5rem var(--gutter) 8rem}
 .go:hover{background:var(--accent);color:#fff}
 .go kbd{font-family:inherit;font-size:12px;opacity:.55;margin-left:.7em}
 .library{margin-top:3rem}
-.library .lab{margin-bottom:.45rem}
+.lib-head{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;margin-bottom:.45rem}
+.lib-head .lab{margin:0}
+.find{
+  font-size:13px; line-height:1.5; color:var(--fg); background:none; border:0; border-bottom:1px solid var(--rule-2);
+  padding:.05rem 0 .15rem; width:11rem; max-width:45%; border-radius:0;
+}
+.find::placeholder{color:var(--fg-3)}
+.find:focus{outline:none;border-bottom-color:var(--accent)}
+.shelf .none{padding:.7rem 0 .75rem;font-size:15px;color:var(--fg-3)}
+.more-lib{display:block;margin-top:.6rem;font-size:13px;color:var(--fg-2)}
+.more-lib:hover{color:var(--accent)}
 .shelf{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
 .shelf li{display:flex;align-items:baseline;gap:1rem;border-bottom:1px solid var(--rule)}
 .shelf .open{
@@ -172,7 +182,9 @@ main{padding:1.5rem var(--gutter) 8rem}
 }
 .shelf .open>span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .shelf .open:hover>span:first-child{color:var(--accent)}
-.shelf time,.shelf .state{font-size:13px;color:var(--fg-3);white-space:nowrap;flex:0 0 auto;font-variant-numeric:tabular-nums}
+.shelf time,.shelf .state,.shelf .words{font-size:13px;color:var(--fg-3);white-space:nowrap;flex:0 0 auto;font-variant-numeric:tabular-nums}
+.shelf time{min-width:3.4rem;text-align:right}
+.shelf .words{min-width:5.6rem;text-align:right}
 .shelf .state.live,.shelf .state.failed{color:var(--accent)}
 .shelf .state .dot{margin-right:.45em}
 .shelf .x{font-size:13px;color:var(--fg-3);visibility:hidden;padding:.4rem 0}
@@ -308,13 +320,19 @@ body[data-sources="off"] .cite{display:none}
 .block:has(.status) .num{display:none}
 .mark{pointer-events:auto;text-align:right;color:var(--fg-3)}
 .mark:hover,.mark[aria-expanded="true"]{color:var(--accent)}
-body[data-marks="off"] .mark,body[data-marks="off"] .block.edited::before{display:none}
+body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:none}
 /* A rule in the gutter: grey where something changed, blue while
-   something is happening, faint where something is still to come. */
-.block.edited::before,.block.busy::before,.block.pending::before{
+   something is happening, faint where something is still to come, blue
+   again where something went wrong. The rule on an edited block is a real
+   element: hovering it shows the passage that was asked about. */
+.block.edited .bar,.block.busy::before,.block.pending::before,.err::before{
   content:""; position:absolute; top:.3em; bottom:.2em; right:calc(100% + .75rem); width:2px; background:var(--rule-2);
 }
-.block.edited:hover::before{background:var(--accent)}
+.block.edited .bar{
+  right:calc(100% + .75rem - 5px); padding:0 5px; box-sizing:content-box; background-clip:content-box;
+  pointer-events:auto; cursor:pointer; border:0;
+}
+.block.edited:hover .bar,.block.edited .bar:hover{background-color:var(--accent)}
 .block.busy::before{background:var(--accent);animation:pulse 1.6s ease-in-out infinite}
 .block.pending::before{background:var(--rule)}
 .status{color:var(--fg-3)}
@@ -332,10 +350,12 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited::before{displa
 .block.pending[data-kind="figure"] .body,.block.pending[data-kind="image"] .body{min-height:3.2em}
 .block.pending .brief{margin:0;font-size:14px;color:var(--fg-3)}
 
-.err{font-size:14px;line-height:1.5;color:var(--fg-2);padding-left:1rem;border-left:2px solid var(--accent)}
+.err{position:relative;font-size:14px;line-height:1.5;color:var(--fg-2)}
+.err::before{background:var(--accent)}
 .err button{color:var(--accent);margin-left:.7rem}
 .err button:hover{text-decoration:underline;text-underline-offset:3px}
-.err.soft{border-left-color:var(--rule-2);color:var(--fg-3)}
+.err.soft{color:var(--fg-3)}
+.err.soft::before{background:var(--rule-2)}
 .block[data-kind="heading"] .err{margin-top:.6rem}
 
 /* ── notes: inline aside, or a sidenote when there is room ── */
@@ -385,6 +405,8 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited::before{displa
 .pop .row button,.pop .row a{color:var(--accent);text-decoration:none}
 .pop .row button:hover,.pop .row a:hover{text-decoration:underline;text-underline-offset:3px}
 .pop .row .host{color:var(--fg-3);font-family:var(--mono);font-size:11.5px;margin-left:.4em}
+.pop .prev{color:var(--fg-2);font-size:13.5px;line-height:1.45;margin-bottom:.5rem;max-height:9rem;overflow:hidden}
+.pop .s .dot{margin-right:.4em}
 
 .outline{width:min(22rem,90vw);padding:.35rem .35rem}
 .outline button{display:flex;width:100%;gap:.7rem;align-items:baseline;padding:.38rem .6rem;border-radius:2px;color:var(--fg-2);line-height:1.35;font-size:14px}
@@ -571,7 +593,8 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited::before{displa
   main{padding-left:2rem;padding-right:var(--gutter)}
   .marg{position:static;display:block;width:auto;text-align:left;font-size:12.5px;margin:0 0 .25rem;pointer-events:auto}
   .num{display:none}
-  .block.edited::before,.block.busy::before,.block.pending::before,.prow.mod::before{right:auto;left:-.85rem}
+  .block.busy::before,.block.pending::before,.err::before,.prow.mod::before{right:auto;left:-.85rem}
+  .block.edited .bar{right:auto;left:calc(-.85rem - 5px)}
 }
 
 /* ══ small screens ════════════════════════════════════════════ */
@@ -588,6 +611,7 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited::before{displa
   .meta dt{margin-top:.4rem}
   .shelf .x{visibility:visible}
   .shelf .state:not(.live):not(.failed){display:none}
+  .shelf .words{display:none}
   .status-row>span{flex-basis:100%;padding-left:0;border-left:0}
   .srow{gap:1rem}
   .srow:has(.seg){flex-direction:column;gap:.6rem}
@@ -664,8 +688,9 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited::before{displa
     <button data-act="derive">Derive<kbd>3</kbd></button>
     <button data-act="figure">Diagram<kbd>4</kbd></button>
     <button data-act="tighter">Tighter<kbd>5</kbd></button>
+    <button data-act="define">Define<kbd>6</kbd></button>
     <span class="sep"></span>
-    <button data-act="ask">Ask&hellip;<kbd>6</kbd></button>
+    <button data-act="ask">Ask&hellip;<kbd>7</kbd></button>
   </div>
   <form class="pen-ask" id="askForm">
     <input id="askInput" autocomplete="off" placeholder="Ask about this…" aria-label="Question">
@@ -944,6 +969,8 @@ const PROMPTS = {
   finder_user:          { group:"write",   label:"Image finder · user" },
   research:             { group:"write",   label:"Research · system" },
   research_user:        { group:"write",   label:"Research · user" },
+  define:               { group:"write",   label:"Definition · system" },
+  define_user:          { group:"write",   label:"Definition · user" },
   edit:                 { group:"revise",  label:"Edit · system" },
   edit_user:            { group:"revise",  label:"Edit · user" },
   explain:              { group:"revise",  label:"Explain" },
@@ -1004,17 +1031,20 @@ const ACTIONS = {
   derive:  { label:"Derivation", key:"3" },
   figure:  { label:"Diagram",    key:"4" },
   tighter: { label:"Tighter",    key:"5" },
-  ask:     { label:"Question",   key:"6" }
+  define:  { label:"Definition", key:"6" },
+  ask:     { label:"Question",   key:"7" }
 };
 const word = edit => String(edit && edit.label || "").toLowerCase();
 
 /* Common ways to ask for a primer. Each becomes a chip under the
    Instructions field on the cover; clicking one writes its text into the
-   field, where it can be edited or added to. */
+   field, where it can be edited or added to. The one marked `define`
+   makes a definition: no planner, and a writer that reads Wikipedia. */
 const BRIEFS = [
   { label:"Short",           text:"Keep it short: the fewest sections that cover the subject, and no more than a few paragraphs in each." },
   { label:"A few paragraphs",text:"Write it as a single section of three or four paragraphs. No diagrams and no images." },
   { label:"Minimal",         text:"A minimal primer: the central idea, what it is for, and nothing else." },
+  { label:"Definition",      text:"Define it: one short section modelled on the first paragraph of its Wikipedia page, read first. No diagrams or images.", define:true },
   { label:"With derivations",text:"Derive every result step by step instead of stating it, saying what justifies each step." },
   { label:"Worked examples", text:"Give every idea a concrete worked example with real numbers." },
   { label:"Rigorous",        text:"Be precise: exact definitions, stated assumptions, and proofs or proof sketches for the central results." },
@@ -1339,7 +1369,7 @@ function aboutPaint(){
   toolsPaint();
 }
 /* Redraw or patch only when the document is the one on screen. */
-function rerender(d){ if(doc === d && route === "doc") render(); }
+function rerender(d){ popLive(d); if(doc === d && route === "doc") render(); }
 
 /* ── sign in, or make an account with the invite code ── */
 function renderLogin(){
@@ -1439,7 +1469,7 @@ function renderCover(){
     if(me && !me.key){ goto("settings"); toast("Add a key, or link to a shared one, first"); return; }
     startDoc({ topic:t, known:known.value.trim(), instruction:instr.value.trim() });
   };
-  shelfSig = null;
+  shelfSig = null; libQuery = "";
   renderLibrary();
   requestAnimationFrame(() => fields.forEach(grow));
   if(!matchMedia("(pointer:coarse)").matches) topic.focus({ preventScroll:true });
@@ -1456,16 +1486,39 @@ function shelfState(it){
   if(s === "failed") return { failed:true, text:"failed" };
   return { text: s === "stopped" ? "stopped" : s === "interrupted" ? "interrupted" : "unfinished" };
 }
+/* The list shows the first FOLD primers; the rest wait behind "more". A
+   search shows every match. The search box is made once and kept, so
+   typing in it survives the repaints that live primers cause. */
+const FOLD = 15, FIND_FROM = 6;
+let libQuery = "", libOpen = false;
 function renderLibrary(){
   const lib = $("#library");
   if(!lib) return;
   const states = index.map(it => { const s = shelfState(it); return s ? (s.live ? "·" : "") + s.text : ""; });
-  const sig = index.map((it, i) => it.id + it.title + states[i]).join("|");
+  const sig = index.map((it, i) => it.id + it.title + states[i] + (it.words == null ? "" : it.words)).join("|") + "\n" + libQuery + (libOpen ? "+" : "");
   if(sig === shelfSig) return;
   shelfSig = sig;
   if(!index.length){ lib.replaceChildren(); return; }
+  let head = lib.querySelector(".lib-head");
+  if(!head){
+    head = el("div", "lib-head");
+    head.append(el("span", "lab", "Library"));
+  }
+  let find = head.querySelector(".find");
+  if(index.length >= FIND_FROM && !find){
+    find = document.createElement("input");
+    find.className = "find"; find.type = "search"; find.placeholder = "Search"; find.setAttribute("aria-label", "Search the library");
+    find.autocomplete = "off"; find.value = libQuery;
+    find.oninput = () => { libQuery = find.value; renderLibrary(); };
+    find.onkeydown = ev => { if(ev.key === "Escape" && find.value){ ev.preventDefault(); find.value = ""; libQuery = ""; renderLibrary(); } };
+    head.append(find);
+  }else if(index.length < FIND_FROM && find){ find.remove(); libQuery = ""; }
+  const q = libQuery.trim().toLowerCase();
+  const found = q ? index.filter(it => (it.title || "").toLowerCase().includes(q)) : index;
+  const shown = (q || libOpen) ? found : found.slice(0, FOLD);
   const list = el("ol", "shelf");
-  index.forEach((it, i) => {
+  if(!shown.length) list.appendChild(el("li", "none", "Nothing matches “" + libQuery.trim() + "”"));
+  shown.forEach(it => {
     const li = el("li");
     const open = btn("open", null, () => openDoc(it.id));
     open.append(el("span", null, it.title));
@@ -1475,6 +1528,7 @@ function renderLibrary(){
       if(s.live) st.prepend(el("i", "dot"));
       open.append(st);
     }
+    if(it.words) open.append(el("span", "words", it.words.toLocaleString() + (it.words === 1 ? " word" : " words")));
     open.append(el("time", null, shortDate(it.updated)));
     let x;
     if(s && s.live) x = btn("x stop", "Stop", () => stopRun(docs.get(it.id)));
@@ -1485,7 +1539,14 @@ function renderLibrary(){
     li.append(open, x);
     list.appendChild(li);
   });
-  lib.replaceChildren(el("span", "lab", "Library"), list);
+  /* The head stays put, so the search box keeps focus while typing. */
+  if(head.parentNode !== lib) lib.prepend(head);
+  lib.querySelectorAll(".shelf, .more-lib").forEach(x => x.remove());
+  lib.append(list);
+  if(!q && found.length > FOLD){
+    const rest = found.length - FOLD;
+    lib.append(btn("more-lib", libOpen ? "Less ↑" : rest + " more ↓", () => { libOpen = !libOpen; renderLibrary(); }));
+  }
 }
 function confirmRow(host, title, yes, no){
   const c = el("div", "confirm");
@@ -1524,6 +1585,30 @@ function rehighlight(){
   const e = main.querySelector(`[data-block-id="${b.id}"] .body`);
   if(e) highlightIn(e, b.hl);
 }
+/* Hovering a revision's rule (or a note's quote) marks the passage that was
+   asked about. It sits in an earlier block, usually the one just above; the
+   search walks back past the blocks that came from the same request, and
+   stops at the nearest match. The quote may be the block's whole markdown,
+   so the markup is stripped before looking. */
+function askedOnHover(h, e, b){
+  h.onmouseenter = () => {
+    const q = b.edit && b.edit.quote ? plainMd(b.edit.quote).trim() : "";
+    if(!q || inFlight) return;
+    for(let x = e.previousElementSibling; x; x = x.previousElementSibling){
+      if(!x.dataset.blockId) continue;
+      const o = doc && doc.blocks.find(y => y.id === x.dataset.blockId);
+      if(o && o.edit && o.edit.ts === b.edit.ts) continue;
+      const body = x.querySelector(".body");
+      const r = body && locate(body, q);
+      if(r){ highlightRange(r); return; }
+    }
+  };
+  h.onmouseleave = () => { if(inFlight) rehighlight(); else clearHighlight(); };
+}
+function plainMd(s){
+  return String(s).replace(/!\[[^\]]*\]\([^)]*\)/g, "").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, "").replace(/(\*\*|__|[*_`~])/g, "");
+}
 
 /* What was asked for, shown when About is on: under a primer's title, and
    in its Inspector. */
@@ -1543,6 +1628,12 @@ function metaNode(d){
     else v.append("“" + d.rewrite.ofTitle + "”");
     v.append(" · “" + d.rewrite.instruction + "”");
     row("Rewrite of", v);
+  }
+  if(d.define && d.define.from){
+    const v = el("span", null, "“" + d.define.term + "” in ");
+    if(d.define.from.doc && !readonly()) v.append(btn("link", d.define.from.title, () => openDoc(d.define.from.doc)));
+    else v.append("“" + d.define.from.title + "”");
+    row("Defines", v);
   }
   row("Written", shortDate(d.created));
   if(d.shared){
@@ -1703,7 +1794,14 @@ function blockEl(b, n){
     const q = btn("side-q");
     q.textContent = b.edit ? "“" + (b.edit.note || b.edit.quote) + "”" : "";
     q.onclick = ev => { ev.stopPropagation(); if(b.edit) showPop(q, provNodes(b)); };
+    askedOnHover(q, e, b);
     e.appendChild(q);
+  }else if(b.edit){
+    const bar = btn("bar");
+    bar.setAttribute("aria-label", "Show what was asked about");
+    bar.onclick = ev => { ev.stopPropagation(); showPop(bar, provNodes(b)); };
+    askedOnHover(bar, e, b);
+    e.appendChild(bar);
   }
 
   const body = el("div", "body");
@@ -1726,6 +1824,7 @@ function blockEl(b, n){
     body.appendChild(imageNode(b));
   }else{
     body.innerHTML = mdToHtml(b.md);
+    wireLinks(body);
     if(b.cites && b.cites.length) addCites(body, b.cites);
   }
   e.appendChild(body);
@@ -1794,8 +1893,11 @@ function addCites(body, cites){
     sup.appendChild(a);
     hoverable(sup, () => citeNodes(c, k));
     const r = c.claim && (locate(body, c.claim) || locate(body, c.claim.replace(/[*_`]/g, "")));
-    if(r){ r.collapse(false); r.insertNode(sup); }
-    else (body.lastElementChild || body).appendChild(sup);
+    if(!r){ (body.lastElementChild || body).appendChild(sup); return; }
+    r.collapse(false);
+    /* A claim that ends inside a link gets its numeral after the link. */
+    const end = r.endContainer, link = (end.nodeType === 3 ? end.parentElement : end).closest("a");
+    if(link && body.contains(link)) link.after(sup); else r.insertNode(sup);
   });
 }
 
@@ -1869,10 +1971,30 @@ if(document.fonts && document.fonts.ready) document.fonts.ready.then(layoutSiden
 const TRANSIENT = ["busy","hl","pending","queued","error","stopped","retry","remove","fresh","plan","draw","find","live","liveRole","status","again"];
 function cleanBlock(b){ const r = { ...b }; TRANSIENT.forEach(k => delete r[k]); return r; }
 const saveT = new Map();
+/* The words a reader would read: prose, headings, notes and captions. */
+function wordCount(d){
+  let n = 0;
+  for(const b of d.blocks || []){
+    const t = (b.kind === "figure" || b.kind === "image") ? (b.caption || "") : (b.md || "");
+    if(t) n += plainMd(t).split(/\s+/).filter(Boolean).length;
+  }
+  return n;
+}
+/* Entries written before the count existed get one, from the saved primer. */
+async function countWords(){
+  const todo = index.filter(it => it.words == null);
+  if(!todo.length) return;
+  for(const it of todo){
+    try{ const d = await store.get("primer:doc:" + it.id); it.words = d ? wordCount(d) : 0; }
+    catch(e){ return; }
+  }
+  await store.set("primer:index", index);
+  if(route === "cover") renderLibrary();
+}
 async function persist(d){
   await store.set("primer:doc:"+d.id, { ...d, blocks: d.blocks.map(cleanBlock) });
   const i = index.findIndex(x => x.id===d.id);
-  const entry = { id:d.id, title:d.title, updated:Date.now(), status:d.status || "done", short:gaps(d).length };
+  const entry = { id:d.id, title:d.title, updated:Date.now(), status:d.status || "done", short:gaps(d).length, words:wordCount(d) };
   if(i>-1) index[i] = entry; else index.unshift(entry);
   await store.set("primer:index", index);
   if(route === "cover") renderLibrary();
@@ -1893,10 +2015,11 @@ async function loadDoc(id){
 }
 async function openDoc(id){
   const d = await loadDoc(id);
-  if(!d) return;
+  if(!d) return null;
   doc = d; undoStack = []; route = "doc";
   render();
   scrollTo(0, 0);
+  return d;
 }
 
 /* A document back from storage: give every unfinished piece its error,
@@ -1988,7 +2111,7 @@ function liveText(raw, role){
     if(!vals.length) return null;
     return { prose:true, text: vals.map((v, i) => i ? (i) + ". " + v : v).join("\n") };
   }
-  if(role === "section" || role === "edit"){
+  if(role === "section" || role === "edit" || role === "define"){
     const parts = [...raw.matchAll(/"md"\s*:\s*"((?:[^"\\]|\\.)*)"/g)].map(m => m[1]);
     const open = /"md"\s*:\s*"((?:[^"\\]|\\.)*)$/.exec(raw);
     if(open) parts.push(open[1]);
@@ -2010,6 +2133,7 @@ function liveInto(d, b){
     if(t) return;
     t = requestAnimationFrame(() => {
       t = 0;
+      popLive(d);
       if(route !== "doc" || doc !== d || !d.blocks.includes(b)) return;
       const body = main.querySelector(`[data-block-id="${b.id}"] .body`);
       if(!body) return;
@@ -2034,15 +2158,19 @@ function trimTitle(s, max, fallback){
   return t || fallback;
 }
 
-/* A new document, on screen and in the library at once, then written. */
-function startDoc(o){
+/* A new document, in the library at once and on screen unless it is
+   made in the background, then written. A definition (the Definition
+   brief, or Define on a selection) is written by the definer. */
+function startDoc(o, background){
   const d = { id:uid(), title:o.topic, topic:o.topic, known:o.known || "", instruction:o.instruction || "",
               created:Date.now(), status:"planning", blocks:[] };
   if(o.rewrite) d.rewrite = o.rewrite;
+  if(o.define) d.define = o.define;
+  else if(BRIEFS.some(b => b.define && d.instruction.includes(b.text))) d.define = { term:o.topic };
   docs.set(d.id, d);
-  undoStack = []; doc = d; route = "doc";
+  if(!background){ undoStack = []; doc = d; route = "doc"; }
   build(d);
-  scrollTo(0, 0);
+  if(!background) scrollTo(0, 0);
   return d;
 }
 
@@ -2057,6 +2185,8 @@ async function build(d){
   let plan;
   if(rw && rw.sections && rw.sections.length){
     plan = { title: rw.ofTitle || d.topic, sections: rw.sections };
+  }else if(d.define){
+    plan = { title: d.topic, sections: ["Definition"] };   // the definer names it once it has read up
   }else try{
     const out = await agent(d, { role:"outline", label:"planning", block:d.blocks[0], by:"you",
       system: sys(rw ? "rewrite_outline" : "outline"),
@@ -2186,11 +2316,16 @@ async function genSection(d, i, title, outline, reader, by){
   if(!slot) return;
   const vars = { READER:reader, TITLE:d.title, OUTLINE:outline, N:i+1, SECTION:title,
                  PRIOR: priorText(d, i) || "(none yet)", INSTRUCTION: instrText(d) };
-  const user = d.rewrite ? usr("rewrite_section_user", { ...vars, INSTRUCTION:d.rewrite.instruction, SOURCE:d.rewrite.source })
-                         : usr("section_user", vars);
+  const df = d.define, role = df ? "define" : "section";
+  const user = df ? usr("define_user", { READER:reader, TERM:d.topic, INSTRUCTION:instrText(d),
+                      HIGHLIGHT: df.from ? df.term : "(nothing: the term was typed)",
+                      FROM: df.from ? ", IN “" + df.from.title + "”" : "", CONTEXT: df.context || "(none)" })
+             : d.rewrite ? usr("rewrite_section_user", { ...vars, INSTRUCTION:d.rewrite.instruction, SOURCE:d.rewrite.source })
+             : usr("section_user", vars);
   try{
-    const { value:arr, callId } = await agent(d, { role:"section", label:"writing §"+(i+1), sec:i, block:slot, system:sys("section"), user,
+    const { value, callId } = await agent(d, { role, label: df ? "defining" : "writing §"+(i+1), sec:i, block:slot, system:sys(role), user,
       parent: d.planCall || null, by: by || (d.planCall ? "" : "you") });
+    const arr = df && value && !Array.isArray(value) ? value.blocks : value;
     const made = (Array.isArray(arr) ? arr : [])
       .filter(x => x && (x.md || ((x.kind==="figure" || x.kind==="image") && x.brief)))
       .map(x => {
@@ -2199,6 +2334,10 @@ async function genSection(d, i, title, outline, reader, by){
         return { id:uid(), kind:"prose", md:String(x.md), sec:i, fresh:true, by:callId };
       });
     if(!made.some(b => b.md)) throw new Error("Empty section.");
+    if(df && value && !Array.isArray(value)){
+      if(value.title) d.title = trimTitle(value.title, 110, d.title);
+      if(value.term) narrowLink(d, String(value.term).trim());
+    }
     replaceSlot(d, i, made);
     /* New text, so the section is due a check again. */
     const h = d.blocks.find(b => b.kind==="heading" && b.sec===i);
@@ -2379,6 +2518,13 @@ function applyResearch(d, blocks, out){
     b.edit = { label:"Corrected", note:String(c.reason||"").trim(), url:String(c.url||""), ts:Date.now(), by:"research" };
     b.fresh = true;
   }
+  /* Terms linked to the web, when the research prompt asks for it: a term
+     is linked once in the primer, at its first mention. */
+  for(const l of (Array.isArray(out.links) ? out.links : [])){
+    const b = blocks[(l.block|0) - 1], text = String(l.text || ""), url = String(l.url || "");
+    if(!b || !text || !/^https?:\/\//.test(url) || d.blocks.some(x => x.md && x.md.includes("](" + url + ")"))) continue;
+    if(linkWords(b, text, url)) b.fresh = true;
+  }
   rerender(d); save(d);
 }
 /* Run, or run again, on demand from the colophon. */
@@ -2393,6 +2539,75 @@ async function researchAll(d){
   d.statusNote = run.cancelled ? "while checking sources" : "";
   run.active = false;
   rerender(d); save(d); tidyRun(d);
+}
+
+/* ══ define ═══════════════════════════════════════════════════
+   A new primer on the highlighted words, written in the background and
+   linked from them, the way an encyclopedia links a term to its article.
+   The definer names the concept and picks the words to link; until then
+   the whole selection is the link. Links to other primers are Markdown
+   in the block, primer:<id>, so they survive everything a block does. */
+const DEFINE = BRIEFS.find(b => b.define);
+function defineFrom(d, blockId, text){
+  const b = d.blocks.find(x => x.id === blockId);
+  if(!b || !b.md) return;
+  const def = startDoc({ topic:text, known:d.known, instruction:DEFINE.text,
+    define:{ term:text, from:{ doc:d.id, block:b.id, title:d.title }, context:b.md } }, true);
+  snapshot();
+  if(linkWords(b, text, "primer:" + def.id)){ patch(d, b); save(d); toast("Defining “" + text + "”", { undo:true }); }
+  else toast("Defining “" + text + "”. Those exact words weren't found in the text, so there is no link.");
+}
+/* The first plain occurrence of `text` in a block becomes a link. */
+function linkWords(b, text, href){
+  const i = b.md.indexOf(text);
+  if(i < 0 || b.md.lastIndexOf("[", i) > b.md.lastIndexOf("]", i)) return false;
+  b.md = b.md.slice(0, i) + "[" + text + "](" + href + ")" + b.md.slice(i + text.length);
+  return true;
+}
+/* Once the definer has said which words name the concept, the link in the
+   primer it came from shrinks to them. */
+async function narrowLink(d, term){
+  const f = d.define.from, was = d.define.term;
+  const at = was.indexOf(term);
+  if(!f || at < 0 || term === was) return;
+  const o = await loadDoc(f.doc), b = o && o.blocks.find(x => x.id === f.block);
+  const old = "[" + was + "](primer:" + d.id + ")", i = b ? b.md.indexOf(old) : -1;
+  if(i < 0) return;
+  b.md = b.md.slice(0, i) + was.slice(0, at) + "[" + term + "](primer:" + d.id + ")" + was.slice(at + term.length) + b.md.slice(i + old.length);
+  d.define.term = term;
+  patch(o, b); save(o);
+}
+/* Prose without its links to other primers, for anyone who cannot follow them. */
+const plainLinks = md => String(md).replace(/\[([^\]]*)\]\(primer:\w+\)/g, "$1");
+/* Links in prose: one to another primer opens it here, with a preview on
+   hover; one to the web opens in a new tab. */
+function wireLinks(body){
+  body.querySelectorAll("a[href]").forEach(a => {
+    const m = /^primer:(\w+)$/.exec(a.getAttribute("href"));
+    if(!m){ if(/^https?:/.test(a.href)){ a.target = "_blank"; a.rel = "noopener"; } return; }
+    const id = m[1];
+    a.className = "plink"; a.dataset.primer = id; a.href = "#";
+    a.onclick = async e => { e.preventDefault(); closePops(); if(!(await openDoc(id))) toast("That primer was deleted."); };
+    hoverable(a, () => defNodes(id));
+  });
+}
+/* What a link to another primer leads to: its title, where it stands, and
+   its opening words, kept current while it is being written. */
+function defNodes(id){
+  const d = docs.get(id);
+  if(!d){ loadDoc(id).then(x => popLive(x || { id, gone:true })); return [kRow("Primer"), el("div", "s", "Loading…")]; }
+  if(d.gone) return [kRow("Primer"), el("div", "s", "That primer was deleted.")];
+  const st = docState(d), first = d.blocks.find(b => b.kind === "prose" && (b.md || b.live));
+  const text = first ? (first.md || (liveText(first.live, first.liveRole) || {}).text || "") : "";
+  const nodes = [kRow("Primer", d.created), el("div", "t", d.title)];
+  if(st.kind !== "done"){ const line = el("div", "s"); if(st.kind === "busy") line.append(el("i", "dot")); line.append(st.text); nodes.push(line); }
+  if(text){ const p = el("div", "prev"); p.innerHTML = mdInline(plainLinks(text).slice(0, 420) + (text.length > 420 ? "…" : "")); nodes.push(p); }
+  nodes.push(linkRow([{ label:"Open", onclick:() => { closePops(); openDoc(id); } }]));
+  return nodes;
+}
+/* Redraw the preview of a primer while its card is up. */
+function popLive(d){
+  if(pop.classList.contains("show") && pop._anchor && pop._anchor.dataset.primer === d.id) pop.replaceChildren(...defNodes(d.id));
 }
 
 /* ══ editing ══════════════════════════════════════════════════ */
@@ -2556,6 +2771,7 @@ document.addEventListener("mousedown", e => {
 });
 function trigger(act){
   if(!sel) return;
+  if(act==="define"){ const {blockId, text} = sel; hideTools(); defineFrom(doc, blockId, text); return; }
   if(act==="ask"){
     const s = window.getSelection();
     if(s && s.rangeCount) highlightRange(s.getRangeAt(0).cloneRange());
@@ -2733,12 +2949,14 @@ function snapshotOf(d){
   const blocks = d.blocks.filter(b => !b.pending && !unfilled(b)).map(b => {
     const r = cleanBlock(b);
     ["by", "origin", "slot", "fail"].forEach(k => delete r[k]);
+    if(r.md) r.md = plainLinks(r.md);
     return r;
   });
   const s = { title:d.title, topic:d.topic, known:d.known || "", instruction:d.instruction || "", created:d.created,
               status:d.status || "done", blocks, view:{ sources:!!setting("showSources"), marks:!!setting("showMarks") } };
   if(d.researched) s.researched = d.researched;
   if(d.rewrite) s.rewrite = { ofTitle:d.rewrite.ofTitle, instruction:d.rewrite.instruction };
+  if(d.define && d.define.from) s.define = { term:d.define.term, from:{ title:d.define.from.title } };
   const use = usageText(usageOf(d));
   if(use) s.usage = use;
   return s;
@@ -2836,7 +3054,7 @@ function docText(d){
   return "# " + d.title + "\n\n" + d.blocks.map(b => {
     if(b.kind === "figure") return "[Diagram" + (b.caption ? ": " + b.caption : b.brief ? ": " + b.brief : "") + "]";
     if(b.kind === "image")  return "[Image" + (b.caption ? ": " + b.caption : b.brief ? ": " + b.brief : "") + "]";
-    return b.md || "";
+    return plainLinks(b.md || "");
   }).filter(Boolean).join("\n\n");
 }
 
@@ -3193,7 +3411,8 @@ const AGENTS = {
   edit:     "Reviser",
   figure:   "Illustrator",
   finder:   "Image finder",
-  research: "Researcher"
+  research: "Researcher",
+  define:   "Definer"
 };
 /* A table of usage: heading cells, body rows, and a total row when given.
    A cell is {text, cls?, title?}. Scrolls sideways where it must. */
@@ -3390,6 +3609,7 @@ function docMarkdown(d){
   if(d.known) asked.push("Already knew: " + d.known);
   if(d.instruction) asked.push("Asked to: " + d.instruction.replace(/\s*\n+\s*/g, " "));
   if(d.rewrite) asked.push("Rewrite of “" + d.rewrite.ofTitle + "”: " + d.rewrite.instruction);
+  if(d.define && d.define.from) asked.push("Defines “" + d.define.term + "” in “" + d.define.from.title + "”");
   if(asked.length) parts.push(asked.map(l => "> " + l).join("\n>\n"));
 
   for(const b of d.blocks){
@@ -3404,7 +3624,7 @@ function docMarkdown(d){
       const under = [b.caption, b.credit].filter(Boolean).join(" · ");
       parts.push("![" + (b.title || b.caption || "") + "](" + src + ")" + (under ? "\n\n*" + under + "*" : ""));
     }else if(b.md){
-      let t = b.md;
+      let t = plainLinks(b.md);
       for(const c of (b.cites || [])){
         if(!c.url) continue;
         const m = "[" + num(c) + "]", at = c.claim ? t.indexOf(c.claim) : -1;
@@ -3524,6 +3744,7 @@ async function enter(){
   await loadMine();
   doc = null; route = "cover"; render(); scrollTo(0, 0);
   if(!isGuest()) migrateLocal();
+  countWords();
 }
 /* No account: a guest cookie for the calls, everything else in this browser. */
 async function enterGuest(){

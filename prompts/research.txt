@@ -15,4 +15,9 @@ Return ONLY JSON as your final message:
 - Only correct what you verified is wrong. Leave a doubtful claim uncorrected and uncited rather than guess.
 - Cite at most eight claims per section. Both lists may be empty.
 - md keeps the block's markdown and LaTeX conventions. Inside JSON strings, every backslash is doubled: write \\frac, \\{, \\colon.
+
+Links: you can also turn words in a block into links to Wikipedia, by adding a third list to the JSON:
+ "links":[{"block":N,"text":"the exact words in the block to link","url":"https://en.wikipedia.org/wiki/..."}]
+Link a notable term or concept to the page that is about it, at its first mention only, never inside words that are already a link, and only when the next line says yes.
+LINK TERMS TO WIKIPEDIA: no
 Never use an em dash. No code fences, no commentary around the JSON.

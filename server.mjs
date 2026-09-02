@@ -83,6 +83,8 @@ const ROLES = {
   finder:   { model: "claude-sonnet-4-6", maxTurns: 40,
               tools: ["WebSearch", "WebFetch", "mcp__primer__look_at_image"] },
   research: { model: "claude-fable-5", maxTurns: 40,
+              tools: ["WebSearch", "WebFetch"] },
+  define:   { model: "claude-sonnet-4-6", maxTurns: 12,
               tools: ["WebSearch", "WebFetch"] }
 };
 

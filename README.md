@@ -29,6 +29,16 @@ password, or unsharing, takes the key away from everyone linked to it; they
 have to link again. Nothing is read from the environment: to share your own
 Claude, add its token as a shared key like anyone else.
 
+Select a term in a primer and press Define, and a new primer defining
+it is written in the background, modelled on the first paragraph of its
+Wikipedia page, which the writer reads first. The words you selected
+become a link to it, narrowed to the term itself once the writer has
+named the concept; hover the link for a preview that updates as the
+definition is written. The Definition chip on the cover writes the same
+kind of primer for a typed term. The research agent can also link terms
+to Wikipedia at their first mention, when its prompt asks for it (change
+the last line of the Research prompt in Settings to yes).
+
 Share on a finished primer copies a link to `/s/<id>`: the primer frozen as
 it is at that moment, readable by anyone with the link, signed in or not.
 Later changes never reach it; share again for a new link (an unchanged
