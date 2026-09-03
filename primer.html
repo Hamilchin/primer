@@ -1691,7 +1691,7 @@ function renderLibrary(){
     if(s && s.live) x = btn("x stop", "Stop", () => stopRun(docs.get(it.id)));
     else{
       x = btn("x", "Delete");
-      x.onclick = () => confirmRow(li, it.title, () => deleteDoc(it.id), () => { li.replaceChildren(open, x); });
+      x.onclick = () => confirmRow(li, it.title, () => deleteDoc(it.id));
     }
     li.append(open, x);
     list.appendChild(li);
@@ -1705,13 +1705,14 @@ function renderLibrary(){
     lib.append(btn("more-lib", libOpen ? "Less ↑" : rest + " more ↓", () => { libOpen = !libOpen; renderLibrary(); }));
   }
 }
-function confirmRow(host, title, yes, no){
-  const c = el("div", "confirm");
-  const y = btn("danger", "Delete", yes);
-  const n = btn(null, "Keep", no);
-  c.append(el("span", null, "Delete “"+title+"”?"), y, n);
+/* Are you sure? In place of whatever `host` holds: the question, a red
+   Delete, and Keep, which puts it back. */
+function confirmRow(host, title, yes){
+  const was = [...host.childNodes], c = el("span", "confirm");
+  const keep = btn(null, "Keep", () => host.replaceChildren(...was));
+  c.append(el("span", null, "Delete “" + title + "”?"), btn("danger", "Delete", yes), keep);
   host.replaceChildren(c);
-  n.focus();
+  keep.focus();
 }
 
 /* ── document ─────────────────────────────── */
@@ -2088,13 +2089,8 @@ function colophon(){
   if(readonly()) return c;
   const d = doc;
   c.append(btn(null, doc.researched ? "Research again" : "Research", () => researchAll(d)));
-  const del = btn(null, "Delete");
-  del.onclick = () => {
-    const wrap = el("span", "confirm");
-    const y = btn("danger", "Delete", () => deleteDoc(d.id));
-    const k = btn(null, "Keep", () => wrap.replaceWith(del));
-    wrap.append(y, k); del.replaceWith(wrap); k.focus();
-  };
+  const del = el("span");
+  del.append(btn(null, "Delete", () => confirmRow(del, d.title, () => deleteDoc(d.id))));
   c.append(del);
   return c;
 }
@@ -3253,16 +3249,15 @@ async function shareDoc(d, anchor){
 }
 /* Put the link on the clipboard; where that is refused, show it selected
    so it can be copied by hand. */
-async function copyLink(url, anchor){
+function copyLink(url, anchor){
   closePops();
-  try{ await navigator.clipboard.writeText(url); toast("Link copied"); }
-  catch(e){
-    const u = el("span", "url", url);
+  return copyText(url, () => {
     const at = (anchor && anchor.isConnected) ? anchor : main.querySelector(".m-tools .act");
-    if(!at){ toast(url); return; }
+    if(!at){ toast(url); return null; }
+    const u = el("span", "url", url);
     openMenu(shareMenu, at, [u, linkRow([{ label:"Open", href:url }])]);
-    const r = document.createRange(); r.selectNodeContents(u); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
-  }
+    return u;
+  }, "Link copied");
 }
 async function openShare(anchor){
   const d = doc;
@@ -3459,9 +3454,12 @@ function hideToast(){ toastEl.classList.remove("show"); }
 
 /* Put text on the clipboard. Where that is refused, select `node` so it
    can be copied by hand, or say so rather than fail in silence. */
-async function copyText(text, node){
-  try{ await navigator.clipboard.writeText(text); toast("Copied"); }
+async function copyText(text, node, said){
+  try{ await navigator.clipboard.writeText(text); toast(said || "Copied"); }
   catch(e){
+    /* Refused: select the text on screen instead, so it can be copied by
+       hand. `node` is that text, or a function that puts it up first. */
+    if(typeof node === "function") node = node();
     if(node){ const r = document.createRange(); r.selectNodeContents(node); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
     else toast("Couldn't copy: " + e.message, { err:true });
   }
@@ -3690,14 +3688,9 @@ function keysControl(){
     const pw = kfield(key.shared ? "New password (unlinks everyone)" : "Password for others", "password"); pw.hidden = !key.shared;
     sh.i.onchange = () => { pw.hidden = !sh.i.checked; if(sh.i.checked) pw.focus(); };
     const save = btn(null, "Save"); save.type = "submit";
-    const del = btn("danger", "Delete");
-    del.onclick = () => {
-      const wrap = el("span", "confirm");
-      wrap.append(el("span", null, "Delete “" + key.name + "”?"),
-        btn("danger", "Delete", async () => { if(await call("/api/keys/" + key.id, null, "DELETE")) toast("Deleted “" + key.name + "”"); }),
-        btn(null, "Keep", () => wrap.replaceWith(del)));
-      del.replaceWith(wrap);
-    };
+    const del = el("span");
+    del.append(btn("danger", "Delete", () => confirmRow(del, key.name,
+      async () => { if(await call("/api/keys/" + key.id, null, "DELETE")) toast("Deleted “" + key.name + "”"); })));
     f.append(name, sh.l, pw, save, del);
     f.onsubmit = async e => {
       e.preventDefault();
