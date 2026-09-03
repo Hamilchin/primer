@@ -47,6 +47,8 @@ export function openStore(dir) {
                                          shared integer not null default 0, pass text, created integer not null);
     create table if not exists key_links (user integer not null, key integer not null, created integer not null,
                                          primary key (user, key));
+    create table if not exists feedback (id integer primary key, user integer, name text not null, kind text not null,
+                                         text text not null, ctx text not null, created integer not null);
     create table if not exists key_usage (key integer not null, day text not null, calls integer not null default 0,
                                          tokens_in integer not null default 0, tokens_out integer not null default 0,
                                          searches integer not null default 0, cost real not null default 0,
@@ -55,6 +57,8 @@ export function openStore(dir) {
   /* Before there were named keys, a user's one credential sat on their row
      (claude: key|token, secret). Such a database gets the active_key column,
      each credential becomes its user's first named key, and the old columns go. */
+  /* A share can be live: the primer as it stands whenever the link is opened. */
+  if (!db.prepare("pragma table_info(shares)").all().some(c => c.name === "live")) db.exec("alter table shares add column live integer not null default 0");
   const cols = db.prepare("pragma table_info(users)").all().map(c => c.name);
   if (!cols.includes("active_key")) db.exec("alter table users add column active_key integer");
   if (cols.includes("secret")) {
@@ -82,9 +86,11 @@ export function openStore(dir) {
     kvDel: db.prepare("delete from kv where user = ? and k = ?"),
     kvKeys: db.prepare("select k from kv where user = ?"),
     shareAdd: db.prepare("insert into shares (id, user, doc, title, hash, body, created) values (?, ?, ?, ?, ?, ?, ?)"),
-    shareLast: db.prepare("select id, hash, created from shares where user = ? and doc = ? order by created desc limit 1"),
+    shareAddLive: db.prepare("insert into shares (id, user, doc, title, hash, body, live, created) values (?, ?, ?, ?, 'live', '', 1, ?)"),
+    shareLive: db.prepare("select id, created from shares where user = ? and doc = ? and live = 1"),
+    shareLast: db.prepare("select id, hash, created from shares where user = ? and doc = ? and live = 0 order by created desc limit 1"),
     shareGet: db.prepare("select shares.*, users.name as by from shares join users on users.id = shares.user where shares.id = ?"),
-    shareList: db.prepare("select id, created from shares where user = ? and doc = ? order by created desc"),
+    shareList: db.prepare("select id, created, live from shares where user = ? and doc = ? order by live desc, created desc"),
     shareDel: db.prepare("delete from shares where id = ? and user = ?"),
     shareMediaAdd: db.prepare("insert or ignore into share_media (share, name) values (?, ?)"),
     shareMediaDel: db.prepare("delete from share_media where share = ?"),
@@ -107,8 +113,15 @@ export function openStore(dir) {
                           tokens_out = tokens_out + excluded.tokens_out, searches = searches + excluded.searches, cost = cost + excluded.cost`),
     usageDays: db.prepare("select day, calls, tokens_in, tokens_out, searches, cost from key_usage where key = ? order by day desc limit ?"),
     usageTotal: db.prepare("select coalesce(sum(calls),0) as calls, coalesce(sum(tokens_in),0) as tokens_in, coalesce(sum(tokens_out),0) as tokens_out, coalesce(sum(searches),0) as searches, coalesce(sum(cost),0) as cost from key_usage where key = ?"),
-    usageDel: db.prepare("delete from key_usage where key = ?")
+    usageDel: db.prepare("delete from key_usage where key = ?"),
+    firstUser: db.prepare("select min(id) as id from users"),
+    fbAdd: db.prepare("insert into feedback (user, name, kind, text, ctx, created) values (?, ?, ?, ?, ?, ?)"),
+    fbList: db.prepare("select * from feedback order by created desc limit ?")
   };
+  /* Who hosts: the accounts named in ADMIN, or, unset, the first account
+     made. The host reads the feedback that comes in. */
+  const admins = (process.env.ADMIN || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+  const isAdmin = u => admins.length ? admins.includes(u.name) : u.id === (q.firstUser.get() || {}).id;
 
   /* ── meta: a value that is made once and then kept ── */
   const meta = (k, make) => {
@@ -178,7 +191,7 @@ export function openStore(dir) {
   };
   const publicUser = u => {
     const k = activeKey(u);
-    return { id: u.id, name: u.name, key: k ? publicKey(k, false) : null };
+    return { id: u.id, name: u.name, key: k ? publicKey(k, false) : null, admin: isAdmin(u) };
   };
 
   return {
@@ -304,11 +317,21 @@ export function openStore(dir) {
         for (const name of media) q.shareMediaAdd.run(id, name);
         return { id, created, reused: false };
       },
+      /* One live link per primer: the same one back each time it is asked for. */
+      live(user, doc, title) {
+        const r = q.shareLive.get(user, doc);
+        if (r) return { id: r.id, created: r.created, live: true, reused: true };
+        const id = randomBytes(9).toString("base64url"), created = Date.now();
+        q.shareAddLive.run(id, user, doc, title, created);
+        return { id, created, live: true, reused: false };
+      },
       get(id) {
         const r = q.shareGet.get(id);
-        return r ? { id: r.id, by: r.by, title: r.title, created: r.created, body: r.body } : null;
+        return r ? { id: r.id, by: r.by, title: r.title, created: r.created, body: r.body, live: !!r.live, user: r.user, doc: r.doc } : null;
       },
-      list(user, doc) { return q.shareList.all(user, doc); },
+      list(user, doc) { return q.shareList.all(user, doc).map(r => ({ id: r.id, created: r.created, live: !!r.live })); },
+      /* The image files a live link shows right now, so its readers can load them. */
+      media(id, names) { for (const name of names) q.shareMediaAdd.run(id, name); },
       delete(user, id) {
         const r = q.shareDel.run(id, user);
         if (r.changes) q.shareMediaDel.run(id);
@@ -316,6 +339,16 @@ export function openStore(dir) {
       },
       /* Whether any share, by anyone, shows this image file. */
       mediaShared(name) { return !!q.shareMediaHas.get(name); }
+    },
+    /* ── feedback: a word from a reader to whoever hosts, with where it came from ── */
+    feedback: {
+      add(user, name, kind, text, ctx) { q.fbAdd.run(user, name, kind, text, JSON.stringify(ctx || {}), Date.now()); },
+      list(n) {
+        return q.fbList.all(n).map(r => {
+          let ctx = {}; try { ctx = JSON.parse(r.ctx); } catch {}
+          return { id: r.id, name: r.name, kind: r.kind, text: r.text, where: ctx, created: r.created };
+        });
+      }
     }
   };
 }

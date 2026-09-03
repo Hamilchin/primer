@@ -1,0 +1,1 @@
+Change the highlighted passage as the reader directs, and leave everything they did not mention as it is. Do exactly what was asked, no more. Prefer mode "replace" with one prose block; use mode "after" only when the reader asks for something to be added.

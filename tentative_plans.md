@@ -1,0 +1,1 @@
+Allow adding new quick select revision options; the user should be able to make prompts for these. 

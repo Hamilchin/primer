@@ -1,7 +1,8 @@
 # Primer
 
-Name a subject; Primer writes an explainer on it, one section at a time, then
-checks the claims and finds figures. Each person signs in and keeps their own
+Name a subject; Primer writes an explainer on it, one section at a time, and
+finds figures. Research, off unless turned on in Settings or run from the foot
+of a primer, then checks the claims against the web. Each person signs in and keeps their own
 primers, prompt edits and settings. Model calls go through the Claude Agent SDK.
 
 ## Run it
@@ -39,11 +40,24 @@ kind of primer for a typed term. The research agent can also link terms
 to Wikipedia at their first mention, when its prompt asks for it (change
 the last line of the Research prompt in Settings to yes).
 
-Share on a finished primer copies a link to `/s/<id>`: the primer frozen as
-it is at that moment, readable by anyone with the link, signed in or not.
-Later changes never reach it; share again for a new link (an unchanged
-primer gets the same one back). The Share menu lists a primer's links and
-can remove them.
+A section can have subsections, numbered 3.1, 3.2 in the margin and listed
+under their section in the contents. The planner divides a section only
+when it would run long and fall into distinct parts, the writer follows
+that plan, and a revision can open a subsection when what it adds is too
+large for a paragraph. Most primers have none.
+
+Share on a finished primer offers two kinds of link to `/s/<id>`, readable
+by anyone, signed in or not. The public link follows the primer: readers
+see it as it stands and as it changes, and while it is still being written
+their page brings each new piece in. Turning the switch off takes the link
+back. A frozen link is a copy of the primer as it is that moment; later
+changes never reach it, and the Share menu lists those copies and can
+remove them.
+
+Feedback in the top bar, and Complain in the pen, send a reader's words to
+whoever hosts, along with the page they were on. The account named by
+`ADMIN` reads them on the Feedback page of Settings; with `ADMIN` unset,
+the first account made is the host.
 
 Everything lives in `data/` (a SQLite file and the images that were found).
 Back that directory up and you have backed up Primer.
@@ -69,3 +83,4 @@ Then send friends the URL and the invite word.
 | `DATA_DIR` | `./data` | database and media |
 | `INVITE` | generated once | needed to create an account |
 | `PRIMER_SECRET` | generated once | encrypts stored keys and tokens |
+| `ADMIN` | the first account | account names, comma-separated, that read feedback |

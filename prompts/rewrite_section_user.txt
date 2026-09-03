@@ -17,4 +17,6 @@ SECTIONS ALREADY WRITTEN:
 
 WRITE SECTION {{N}}: {{SECTION}}
 
+{{SUBSECTIONS}}
+
 Follow the instruction for the rewrite. Later sections will cover what follows; do not preview or summarise them.

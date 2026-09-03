@@ -100,6 +100,10 @@ a:hover{text-decoration-color:currentColor}
 .act.on{color:var(--fg);text-decoration:underline;text-underline-offset:5px;text-decoration-color:var(--rule-2)}
 .act.hide{display:none}
 .act.back{font-size:17px;line-height:1;position:relative;top:-1px}
+/* Feedback stands out from the other words in the bar: this is a beta,
+   and hearing back matters more than quiet. */
+.act.feedback{color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:.22rem .7rem;line-height:1.2}
+.act.feedback:hover,.act.feedback[aria-expanded="true"]{background:var(--accent);color:#fff}
 .act.stop{color:var(--accent)}
 .act.stop::before{
   content:""; display:inline-block; width:.4em; height:.4em; border-radius:50%; background:currentColor;
@@ -123,7 +127,6 @@ main{padding:1.5rem var(--gutter) 8rem}
 .topic::placeholder{color:var(--fg-3);font-weight:400}
 .topic:focus{outline:none;border-bottom-color:var(--accent)}
 .composer .more{margin-top:1.6rem}
-.composer.blank .more{display:none}
 .known{
   width:100%; display:block; font-size:16px; line-height:1.5; color:var(--fg);
   background:none; border:0; border-bottom:1px solid var(--rule-2); padding:.15rem 0 .45rem;
@@ -244,11 +247,18 @@ main{padding:1.5rem var(--gutter) 8rem}
 .toc .n{color:var(--fg-3);flex:0 0 1.4rem;font-variant-numeric:tabular-nums}
 .toc .t{min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .toc .todo .t{color:var(--fg-3)}
-/* On a wide screen the contents move into the left margin and stay there. */
+/* A subsection sits under its section, numbered 3.1, 3.2, the way a
+   textbook or Wikipedia numbers them. */
+.toc li.subsec button{padding-left:2.1rem;font-size:14px}
+.toc li.subsec .n{flex-basis:2.3rem}
+.toc li.subsec .t{color:var(--fg-2)}
+/* On a wide screen the contents move into the left margin and stay there,
+   unless the Contents setting keeps them under the title, or off. */
 .side-toc{display:none}
+body[data-contents="off"] .toc,body[data-contents="off"] .side-toc{display:none!important}
 @media (min-width:1340px){
-  .toc{display:none}
-  .side-toc{
+  body:not([data-contents="top"]) .toc{display:none}
+  body:not([data-contents="top"]) .side-toc{
     display:block; position:fixed; top:calc(var(--head) + 2.7rem); left:calc(50% - 20rem - var(--gutter) - var(--marg) - 12.75rem); width:12rem;
     max-height:calc(100vh - var(--head) - 4rem); overflow:auto; font-size:13px; line-height:1.4;
   }
@@ -258,11 +268,14 @@ main{padding:1.5rem var(--gutter) 8rem}
   .side-toc .n{flex:0 0 1.2rem;font-variant-numeric:tabular-nums}
   .side-toc .t{min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .side-toc .todo button{color:var(--fg-3);opacity:.55}
+  .side-toc li.subsec button{padding-left:1.7rem;font-size:12.5px}
+  .side-toc li.subsec .n{flex-basis:2rem}
 }
 
 .block{position:relative;margin:0 0 1rem;scroll-margin-top:calc(var(--head) + 1.25rem)}
 .block[data-kind="heading"]{margin:2.6rem 0 1rem}
 .doc-head + .block[data-kind="heading"]{margin-top:0}
+.block[data-kind="subheading"]{margin:1.9rem 0 .55rem}
 .body>*:first-child{margin-top:0}
 .body>*:last-child{margin-bottom:0}
 .body p{margin:0 0 1rem;text-wrap:pretty}
@@ -318,6 +331,8 @@ body[data-sources="off"] .cite{display:none}
    greyed, so the two read as one line. */
 .num{top:0;font-family:var(--disp);font-size:1.55rem;line-height:1.25;font-variant-numeric:lining-nums tabular-nums}
 .block:has(.status) .num{display:none}
+/* A subsection's number matches its smaller heading. */
+.num.numsub{font-family:inherit;font-size:1.08rem;font-weight:600;line-height:inherit}
 .mark{pointer-events:auto;text-align:right;color:var(--fg-3)}
 .mark:hover,.mark[aria-expanded="true"]{color:var(--accent)}
 body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:none}
@@ -369,6 +384,12 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
   margin-top:4rem; padding-top:.8rem; border-top:1px solid var(--rule); display:flex; flex-wrap:wrap;
   gap:.4rem 1.25rem; align-items:baseline; font-size:13px; color:var(--fg-3);
 }
+/* The same toolbar and About panel again at the foot, for a reader who
+   arrives at the end and wants what was at the top. */
+.doc-foot{margin-top:3.2rem;padding-top:.8rem;border-top:1px solid var(--rule)}
+.doc-foot .doc-bar{margin-bottom:0}
+.doc-foot .meta{border-bottom:0;margin:.6rem 0 0;padding-bottom:.2rem}
+.doc-foot + .colophon{margin-top:1.4rem}
 .colophon .fill{flex:1}
 .colophon button{color:var(--fg-2)}
 .colophon button:hover{color:var(--accent)}
@@ -422,8 +443,31 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 .outline form input:focus{outline:none;border-bottom-color:var(--accent)}
 .outline form button{width:auto;flex:0 0 auto;color:var(--accent);font-size:13px;padding:.3rem .4rem}
 .outline .rule{border-top:1px solid var(--rule);margin:.35rem .25rem}
+.feedback form{flex-direction:column;align-items:stretch;border-top:0;margin-top:0;gap:.5rem}
+.feedback form textarea{
+  width:100%; background:none; border:0; border-bottom:1px solid var(--rule-2); border-radius:0; padding:.3rem .1rem .4rem;
+  font-size:14.5px; line-height:1.45; resize:none; overflow:hidden; color:var(--fg);
+}
+.feedback form textarea:focus{outline:none;border-bottom-color:var(--accent)}
+.feedback form button{align-self:flex-end}
+/* What readers sent, on the host's Feedback page in Settings. */
+.inbox{list-style:none;margin:0;padding:0;font-size:15px}
+.inbox li{padding:.7rem 0}
+.inbox .k{font-size:13px;color:var(--fg-3);margin-bottom:.15rem}
+.inbox .k .sep{margin:0 .4em}
+.inbox .msg{margin:0;white-space:pre-wrap;text-wrap:pretty}
+.inbox .src{font-size:13.5px;color:var(--fg-2);margin-top:.25rem}
+.inbox .src q{display:block;color:var(--fg-3);margin-bottom:.1rem}
+.inbox .src a{color:var(--accent);text-decoration:none}
+.inbox .src a:hover{text-decoration:underline;text-underline-offset:3px}
+.inbox .none{color:var(--fg-3);font-size:14px}
 /* The Share menu: a link for the primer as it stands, the links made before, and other ways out. */
 .share{width:min(20rem,90vw)}
+.share .pub{display:flex;align-items:center;gap:.7rem;padding:.4rem .6rem .1rem;font-size:14px;color:var(--fg)}
+.share .pub span{flex:1}
+.share .pub .switch,.share .pub .switch:hover{display:block;width:2.5rem;padding:0;margin:0;background:var(--rule-2)}
+.share .pub .switch[aria-checked="true"],.share .pub .switch[aria-checked="true"]:hover{background:var(--accent)}
+.share .hint.under{padding-top:0;padding-bottom:.3rem}
 .share .linkrow{display:flex;align-items:baseline}
 .share .linkrow button:first-child{flex:1}
 .share .linkrow .rm{width:auto;flex:0 0 auto;font-size:13px;color:var(--fg-3)}
@@ -459,17 +503,25 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 .usage .total td{border-bottom:0;color:var(--fg)}
 .usage .total td:first-child{font-weight:500}
 /* ══ folded rows ══════════════════════════════════════════════
-   A line to press; what it holds opens under it. Rows stack on single rules. */
-.fold{margin:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
-.fold + .fold,.klist + .fold{border-top:0}
-.fold summary{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;padding:.7rem 0;cursor:pointer;list-style:none;font-size:16px;color:var(--fg)}
+   A line to press; what it holds opens under it. No rules between rows:
+   a chevron at the right end says the line opens, and turns when it has. */
+.fold{margin:0}
+.fold summary{display:flex;align-items:baseline;gap:1rem;padding:.5rem 0;cursor:pointer;list-style:none;font-size:16px;color:var(--fg)}
 .fold summary::-webkit-details-marker{display:none}
+.fold summary::after{
+  content:""; flex:0 0 auto; margin-left:auto; width:.38em; height:.38em; position:relative; top:-.12em;
+  border-right:1.5px solid var(--fg-3); border-bottom:1.5px solid var(--fg-3); transform:rotate(-45deg); transition:transform .15s;
+}
+.fold[open] > summary::after{transform:rotate(45deg);top:-.2em}
 .fold summary:hover{color:var(--accent)}
+.fold summary:hover::after{border-color:var(--accent)}
 .fold .kform{padding:.3rem 0 1.1rem}
 /* ── prompts: one folded row each; an edited prompt keeps a rule in the
       margin and its Reset, open or closed ── */
-.prompts h3{margin:1.6rem 0 .35rem}
-.prompts .sub + h3{margin-top:.2rem}
+/* A subsection heading on Settings, numbered in the margin like a primer's. */
+.ssub{position:relative;margin:1.9rem 0 .55rem;scroll-margin-top:calc(var(--head) + 1.25rem)}
+.ssub h3{margin:0;font-size:1.08rem;font-weight:600}
+.sub + .ssub{margin-top:.8rem}
 .prow{position:relative}
 .prow .reset{font-size:13px;color:var(--accent);visibility:hidden}
 .prow.mod .reset{visibility:visible}
@@ -504,8 +556,8 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 .srow.wide .help{max-width:none}
 .keys{font-size:14px}
 .keys .warn{margin:0 0 .9rem;padding-left:.8rem;border-left:2px solid var(--accent);color:var(--fg);font-size:14px;line-height:1.5}
-.klist{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
-.krow{display:flex;gap:.8rem;align-items:flex-start;border-bottom:1px solid var(--rule);padding:.6rem 0}
+.klist{list-style:none;margin:0;padding:0}
+.krow{display:flex;gap:.8rem;align-items:flex-start;padding:.5rem 0}
 .krow input[type="radio"]{accent-color:var(--accent);margin:.35rem 0 0;flex:0 0 auto}
 .krow details,.krow .kinfo{flex:1;min-width:0}
 .krow summary,.krow .kinfo{list-style:none;display:flex;flex-wrap:wrap;gap:.15rem 1rem;align-items:baseline}
@@ -630,6 +682,7 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
   .pen{position:fixed;left:.6rem;right:.6rem;top:auto!important;bottom:calc(.6rem + env(safe-area-inset-bottom));padding:.35rem .4rem}
   .pen.show{left:.6rem!important}
   .pen-row{width:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:.15rem}
+  .pen-row .sep{display:none}
   .pen-row button{justify-content:center;padding:.5rem .4rem}
   .pen .sep,.pen kbd{display:none}
   .pen-ask{width:100%}
@@ -646,7 +699,7 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
   @page{margin:18mm 16mm}
   html,body{background:#fff;color:#000}
   body{font-size:10.5pt;line-height:1.5}
-  .head,.pen,.pop,.toast,.marg,.side-q,.side-toc,.doc-bar,.status-row,.doc-tools,
+  .head,.pen,.pop,.toast,.marg,.side-q,.side-toc,.doc-bar,.status-row,.doc-tools,.doc-foot,
   .colophon button,.colophon .confirm,.err button{display:none!important}
   main{padding:0}
   .doc{max-width:none;margin:0;padding-bottom:0!important}
@@ -655,7 +708,7 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
   .body h3{font-size:11.5pt}
   a{color:#000}
   .block{break-inside:avoid;page-break-inside:avoid}
-  .block[data-kind="heading"]{break-after:avoid;page-break-after:avoid}
+  .block[data-kind="heading"],.block[data-kind="subheading"]{break-after:avoid;page-break-after:avoid}
   figure,img,svg,.katex-display{break-inside:avoid;page-break-inside:avoid}
   .block[data-kind="figure"] svg{color:#000;max-width:100%;height:auto;max-height:10cm}
   .block[data-kind="image"] img{max-width:100%;width:auto;height:auto;max-height:10cm}
@@ -675,6 +728,7 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
   <button class="wordmark" id="homeBtn" aria-label="primer, home"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5.5 25.5H26.5M9 17.5H23M12.5 9.5H19.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="4"/></svg>primer</button>
   <nav class="acts">
     <button class="act hide back" id="backBtn" aria-label="Back" title="Back">&larr;</button>
+    <button class="act feedback" id="feedbackBtn">Feedback</button>
     <button class="act hide" id="settingsBtn">Settings</button>
   </nav>
 </header>
@@ -690,17 +744,20 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
     <button data-act="tighter">Tighter<kbd>5</kbd></button>
     <button data-act="define">Define<kbd>6</kbd></button>
     <span class="sep"></span>
-    <button data-act="ask">Ask&hellip;<kbd>7</kbd></button>
+    <button data-act="revise">Edit&hellip;<kbd>7</kbd></button>
+    <button data-act="ask">Ask&hellip;<kbd>8</kbd></button>
+    <button data-act="complain">Complain&hellip;<kbd>9</kbd></button>
   </div>
   <form class="pen-ask" id="askForm">
     <input id="askInput" autocomplete="off" placeholder="Ask about this…" aria-label="Question">
-    <button type="submit">Ask</button>
+    <button type="submit" id="askGo">Ask</button>
   </form>
 </div>
 
 <div class="pop" id="pop" role="dialog"></div>
 <div class="pop outline share" id="share" role="menu"></div>
 <div class="pop outline" id="rewrite" role="menu"></div>
+<div class="pop outline feedback" id="feedback" role="dialog" aria-label="Feedback"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -777,21 +834,24 @@ const guestMe = () => ({ guest:true, name:"Guest", key:guestKeyInfo() });
    rule. Only values that differ from def are stored.                  */
 const SECTIONS = [
   { id:"keys", title:"Keys" }, { id:"writing", title:"Writing" }, { id:"display", title:"Display" },
-  { id:"account", title:"Account" }, { id:"prompts", title:"Prompts" }
+  { id:"account", title:"Account" }, { id:"prompts", title:"Prompts" }, { id:"inbox", title:"Feedback", admin:true }
 ];
 const SETTINGS = {
-  keys: { type:"keys", section:"keys", wide:true,
-    help:"Every primer is written on a key: an Anthropic API key or a Claude subscription token, your own or one someone shared with you. A subscription token comes from running claude setup-token." },
-  research: { type:"bool", section:"writing", def:true, label:"Research after writing",
-    help:"Once a primer is written, an agent checks its key claims on the web: confirmed claims get a source, wrong ones are corrected." },
+  keys: { type:"keys", section:"keys", wide:true },
+  research: { type:"bool", section:"writing", def:false, label:"Research after writing",
+    help:"Once a primer is written, an agent checks its key claims on the web: confirmed claims get a source, wrong ones are corrected. Off, Research at the foot of a primer runs the same check on demand." },
   showSources: { type:"bool", section:"display", def:true, attr:"sources", label:"Show sources",
     help:"A small numeral after each cited claim. Hover it for the source." },
   showMarks: { type:"bool", section:"display", def:true, attr:"marks", label:"Show margin annotations",
     help:"Revisions, corrections and found images noted in the margin. Off, the primer reads clean; the Inspector still keeps every call." },
+  contents: { type:"select", section:"display", def:"margin", attr:"contents", label:"Contents",
+    help:"Where the table of contents goes. In the margin it stays beside the primer as you read, on a screen wide enough; on a narrower one it sits under the title.",
+    options:[{ value:"margin", label:"Margin" }, { value:"top", label:"Under the title" }, { value:"off", label:"Off" }] },
   theme: { type:"select", section:"display", def:"system", label:"Theme",
     options:[{ value:"system", label:"System" }, { value:"light", label:"Light" }, { value:"dark", label:"Dark" },
              { value:"paper", label:"Paper" }, { value:"paper-dark", label:"Paper dark" }] },
-  account: { type:"account", section:"account" }
+  account: { type:"account", section:"account" },
+  inbox: { type:"inbox", section:"inbox", wide:true }
 };
 let settings = {};
 const setting = k => (k in settings) ? settings[k] : SETTINGS[k].def;
@@ -809,7 +869,7 @@ function applySettings(){
     const a = SETTINGS[k].attr;
     if(!a) return;
     const on = v && (a in v) ? v[a] : setting(k);
-    document.body.dataset[a] = on ? "on" : "off";
+    document.body.dataset[a] = SETTINGS[k].type === "bool" ? (on ? "on" : "off") : String(on);
   });
   applyTheme();
 }
@@ -953,35 +1013,38 @@ function repairJSON(s){
    prompts/<key>.txt, raw text, loaded at boot. This table fixes the
    order and the labels on the Prompts page; runtime edits there are
    stored as overrides and Reset returns to the file. {{PLACEHOLDERS}}
-   are filled in at call time. `group` sorts them on the page.        */
+   are filled in at call time. `group` sorts them on the page. The
+   templates marked `user` only arrange the fields into a message; they
+   are loaded but not shown, there being nothing in them to change.   */
 const PROMPT_GROUPS = { base:"Base", write:"Writing a primer", revise:"Revising a selection", rewrite:"Rewriting a primer" };
 const PROMPTS = {
   house:                { group:"base",    label:"House style" },
   reader:               { group:"base",    label:"Reader" },
-  instruction:          { group:"base",    label:"Instructions wrapper" },
-  outline:              { group:"write",   label:"Outline · system" },
-  outline_user:         { group:"write",   label:"Outline · user" },
-  section:              { group:"write",   label:"Section · system" },
-  section_user:         { group:"write",   label:"Section · user" },
-  figure:               { group:"write",   label:"Diagram · system" },
-  figure_user:          { group:"write",   label:"Diagram · user" },
-  finder:               { group:"write",   label:"Image finder · system" },
-  finder_user:          { group:"write",   label:"Image finder · user" },
-  research:             { group:"write",   label:"Research · system" },
-  research_user:        { group:"write",   label:"Research · user" },
-  define:               { group:"write",   label:"Definition · system" },
-  define_user:          { group:"write",   label:"Definition · user" },
-  edit:                 { group:"revise",  label:"Edit · system" },
-  edit_user:            { group:"revise",  label:"Edit · user" },
+  instruction:          { group:"base",    label:"Instructions wrapper", user:true },
+  outline:              { group:"write",   label:"Outline" },
+  outline_user:         { group:"write",   label:"Outline · user", user:true },
+  section:              { group:"write",   label:"Section" },
+  section_user:         { group:"write",   label:"Section · user", user:true },
+  figure:               { group:"write",   label:"Illustrator" },
+  figure_user:          { group:"write",   label:"Diagram · user", user:true },
+  finder:               { group:"write",   label:"Image finder" },
+  finder_user:          { group:"write",   label:"Image finder · user", user:true },
+  research:             { group:"write",   label:"Researcher" },
+  research_user:        { group:"write",   label:"Research · user", user:true },
+  define:               { group:"write",   label:"Definer" },
+  define_user:          { group:"write",   label:"Definition · user", user:true },
+  edit:                 { group:"revise",  label:"Reviser" },
+  edit_user:            { group:"revise",  label:"Edit · user", user:true },
   explain:              { group:"revise",  label:"Explain" },
   example:              { group:"revise",  label:"Example" },
   derive:               { group:"revise",  label:"Derive" },
   tighter:              { group:"revise",  label:"Tighter" },
+  revise:               { group:"revise",  label:"Edit" },
   ask:                  { group:"revise",  label:"Ask" },
   figure_action:        { group:"revise",  label:"Diagram" },
-  rewrite_outline:      { group:"rewrite", label:"Outline · system" },
-  rewrite_outline_user: { group:"rewrite", label:"Outline · user" },
-  rewrite_section_user: { group:"rewrite", label:"Section · user" }
+  rewrite_outline:      { group:"rewrite", label:"Outline" },
+  rewrite_outline_user: { group:"rewrite", label:"Outline · user", user:true },
+  rewrite_section_user: { group:"rewrite", label:"Section · user", user:true }
 };
 
 /* Fetch prompts/<key>.txt for every entry. Returns the keys that failed.
@@ -1032,7 +1095,9 @@ const ACTIONS = {
   figure:  { label:"Diagram",    key:"4" },
   tighter: { label:"Tighter",    key:"5" },
   define:  { label:"Definition", key:"6" },
-  ask:     { label:"Question",   key:"7" }
+  revise:  { label:"Edit",       key:"7" },
+  ask:     { label:"Question",   key:"8" },
+  complain:{ label:"Complaint",  key:"9" }
 };
 const word = edit => String(edit && edit.label || "").toLowerCase();
 
@@ -1109,9 +1174,49 @@ function shortDate(ts){
   return d.toLocaleDateString(undefined, o);
 }
 const host = u => { try{ return new URL(u).host.replace(/^www\./,""); }catch(e){ return String(u||""); } };
-function grow(ta){ ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; }
+/* Fit a textarea to its text. Hidden, it measures nothing; leave it to
+   its rows until it can be seen. */
+function grow(ta){ ta.style.height = "auto"; const h = ta.scrollHeight; ta.style.height = h ? h + "px" : ""; }
 const docked = () => matchMedia("(pointer:coarse)").matches || innerWidth <= 700;
 const headingTitle = b => String(b.md || "").replace(/^#+\s*/,"");
+/* The subsections of a section, as {title, block?}: its subheading blocks
+   once it is written, the plan's titles (h.subs) until then. */
+function subsOf(d, h){
+  const made = d.blocks.filter(b => b.kind === "subheading" && b.sec === h.sec);
+  const written = made.length || d.blocks.some(b => b.sec === h.sec && b.kind !== "heading" && !b.slot && (b.md || b.brief || b.src));
+  return written ? made.map(b => ({ title:headingTitle(b), block:b })) : (h.subs || []).map(t => ({ title:t }));
+}
+/* The outline as the writers read it: numbered sections, subsections under them. */
+function outlineText(d){
+  return d.blocks.filter(b => b.kind === "heading").map((h, i) =>
+    [(i+1) + ". " + headingTitle(h), ...subsOf(d, h).map((x, j) => "   " + (i+1) + "." + (j+1) + " " + x.title)].join("\n")).join("\n");
+}
+/* The number a block carries in the margin: "3" for a section, "3.2" for
+   a subsection. */
+function numberOf(d, b){
+  let n = 0, m = 0;
+  for(const x of d.blocks){
+    if(x.kind === "heading"){ n++; m = 0; } else if(x.kind === "subheading") m++;
+    if(x.id === b.id) break;
+  }
+  return b.kind === "subheading" ? n + "." + m : String(n);
+}
+/* A subheading block from a title the writer or the reviser gave. */
+const subBlock = (title, base) => ({ id:uid(), kind:"subheading", md:"### " + trimTitle(title, 72, "Subsection"), fresh:true, ...base });
+/* Prose as blocks. A model that puts a markdown heading inside its prose,
+   though asked not to, gets it split out as the subheading it meant. Code
+   fences are left alone. */
+function proseBlocks(md, base){
+  const out = []; let buf = [], fenced = false;
+  const flush = () => { const t = buf.join("\n").trim(); if(t) out.push({ id:uid(), kind:"prose", md:t, fresh:true, ...base }); buf = []; };
+  for(const line of String(md).split("\n")){
+    if(/^\s*```/.test(line)) fenced = !fenced;
+    const m = fenced ? null : /^#{1,6}\s+(.+?)\s*#*\s*$/.exec(line);
+    if(m){ flush(); out.push(subBlock(m[1], base)); } else buf.push(line);
+  }
+  flush();
+  return out;
+}
 
 /* ══ markdown + math ══════════════════════════════════════════ */
 marked.setOptions({breaks:false, gfm:true});
@@ -1319,10 +1424,8 @@ function render(){
   else if(route === "inspector" && doc) renderInspector();
   else if((route === "doc" || route === "shared") && doc) renderDoc();
   else { route = me ? "cover" : "login"; document.body.dataset.route = route; if(me) renderCover(); else renderLogin(); }
-  /* A shared primer lives at /s/… and the guide at /guide; every other
-     page is at the root. */
-  const want = route === "shared" ? location.pathname : route === "guide" ? "/guide" : "/";
-  if(location.pathname !== want) history.replaceState(null, "", want);
+  syncHistory();
+  document.title = pageTitle();
   paintHeader();
   markCurrent();
 }
@@ -1360,12 +1463,10 @@ function toolsNode(d){
 function barNode(d){ const bar = el("div", "doc-bar"); bar.append(toolsNode(d), statusNode(d)); return bar; }
 function toolsPaint(){
   if(!onDoc()) return;
-  const old = main.querySelector(".m-tools");
-  if(old) old.replaceWith(toolsNode(doc));
+  main.querySelectorAll(".m-tools").forEach(old => old.replaceWith(toolsNode(doc)));
 }
 function aboutPaint(){
-  const m = main.querySelector(".meta");
-  if(m) m.hidden = !aboutOpen;
+  main.querySelectorAll(".meta").forEach(m => { m.hidden = !aboutOpen; });
   toolsPaint();
 }
 /* Redraw or patch only when the document is the one on screen. */
@@ -1422,7 +1523,7 @@ function renderLogin(){
 /* ── cover: composer + library ────────────── */
 function renderCover(){
   const c = el("section", "cover");
-  c.innerHTML = `<form class="composer blank" id="composer">
+  c.innerHTML = `<form class="composer" id="composer">
       <textarea id="cTopic" class="topic" rows="1" autocomplete="off" placeholder="What do you want to understand?" aria-label="Topic"></textarea>
       <div class="more">
         <label class="lab" for="cKnown">What you already know</label>
@@ -1439,8 +1540,6 @@ function renderCover(){
   const form = $("#composer"), topic = $("#cTopic"), known = $("#cKnown"), instr = $("#cInstr");
   const fields = [topic, known, instr];
   fields.forEach(f => { f.oninput = () => grow(f); });
-  /* The rest of the form only once there is a topic. */
-  topic.addEventListener("input", () => form.classList.toggle("blank", !topic.value.trim()));
   topic.onkeydown = e => { if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); form.requestSubmit(); } };
   [known, instr].forEach(f => {
     f.onkeydown = e => { if(e.key==="Enter" && (e.metaKey||e.ctrlKey)){ e.preventDefault(); form.requestSubmit(); } };
@@ -1565,13 +1664,16 @@ function renderDoc(){
   const head = a.querySelector(".doc-head");
   head.append(barNode(doc), metaNode(doc), docToc(doc), docToc(doc, true));
 
-  let n = 0, fi = 0;
+  let n = 0, m = 0, fi = 0;
   doc.blocks.forEach(b => {
-    if(b.kind === "heading") n++;
-    const e = blockEl(b, n);
+    if(b.kind === "heading"){ n++; m = 0; } else if(b.kind === "subheading") m++;
+    const e = blockEl(b, b.kind === "subheading" ? n + "." + m : n);
     if(e.classList.contains("fresh")) e.style.setProperty("--i", fi++);
     a.appendChild(e);
   });
+  if(doc.blocks.some(b => b.kind === "heading")){
+    const foot = el("div", "doc-foot"); foot.append(barNode(doc), metaNode(doc)); a.appendChild(foot);
+  }
   if(!doc.blocks.some(b => b.pending) && doc.blocks.some(b => b.kind==="heading")) a.appendChild(colophon());
   main.replaceChildren(a);
   typeset(a);
@@ -1637,7 +1739,7 @@ function metaNode(d){
   }
   row("Written", shortDate(d.created));
   if(d.shared){
-    row("Shared by", d.shared.by + ", " + shortDate(d.shared.created));
+    row("Shared by", d.shared.live ? d.shared.by + ", as a public link that follows the primer" : d.shared.by + ", " + shortDate(d.shared.created));
     if(d.usage) row("Usage", d.usage);
   }else{
     const use = usageText(usageOf(d));
@@ -1662,6 +1764,13 @@ function docState(d){
              : w.label;
     if(jobs.length > 1) text += ", and " + (jobs.length - 1) + " more";
     return { kind:"busy", text };
+  }
+  /* A live link to a primer still being made: say so, and the page will
+     bring the new pieces in as they land. */
+  if(d.shared && d.shared.live && /^(planning|writing|researching)$/.test(d.status)){
+    const done = new Set(d.blocks.filter(b => b.sec != null && b.kind !== "heading" && b.kind !== "subheading" && (b.md || b.src)).map(b => b.sec)).size;
+    return { kind:"live", text: d.status === "planning" ? "being planned" : d.status === "researching" ? "sources being checked"
+                                : "being written" + (secs ? ", §" + Math.min(done + 1, secs) + " of " + secs : "") };
   }
   if(d.status === "failed") return { kind:"failed", text:"failed" + (d.statusNote ? ": " + d.statusNote : "") };
   if(d.status && d.status !== "done"){
@@ -1692,6 +1801,7 @@ function statusNode(d){
     });
     line.append(btn("lnk", "Stop", () => stopRun(d)));
   }
+  else if(s.kind === "live"){ line.append(el("i", "dot")); line.append(s.text); }
   else if(s.kind === "stopped"){ line.append(s.text); if(!readonly()) line.append(btn("lnk", "Resume", () => resume(d))); }
   else if(s.kind === "failed"){ line.append(s.text); if(!readonly()) line.append(btn("lnk", "Retry", () => resume(d))); }
   else if(s.kind === "short"){ line.append(s.text); if(!readonly()) line.append(btn("lnk", "Fill in", () => resume(d))); }
@@ -1715,8 +1825,7 @@ function statusNode(d){
 /* Refresh the status line of the document on screen without a full redraw. */
 function statusPaint(){
   if(!onDoc()) return;
-  const old = main.querySelector(".m-status");
-  if(old) old.replaceWith(statusNode(doc));
+  main.querySelectorAll(".m-status").forEach(old => old.replaceWith(statusNode(doc)));
 }
 
 /* A short table of contents: one numbered line per entry, greyed while
@@ -1731,21 +1840,28 @@ function tocNode(items, side){
   items.forEach((it, i) => {
     const li = el("li");
     if(it.todo) li.classList.add("todo");
+    if(it.sub) li.classList.add("subsec");
     const b = btn(null, null, () => { const e = it.at(); if(e) e.scrollIntoView({ behavior:"smooth", block:"start" }); });
-    b.append(el("span", "n", String(i+1)), el("span", "t", it.title));
+    b.append(el("span", "n", it.num || String(i+1)), el("span", "t", it.title));
     b.title = it.title;
     li.append(b); ol.append(li);
   });
   nav.append(ol);
   return nav;
 }
-/* A primer's contents: its sections, greyed until written. */
+/* A primer's contents: its sections, greyed until written, and under each
+   its subsections: the ones the plan promised while the section is still
+   to come, the ones actually written after that. */
 function docToc(d, side){
-  return tocNode(d.blocks.filter(b => b.kind === "heading").map(h => ({
-    title: headingTitle(h),
-    todo: !d.blocks.some(b => b.sec === h.sec && b.kind !== "heading" && (b.md || b.src)),
-    at: () => main.querySelector(`[data-block-id="${h.id}"]`)
-  })), side);
+  const items = [];
+  d.blocks.filter(b => b.kind === "heading").forEach((h, i) => {
+    items.push({ num:String(i+1), title:headingTitle(h),
+      todo: !d.blocks.some(b => b.sec === h.sec && b.kind !== "heading" && b.kind !== "subheading" && (b.md || b.src)),
+      at: () => main.querySelector(`[data-block-id="${h.id}"]`) });
+    subsOf(d, h).forEach((x, j) => items.push({ num:(i+1) + "." + (j+1), title:x.title, sub:true, todo:!x.block,
+      at: () => main.querySelector(`[data-block-id="${(x.block || h).id}"]`) }));
+  });
+  return tocNode(items, side);
 }
 
 /* The word in the margin while a block is being made. */
@@ -1768,8 +1884,8 @@ function blockEl(b, n){
   if(b.edit && b.kind !== "note") e.classList.add("edited");
   b.fresh = false;
 
-  if(b.kind === "heading"){
-    e.appendChild(el("span", "marg num", "§ " + (n || "")));
+  if(b.kind === "heading" || b.kind === "subheading"){
+    e.appendChild(el("span", "marg num" + (b.kind === "subheading" ? " numsub" : ""), "§ " + (n || "")));
   }
   if(b.queued) e.classList.add("queued");
   if((b.pending && !b.queued) || b.busy || b.status){
@@ -1777,7 +1893,7 @@ function blockEl(b, n){
     s.appendChild(el("i", "dot"));
     s.append(statusWord(b));
     e.appendChild(s);
-  }else if(b.edit && b.kind !== "note"){
+  }else if(b.edit && b.kind !== "note" && b.kind !== "heading" && b.kind !== "subheading"){
     const m = btn("marg mark", word(b.edit));
     m.setAttribute("aria-label", b.edit.label + ", revision");
     m.onclick = ev => { ev.stopPropagation(); showPop(m, provNodes(b)); };
@@ -1930,9 +2046,7 @@ function patch(d, b){
   if(doc !== d || route !== "doc") return;
   const old = main.querySelector(`[data-block-id="${b.id}"]`);
   if(!old) return render();
-  let n = 0;
-  for(const x of d.blocks){ if(x.kind==="heading") n++; if(x.id===b.id) break; }
-  const fresh = blockEl(b, n);
+  const fresh = blockEl(b, numberOf(d, b));
   old.replaceWith(fresh);
   typeset(fresh);
   layoutSidenotes();
@@ -2063,7 +2177,7 @@ async function resumable(d){
 /* What the writers need, derived from the document itself. */
 function docContext(d){
   const titles = d.blocks.filter(b => b.kind==="heading").map(headingTitle);
-  return { titles, outline: titles.map((s,i) => (i+1)+". "+s).join("\n"), reader: readerText(d.known) };
+  return { titles, outline: outlineText(d), reader: readerText(d.known) };
 }
 async function deleteDoc(id){
   const d = docs.get(id);
@@ -2205,8 +2319,15 @@ async function build(d){
   d.title = trimTitle(plan.title, 110, d.topic);
   d.blocks = [];
   plan.sections.forEach((raw, i) => {
-    const title = trimTitle(raw, 72, "Section " + (i + 1));
-    d.blocks.push({ id:uid(), kind:"heading", md:"## "+title, sec:i, fresh:true });
+    /* A section is its title, or {title, subsections} where the planner
+       found a section that needs dividing. One subsection is none. */
+    const o = raw && typeof raw === "object" ? raw : { title:raw };
+    const title = trimTitle(o.title, 72, "Section " + (i + 1));
+    const subs = (Array.isArray(o.subsections) ? o.subsections : [])
+      .map(x => trimTitle(x && typeof x === "object" ? x.title : x, 72, "")).filter(Boolean);
+    const h = { id:uid(), kind:"heading", md:"## "+title, sec:i, fresh:true };
+    if(subs.length > 1) h.subs = subs;
+    d.blocks.push(h);
     d.blocks.push({ id:uid(), kind:"prose", pending:true, queued:true, md:"", sec:i, slot:true });
   });
   d.status = "writing";
@@ -2300,7 +2421,7 @@ function priorText(d, i){
   const parts = [];
   for(const b of d.blocks){
     if(b.sec == null || b.sec >= i) continue;
-    if(b.kind === "heading" || b.kind === "prose" || b.kind === "note"){ if(b.md) parts.push(b.md); }
+    if(b.kind === "heading" || b.kind === "subheading" || b.kind === "prose" || b.kind === "note"){ if(b.md) parts.push(b.md); }
     else if((b.kind === "figure" || b.kind === "image") && (b.brief || b.caption)){
       parts.push((b.kind === "figure" ? "[Diagram]" : "[Image]") + (b.brief ? "\nBrief: " + b.brief : "") + (b.caption ? "\nCaption: " + b.caption : ""));
     }
@@ -2314,8 +2435,10 @@ function priorText(d, i){
 async function genSection(d, i, title, outline, reader, by){
   const slot = d.blocks.find(b => b.slot && b.sec===i);
   if(!slot) return;
+  const h0 = d.blocks.find(b => b.kind==="heading" && b.sec===i), subs = (h0 && h0.subs) || [];
   const vars = { READER:reader, TITLE:d.title, OUTLINE:outline, N:i+1, SECTION:title,
-                 PRIOR: priorText(d, i) || "(none yet)", INSTRUCTION: instrText(d) };
+                 PRIOR: priorText(d, i) || "(none yet)", INSTRUCTION: instrText(d),
+                 SUBSECTIONS: subs.length ? "ITS SUBSECTIONS, FROM THE PLAN, EACH OPENED WITH A SUBHEADING ELEMENT:\n" + subs.map(x => "- " + x).join("\n") : "" };
   const df = d.define, role = df ? "define" : "section";
   const user = df ? usr("define_user", { READER:reader, TERM:d.topic, INSTRUCTION:instrText(d),
                       HIGHLIGHT: df.from ? df.term : "(nothing: the term was typed)",
@@ -2327,13 +2450,14 @@ async function genSection(d, i, title, outline, reader, by){
       parent: d.planCall || null, by: by || (d.planCall ? "" : "you") });
     const arr = df && value && !Array.isArray(value) ? value.blocks : value;
     const made = (Array.isArray(arr) ? arr : [])
-      .filter(x => x && (x.md || ((x.kind==="figure" || x.kind==="image") && x.brief)))
-      .map(x => {
-        if(x.kind==="figure" && x.brief) return { id:uid(), kind:"figure", md:"", sec:i, brief:String(x.brief).trim(), pending:true, draw:true, by:callId };
-        if(x.kind==="image"  && x.brief) return { id:uid(), kind:"image",  md:"", sec:i, brief:String(x.brief).trim(), pending:true, find:true, by:callId };
-        return { id:uid(), kind:"prose", md:String(x.md), sec:i, fresh:true, by:callId };
+      .filter(x => x && (x.md || x.title || ((x.kind==="figure" || x.kind==="image") && x.brief)))
+      .flatMap(x => {
+        if(x.kind==="figure" && x.brief) return [{ id:uid(), kind:"figure", md:"", sec:i, brief:String(x.brief).trim(), pending:true, draw:true, by:callId }];
+        if(x.kind==="image"  && x.brief) return [{ id:uid(), kind:"image",  md:"", sec:i, brief:String(x.brief).trim(), pending:true, find:true, by:callId }];
+        if(x.kind==="subheading") return [subBlock(x.title || x.md, { sec:i, by:callId })];
+        return proseBlocks(x.md, { sec:i, by:callId });
       });
-    if(!made.some(b => b.md)) throw new Error("Empty section.");
+    if(!made.some(b => b.kind === "prose" && b.md)) throw new Error("Empty section.");
     if(df && value && !Array.isArray(value)){
       if(value.title) d.title = trimTitle(value.title, 110, d.title);
       if(value.term) narrowLink(d, String(value.term).trim());
@@ -2612,7 +2736,7 @@ function popLive(d){
 
 /* ══ editing ══════════════════════════════════════════════════ */
 function context(d, idx){
-  const outline = d.blocks.filter(b=>b.kind==="heading").map(headingTitle).join(" · ");
+  const outline = outlineText(d);
   const before = d.blocks.slice(Math.max(0,idx-2), idx).map(b=>b.md).join("\n\n");
   const after  = d.blocks.slice(idx+1, idx+3).map(b=>b.md).join("\n\n");
   return { outline, before, after };
@@ -2632,41 +2756,63 @@ async function applyEdit(blockId, act, question){
   inFlight++;
   patch(d, target);
 
+  /* Edit on a diagram goes to the illustrator and redraws it in place; on a
+     heading it renames the section; on prose it is a revision like the rest. */
+  const drawing = act==="figure" || (act==="revise" && target.kind==="figure");
+  const heading = target.kind === "heading" || target.kind === "subheading";
+  let action = rawPrompt(act==="figure" ? "figure_action" : act);
+  if(act==="revise" && drawing) action = "Redraw this diagram as the reader directs, keeping everything they did not ask to change. Return one figure block with its caption.";
+  else if(heading) action += "\nThe target is a section heading. Return mode \"replace\" with one prose block whose md is the new heading text alone: a short noun phrase, no markdown marks.";
   const { outline, before, after } = context(d, idx);
   const user = usr("edit_user", {
     READER: readerText(d.known),
     TITLE: d.title,
     OUTLINE: outline,
     BEFORE: before || "(none)",
-    TARGET: target.md,
+    TARGET: target.md + (drawing && target.caption ? "\n\nCaption: " + target.caption : ""),
     AFTER: after || "(none)",
     HIGHLIGHT: highlighted,
     QUESTION: question || "(nothing)",
-    ACTION: rawPrompt(act==="figure" ? "figure_action" : act)
+    ACTION: action
   });
-  const role = act==="figure" ? "figure" : "edit";
+  const role = drawing ? "figure" : "edit";
   const secLabel = target.sec != null ? " §" + (target.sec+1) : "";
 
   try{
     const { value:out } = await agent(d, { role, label: word(a) + secLabel, sec:target.sec, system:sys(role), user, by:"you" });
-    const blocks = ((out && out.blocks)||[]).filter(x => x && x.md);
+    const blocks = ((out && out.blocks)||[]).filter(x => x && (x.md || x.title));
     if(!blocks.length) throw new Error("Empty response.");
     const stamp = { label:a.label, note:question||"", quote:highlighted.slice(0,220), ts:Date.now() };
-    const made = blocks.map(x => {
-      const b = { id:uid(), kind: act==="figure" ? "figure" : (x.kind==="note" ? "note" : "prose"),
-        md:x.md, sec:target.sec, edit:stamp, fresh:true };
-      if(act==="figure" && x.caption) b.caption = String(x.caption).trim();
-      return b;
+    /* The reviser may open a subsection for what it adds; a heading it left
+       inside prose becomes one as well. */
+    const made = blocks.flatMap(x => {
+      const base = { sec:target.sec, edit:stamp };
+      if(drawing){
+        const b = { id:uid(), kind:"figure", md:x.md, fresh:true, ...base };
+        if(x.caption) b.caption = String(x.caption).trim();
+        return [b];
+      }
+      if(x.kind==="subheading") return [subBlock(x.title || x.md, base)];
+      if(x.kind==="note") return [{ id:uid(), kind:"note", md:x.md, fresh:true, ...base }];
+      return proseBlocks(x.md, base);
     });
+    if(!made.length) throw new Error("Empty response.");
     target.busy = false; delete target.hl; inFlight--; clearHighlight();
     const at = d.blocks.indexOf(target);
-    const replaced = act!=="figure" && out.mode==="replace";
-    if(at < 0) d.blocks.push(...made);
+    const replaced = act==="figure" ? false : act==="revise" && drawing ? true : out.mode==="replace";
+    let landed = made[0];
+    if(heading && replaced){
+      /* A heading stays the block it is; it takes the new title. */
+      const t = made.find(b => b.kind === "prose" && b.md);
+      target.md = (target.kind === "heading" ? "## " : "### ") + trimTitle(t ? t.md : "", 72, headingTitle(target));
+      target.edit = stamp; target.fresh = true; landed = target;
+    }
+    else if(at < 0) d.blocks.push(...made);
     else if(replaced) d.blocks.splice(at, 1, ...made);
     else d.blocks.splice(at+1, 0, ...made);
     if(doc === d && route === "doc"){
       render();
-      const first = main.querySelector(`[data-block-id="${made[0].id}"]`);
+      const first = main.querySelector(`[data-block-id="${landed.id}"]`);
       if(first) first.scrollIntoView({block:"nearest", behavior:"smooth"});
     }
     save(d);
@@ -2768,13 +2914,20 @@ document.addEventListener("mousedown", e => {
   if(!pop.contains(e.target)) closePop();
   if(!menuOwns(shareMenu, e.target)) closeMenu(shareMenu);
   if(!menuOwns(rewriteMenu, e.target)) closeMenu(rewriteMenu);
+  if(!menuOwns(feedbackMenu, e.target)) closeMenu(feedbackMenu);
 });
 function trigger(act){
   if(!sel) return;
   if(act==="define"){ const {blockId, text} = sel; hideTools(); defineFrom(doc, blockId, text); return; }
-  if(act==="ask"){
+  /* Ask, Edit and Complain take a line of text first: the same field,
+     worded for each. A complaint goes to Alexander, not to the model. */
+  if(act==="ask" || act==="revise" || act==="complain"){
     const s = window.getSelection();
     if(s && s.rangeCount) highlightRange(s.getRangeAt(0).cloneRange());
+    pen.dataset.mode = act;
+    askInput.placeholder = act==="ask" ? "Ask about this…" : act==="revise" ? "What should change?" : "What's wrong here? This goes to Alexander.";
+    askInput.setAttribute("aria-label", act==="ask" ? "Question" : act==="revise" ? "Instruction" : "Complaint");
+    $("#askGo").textContent = act==="ask" ? "Ask" : act==="revise" ? "Edit" : "Send";
     pen.classList.add("asking"); askInput.focus(); return;
   }
   const {blockId} = sel;
@@ -2789,9 +2942,15 @@ $("#askForm").onsubmit = e => {
   e.preventDefault();
   const q = askInput.value.trim();
   if(!q || !sel) return;
-  const {blockId} = sel;
+  const {blockId, text} = sel, mode = pen.dataset.mode || "ask";
   hideTools();
-  applyEdit(blockId, "ask", q);
+  if(mode === "complain"){
+    const b = doc && doc.blocks.find(x => x.id === blockId);
+    const h = b && b.sec != null && doc.blocks.find(x => x.kind === "heading" && x.sec === b.sec);
+    sendFeedback("complaint", q, { block:blockId, quote:text, passage: b && b.md ? String(b.md) : "", section: h ? headingTitle(h) : "" });
+    return;
+  }
+  applyEdit(blockId, mode, q);
 };
 askInput.onkeydown = e => {
   if(e.key==="Escape"){ e.preventDefault(); e.stopPropagation(); pen.classList.remove("asking"); askInput.value=""; clearHighlight(); }
@@ -2823,7 +2982,7 @@ let hoverT = null;
 function hoverable(anchor, build){
   anchor.addEventListener("mouseenter", () => {
     clearTimeout(hoverT);
-    hoverT = setTimeout(() => { if(pop._anchor !== anchor) showPop(anchor, build(), { hover:true }); }, 140);
+    hoverT = setTimeout(() => { const nodes = pop._anchor !== anchor && build(); if(nodes) showPop(anchor, nodes, { hover:true }); }, 140);
   });
   anchor.addEventListener("mouseleave", leavePop);
 }
@@ -2922,10 +3081,80 @@ const menuOwns = (m, target) => m.contains(target) || !!(m._anchor && m._anchor.
    you were, and Back (or the same button again) returns. */
 const backRoute = () => doc ? (doc.shared ? "shared" : "doc") : me ? "cover" : "login";
 function goto(r){
-  route = (route === r) ? backRoute() : r;
-  render(); scrollTo(0, 0);
+  if(route === r){ goBack(); return; }
+  route = r; render(); scrollTo(0, 0);
 }
-function goBack(){ route = backRoute(); render(); scrollTo(0, 0); }
+/* Back goes to the page before this one in the browser's history when
+   Primer put it there, so the browser's own Back agrees with it. */
+function goBack(){
+  if(history.state && history.state.i > 0){ history.back(); return; }
+  route = backRoute(); render(); scrollTo(0, 0);
+}
+
+/* ══ addresses ════════════════════════════════════════════════
+   Every page has an address, a title, and a place in the browser's
+   history: a primer at /p/<id>, its Inspector under that, Settings at
+   /settings, the guide at /guide, a shared primer at /s/<id>. Back and
+   Forward move between them, and a reload reopens the same page.      */
+function pageUrl(){
+  if(route === "shared") return doc && doc.shared ? "/s/" + doc.shared.id : location.pathname;
+  if(route === "guide") return "/guide";
+  if(route === "settings") return "/settings";
+  if((route === "doc" || route === "inspector") && doc) return "/p/" + doc.id + (route === "inspector" ? "/inspector" : "");
+  return "/";
+}
+function pageTitle(){
+  if(route === "settings") return "Settings · primer";
+  if(route === "guide") return "Setup guide · primer";
+  if(route === "login") return "Sign in · primer";
+  if(route === "inspector" && doc) return "Inspector · " + doc.title + " · primer";
+  if(onDoc()) return doc.title + " · primer";
+  return "primer";
+}
+/* Each page Primer moves to becomes a history entry, numbered from the
+   one it was opened on; drawing the same page again changes nothing. */
+let popping = false;
+function syncHistory(){
+  if(popping) return;
+  const st = { route, doc: doc && !doc.shared ? doc.id : null, share: doc && doc.shared ? doc.shared.id : null };
+  const cur = history.state, url = pageUrl();
+  if(cur && cur.route === st.route && cur.doc === st.doc && cur.share === st.share){
+    if(location.pathname !== url) history.replaceState(cur, "", url);
+    return;
+  }
+  st.i = cur && cur.i != null ? cur.i + 1 : 0;
+  if(st.i) history.pushState(st, "", url); else history.replaceState(st, "", url);
+}
+addEventListener("popstate", async e => {
+  const st = e.state;
+  if(!st) return;
+  popping = true;
+  try{
+    closePops(); hideTools();
+    if(st.route === "shared" && st.share){
+      if(doc && doc.shared && doc.shared.id === st.share){ route = "shared"; render(); }
+      else await openShared(st.share);
+    }else{
+      if(!st.doc) doc = null;
+      else if(!(doc && doc.id === st.doc)){ doc = (await loadDoc(st.doc)) || null; undoStack = []; }
+      route = !me && st.route !== "guide" ? "login" : st.route === "login" && me ? "cover" : st.route;
+      if((route === "doc" || route === "inspector") && !doc) route = "cover";
+      render();
+    }
+    scrollTo(0, 0);
+  }finally{ popping = false; }
+});
+/* The address the page was opened at, honoured once someone is signed in. */
+let landing = location.pathname;
+async function openLanding(){
+  const p = landing; landing = null;
+  const at = p && /^\/p\/([\w-]+)(\/inspector)?$/.exec(p);
+  if(at){
+    const d = await openDoc(at[1]);
+    if(d && at[2]){ route = "inspector"; render(); }
+    else if(!d) toast("That primer isn't in this library.");
+  }else if(p === "/settings"){ route = "settings"; render(); }
+}
 settingsBtn.onclick = () => goto("settings");
 backBtn.onclick = goBack;
 $("#homeBtn").onclick = goHome;
@@ -2981,14 +3210,43 @@ async function copyLink(url, anchor){
   }
 }
 async function openShare(anchor){
-  const d = doc, links = el("div", "links");
-  const copy = menuItem(shareMenu, "Copy link", () => readonly() ? copyLink(location.href, anchor) : shareDoc(d, anchor));
-  if(!openMenu(shareMenu, anchor, [copy, links]) || readonly()) return;
-  /* The links already made for this primer, each one a copy from its day. */
+  const d = doc;
+  if(readonly()){ openMenu(shareMenu, anchor, [menuItem(shareMenu, "Copy link", () => copyLink(location.href, anchor))]); return; }
+  /* The public link follows the primer: readers see it as it is now and as
+     it changes. A frozen copy stays as it was the day it was made. */
+  const pub = el("div", "pub"), sw = btn("switch"), lab = el("span", null, "Public link");
+  sw.setAttribute("role", "switch"); sw.setAttribute("aria-label", "Public link"); sw.append(el("i"));
+  const pubLink = el("div", "links"), links = el("div", "links");
+  const hint = el("span", "hint under", "Anyone with it reads this primer as it stands, and as it changes.");
+  pub.append(lab, sw);
+  const freeze = menuItem(shareMenu, "Copy a frozen link", () => shareDoc(d, anchor));
+  freeze.title = "A copy of the primer as it is this moment; later changes never reach it.";
+  const rule = el("div", "rule");
+  if(!openMenu(shareMenu, anchor, [pub, hint, pubLink, rule, freeze, links])) return;
+  let live = null;
+  const paint = () => {
+    sw.setAttribute("aria-checked", String(!!live));
+    pubLink.replaceChildren();
+    if(!live) return;
+    const u = el("span", "url", shareUrl(live.id));
+    pubLink.append(u, linkRow([{ label:"Copy", onclick:() => copyLink(shareUrl(live.id), anchor) }, { label:"Open", href:shareUrl(live.id) }]));
+  };
+  sw.onclick = async () => {
+    sw.disabled = true;
+    try{
+      if(live){ await api("/api/share/" + live.id, null, "DELETE"); live = null; paint(); toast("The link no longer opens"); }
+      else{
+        live = await api("/api/share", { of:d.id, live:true, title:d.title }); paint();
+        navigator.clipboard.writeText(shareUrl(live.id)).then(() => toast("Public link copied"), () => toast("The link is public"));
+      }
+    }catch(e){ toast("Couldn't change that: " + e.message, { err:true }); }
+    sw.disabled = false;
+  };
   let list = [];
   try{ list = (await api("/api/shares?doc=" + encodeURIComponent(d.id))).shares || []; }catch(e){}
   if(!shareMenu.classList.contains("show") || doc !== d) return;
-  list.forEach(s => {
+  live = list.find(s => s.live) || null; paint();
+  list.filter(s => !s.live).forEach(s => {
     const row = el("div", "linkrow");
     const b = btn(null, "Link from " + timeAgo(s.created), () => copyLink(shareUrl(s.id), anchor));
     b.setAttribute("role", "menuitem"); b.title = shareUrl(s.id);
@@ -3019,10 +3277,30 @@ async function openShared(id){
     toast(e.status === 404 ? "That link doesn't lead to a primer any more." : "Couldn't open that link: " + e.message, { err:true });
     return;
   }
-  doc = { ...s.doc, id:"share:" + s.id, shared:{ id:s.id, by:s.by, created:s.created } };
+  doc = { ...s.doc, id:"share:" + s.id, shared:{ id:s.id, by:s.by, created:s.created, live:!!s.live } };
   undoStack = []; route = "shared";
   render();
   scrollTo(0, 0);
+  if(s.live) watchShared(s.id);
+}
+/* A live link is read again while it is on screen: often while the primer
+   is still being made, now and then once it is done. Only a change redraws. */
+let watchT = 0;
+function watchShared(id){
+  clearTimeout(watchT);
+  const busy = doc && /^(planning|writing|researching)$/.test(doc.status);
+  watchT = setTimeout(async () => {
+    if(route !== "shared" || !doc || !doc.shared || doc.shared.id !== id) return;
+    try{
+      const s = await api("/api/share/" + id);
+      if(route !== "shared" || !doc || doc.shared.id !== id) return;
+      const fresh = { ...s.doc, id:"share:" + s.id, shared:{ id:s.id, by:s.by, created:s.created, live:!!s.live } };
+      if(JSON.stringify(fresh.blocks) !== JSON.stringify(doc.blocks) || fresh.title !== doc.title || fresh.status !== doc.status){
+        const y = scrollY; doc = fresh; render(); scrollTo(0, y);
+      }
+    }catch(e){ if(e.status === 404){ toast("The link no longer opens; the primer was taken back.", { err:true }); return; } }
+    watchShared(id);
+  }, busy ? 3000 : 15000);
 }
 
 /* Rewrite: this primer, read in full by the planner and the writer, as a
@@ -3049,6 +3327,35 @@ function startRewrite(src, instruction, sections){
   if(sections) rewrite.sections = sections;
   startDoc({ topic: src.topic || src.title, known: src.known, rewrite });
 }
+/* ══ feedback ═════════════════════════════════════════════════
+   A word to Alexander from anywhere: Feedback in the top bar, or Complain
+   in the pen about a passage. It goes with the page it came from, and the
+   account that hosts reads it on the Feedback page of Settings.       */
+const feedbackBtn = $("#feedbackBtn"), feedbackMenu = $("#feedback");
+hoverable(feedbackBtn, () => feedbackMenu.classList.contains("show") ? null :
+  [el("div", "s", "Something broken, confusing or missing? Say so in a sentence and it goes straight to Alexander, with the page you are on.")]);
+feedbackBtn.onclick = () => openFeedback(feedbackBtn);
+function openFeedback(anchor){
+  const form = el("form"), ta = el("textarea"), go = btn(null, "Send");
+  ta.rows = 3; ta.placeholder = "What happened, or what you wish it did"; ta.setAttribute("aria-label", "Feedback");
+  ta.oninput = () => grow(ta);
+  ta.onkeydown = e => { if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){ e.preventDefault(); form.requestSubmit(); } };
+  go.type = "submit";
+  form.append(ta, go);
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const t = ta.value.trim(); if(!t){ ta.focus(); return; }
+    go.disabled = true;
+    if(await sendFeedback("feedback", t)) closeMenu(feedbackMenu); else go.disabled = false;
+  };
+  if(openMenu(feedbackMenu, anchor, [el("span", "hint", "To Alexander, with the page you are on"), form])) ta.focus();
+}
+async function sendFeedback(kind, text, extra){
+  const where = { url:location.href, route, width:innerWidth, ...(doc ? { doc:doc.id, title:doc.title } : {}), ...(extra || {}) };
+  try{ await api("/api/feedback", { kind, text, where }); toast("Sent to Alexander. Thank you."); return true; }
+  catch(e){ toast("Couldn't send that: " + e.message, { err:true }); return false; }
+}
+
 /* The whole primer as text, for the rewrite prompts. */
 function docText(d){
   return "# " + d.title + "\n\n" + d.blocks.map(b => {
@@ -3066,9 +3373,12 @@ function markCurrent(){
   headEl.classList.toggle("scrolled", scrollY > 2);
   const nav = main.querySelector(".side-toc");
   if(!nav) return;
+  const items = nav._items;
   let n = 0;
-  nav._items.forEach((it, i) => { const e = it.at(); if(e && e.getBoundingClientRect().top <= 120) n = i + 1; });
-  nav.querySelectorAll("li > button").forEach((b, i) => b.classList.toggle("cur", i + 1 === n));
+  items.forEach((it, i) => { const e = it.at(); if(e && e.getBoundingClientRect().top <= 120) n = i + 1; });
+  let p = n;   // the section a current subsection belongs to
+  while(p > 0 && items[p - 1].sub) p--;
+  nav.querySelectorAll("li > button").forEach((b, i) => b.classList.toggle("cur", i + 1 === n || i + 1 === p));
 }
 let scT = null;
 addEventListener("scroll", () => { cancelAnimationFrame(scT); scT = requestAnimationFrame(markCurrent); }, {passive:true});
@@ -3103,11 +3413,16 @@ async function copyText(text, node){
    One folded row per prompt, under its group. Open it to read or edit;
    an edit is kept as an override the moment it is made, and Reset
    returns to the file. */
-function promptsNode(sec){
+/* The prompts, in their groups: each group a numbered subsection of
+   section n. Returns the groups as contents entries. */
+function promptsNode(sec, n){
   sec.classList.add("prompts");
-  Object.keys(PROMPT_GROUPS).forEach(g => {
-    sec.append(el("h3", "lab", PROMPT_GROUPS[g]));
-    Object.keys(PROMPTS).filter(k => PROMPTS[k].group === g).forEach(k => sec.append(promptRow(k)));
+  return Object.keys(PROMPT_GROUPS).map((g, j) => {
+    const num = n + "." + (j + 1), head = el("div", "ssub");
+    head.append(el("span", "marg num numsub", "§ " + num), el("h3", null, PROMPT_GROUPS[g]));
+    sec.append(head);
+    Object.keys(PROMPTS).filter(k => PROMPTS[k].group === g && !PROMPTS[k].user).forEach(k => sec.append(promptRow(k)));
+    return { num, title:PROMPT_GROUPS[g], sub:true, at:() => head };
   });
 }
 function promptRow(k){
@@ -3169,6 +3484,30 @@ const CONTROLS = {
     return i;
   },
   keys(){ return isGuest() ? guestKeysControl() : keysControl(); },
+  /* What readers sent, newest first, each with where it came from. */
+  inbox(){
+    const box = el("div", "inbox"); box.textContent = "Loading…";
+    api("/api/feedback").then(r => {
+      const items = r.items || [];
+      if(!items.length){ box.replaceChildren(el("p", "none", "Nothing yet. What readers send from the Feedback button, or Complain in the pen, lands here.")); return; }
+      const ul = el("ul", "inbox");
+      items.forEach(it => {
+        const li = el("li"), w = it.where || {};
+        const k = el("div", "k"); k.append(shortDate(it.created) + ", " + new Date(it.created).toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit" }),
+          el("span", "sep", "·"), it.name, el("span", "sep", "·"), it.kind === "complaint" ? "complaint" : "feedback");
+        li.append(k, el("p", "msg", it.text));
+        const src = el("div", "src");
+        if(w.quote) src.append(el("q", null, w.quote));
+        const at = [w.title, w.section].filter(Boolean).join(" § ") || (w.route ? "the " + w.route + " page" : "");
+        if(at){ if(w.url){ const a = el("a", null, at); a.href = w.url; a.target = "_blank"; a.rel = "noopener"; src.append(a); } else src.append(at); }
+        if(w.width) src.append((src.childNodes.length ? " · " : "") + w.width + "px wide");
+        if(src.childNodes.length) li.append(src);
+        ul.append(li);
+      });
+      box.replaceChildren(ul);
+    }).catch(e => { box.textContent = "Couldn't load feedback: " + e.message; });
+    return box;
+  },
   account(){
     const a = el("div", "account");
     if(isGuest()){
@@ -3378,7 +3717,8 @@ function renderGuide(){
 function renderSettings(){
   const page = el("article", "doc settings");
   page.innerHTML = `<header class="doc-head"><h1 class="title">Settings</h1></header>`;
-  const secs = new Map(SECTIONS.map((s, i) => {
+  const shown = SECTIONS.filter(s => !s.admin || (me && me.admin));
+  const secs = new Map(shown.map((s, i) => {
     const sec = el("section", "ssec");
     sec.append(el("span", "marg num", "§ " + (i + 1)), el("h2", "sub", s.title));
     return [s.id, sec];
@@ -3391,11 +3731,16 @@ function renderSettings(){
       if(s.help) text.append(el("p", "help", s.help));
       row.append(text);
     }
+    if(!secs.has(s.section)) return;
     row.append(CONTROLS[s.type](k, s, v => setSetting(k, v)));
     secs.get(s.section).append(row);
   });
-  promptsNode(secs.get("prompts"));
-  const items = SECTIONS.map(s => ({ title:s.title, at:() => secs.get(s.id) }));
+  const groups = promptsNode(secs.get("prompts"), shown.findIndex(s => s.id === "prompts") + 1);
+  const items = [];
+  shown.forEach((s, i) => {
+    items.push({ num:String(i + 1), title:s.title, at:() => secs.get(s.id) });
+    if(s.id === "prompts") items.push(...groups);
+  });
   page.querySelector(".doc-head").append(tocNode(items), tocNode(items, true));
   page.append(...secs.values());
   main.replaceChildren(page);
@@ -3714,6 +4059,7 @@ document.addEventListener("keydown", e => {
   if(e.key === "Escape"){
     if(shareMenu.classList.contains("show")){ closeMenu(shareMenu); return; }
     if(rewriteMenu.classList.contains("show")){ closeMenu(rewriteMenu); return; }
+    if(feedbackMenu.classList.contains("show")){ closeMenu(feedbackMenu); return; }
     if(pop.classList.contains("show")){ closePop(); return; }
     if(pen.classList.contains("show")){ hideTools(); return; }
     if(aside() && !inField){ goBack(); return; }
@@ -3743,6 +4089,7 @@ async function loadMine(){
 async function enter(){
   await loadMine();
   doc = null; route = "cover"; render(); scrollTo(0, 0);
+  await openLanding();
   if(!isGuest()) migrateLocal();
   countWords();
 }
@@ -3769,6 +4116,7 @@ async function migrateLocal(){
   if(index.length) toast(index.length === 1 ? "Moved one primer into your account" : "Moved " + index.length + " primers into your account");
 }
 (async function boot(){
+  popping = true;   // no history entries while the page finds its footing
   const missing = await loadPrompts();
   try{ me = await api("/api/me"); }catch(e){ me = null; }
   if(me && me.guest) me = guestMe();
@@ -3778,6 +4126,8 @@ async function migrateLocal(){
   if(shared){ if(me) await loadMine(); await openShared(shared); }
   else if(location.pathname === "/guide"){ if(me) await loadMine(); route = "guide"; render(); }
   else if(me) await enter(); else { route = "login"; render(); }
+  /* A reload keeps the old entry's state; start the count afresh here. */
+  popping = false; history.replaceState(null, "", location.pathname); syncHistory();
   if(missing.length) toast("Couldn't read " + (missing.length===1 ? "prompts/"+missing[0]+".txt" : missing.length+" files in prompts/") +
     ". Primer has to be served by its own server: npm start", { err:true });
 })();

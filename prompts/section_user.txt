@@ -13,4 +13,6 @@ SECTIONS ALREADY WRITTEN:
 
 WRITE SECTION {{N}}: {{SECTION}}
 
+{{SUBSECTIONS}}
+
 Later sections will cover what follows; do not preview or summarise them.

@@ -44,7 +44,7 @@
 // /api/shares?doc= lists a primer's links, DELETE /api/share/:id removes one.
 //
 // Environment (all optional):
-//   PORT=8787  HOST=127.0.0.1  DATA_DIR=./data  INVITE=...  PRIMER_SECRET=...
+//   PORT=8787  HOST=127.0.0.1  DATA_DIR=./data  INVITE=...  PRIMER_SECRET=...  ADMIN=name,name
 // No credential comes from the environment: keys are added in Settings.
 //
 // Setup:
@@ -190,6 +190,35 @@ function brief(content) {
 /* The CLI's own word for what went wrong, turned into a sentence that names
    the key and says where to fix it. `key` is the key the call ran on; `own`
    whether the caller owns it (else it is someone's shared key). */
+/* The image files among a primer's blocks, by name. */
+const mediaOf = blocks => [...new Set(blocks.map(x => x && typeof x.src === "string" && x.src.startsWith("/media/") ? x.src.slice(7) : "")
+  .filter(n => MEDIA_NAME.test(n)))];
+/* What a live link shows: the owner's primer as stored, without the pieces
+   still being made or never made, links to their other primers made plain,
+   and their display switches. The same shape the page makes for a frozen
+   copy. Null once the primer is gone. */
+function liveSnapshot(s) {
+  let d, st = {};
+  try { d = JSON.parse(db.kv.get(s.user, "primer:doc:" + s.doc)); } catch { return null; }
+  if (!d || !Array.isArray(d.blocks)) return null;
+  try { st = JSON.parse(db.kv.get(s.user, "primer:settings")) || {}; } catch {}
+  const unfilled = b => !b.md && !b.src && (b.slot || ((b.kind === "figure" || b.kind === "image") && b.brief));
+  const drop = ["by", "origin", "slot", "fail", "busy", "hl", "queued", "error", "stopped", "fresh", "plan", "draw", "find", "live", "liveRole", "status", "again", "checked"];
+  const blocks = d.blocks.filter(b => b && !b.pending && !unfilled(b)).map(b => {
+    const r = { ...b };
+    drop.forEach(k => delete r[k]);
+    if (r.md) r.md = String(r.md).replace(/\[([^\]]*)\]\(primer:\w+\)/g, "$1");
+    return r;
+  });
+  const out = { title: d.title, topic: d.topic, known: d.known || "", instruction: d.instruction || "", created: d.created,
+                status: d.status || "done", blocks, view: { sources: st.showSources !== false, marks: st.showMarks !== false } };
+  if (d.researched) out.researched = d.researched;
+  if (d.rewrite) out.rewrite = { ofTitle: d.rewrite.ofTitle, instruction: d.rewrite.instruction };
+  if (d.define && d.define.from) out.define = { term: d.define.from ? d.define.term : "", from: { title: d.define.from.title } };
+  return out;
+}
+/* Addresses the page answers for itself: /, /guide, /settings, /p/<id>, /p/<id>/inspector. */
+const PAGE_PATH = /^\/(guide|settings|p\/[\w-]+(\/inspector)?)?$/;
 function explain(kind, text, key, own) {
   const t = String(text || "").replace(/\s*·\s*(Please run \/login|Fix external API key)\s*$/i, "").trim();
   const name = "the key “" + key.name + "”", said = t ? " (" + t + ")." : ".";
@@ -414,11 +443,11 @@ async function serve(req, res) {
       if (!user) throw halt(401, "Wrong name or password.");
     }
     setCookie(db.sessions.create(user.id));
-    return json(200, { name: user.name, key: user.key });
+    return json(200, { name: user.name, key: user.key, admin: user.admin });
   }
   if (req.method === "POST" && path === "/api/logout") { db.sessions.delete(token); setCookie(null); return json(200, {}); }
   if (path === "/api/me") {
-    if (me) return json(200, { name: me.name, key: me.key });
+    if (me) return json(200, { name: me.name, key: me.key, admin: me.admin });
     if (guest) return json(200, { guest: true });
     throw halt(401, "Not signed in.");
   }
@@ -430,8 +459,29 @@ async function serve(req, res) {
     const id = path.slice("/api/share/".length);
     const s = SHARE_ID.test(id) && db.shares.get(id);
     if (!s) throw halt(404, "That link doesn't lead to a primer any more.");
+    const head = '{"id":' + JSON.stringify(s.id) + ',"by":' + JSON.stringify(s.by) + ',"created":' + s.created;
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-cache" });
-    return res.end('{"id":' + JSON.stringify(s.id) + ',"by":' + JSON.stringify(s.by) + ',"created":' + s.created + ',"doc":' + s.body + "}");
+    if (!s.live) return res.end(head + ',"doc":' + s.body + "}");
+    /* A live link: the primer as its owner has it right now, less the pieces still being made. */
+    const snap = liveSnapshot(s);
+    if (!snap) throw halt(404, "That link doesn't lead to a primer any more.");
+    db.shares.media(s.id, mediaOf(snap.blocks));
+    return res.end(head + ',"live":true,"doc":' + JSON.stringify(snap) + "}");
+  }
+
+  /* ── feedback: from anyone on the page, to whoever hosts ── */
+  if (req.method === "POST" && path === "/api/feedback") {
+    const b = await readBody(req);
+    if (!me) slow(ip);
+    const text = String(b.text || "").trim().slice(0, 4000);
+    if (!text) throw halt(400, "Say something first.");
+    const kind = b.kind === "complaint" ? "complaint" : "feedback";
+    const w = b.where && typeof b.where === "object" ? b.where : {}, cut = (v, n) => v == null ? undefined : String(v).slice(0, n);
+    const where = { url: cut(w.url, 500), route: cut(w.route, 40), doc: cut(w.doc, 40), title: cut(w.title, 200), section: cut(w.section, 200),
+                    block: cut(w.block, 40), quote: cut(w.quote, 500), passage: cut(w.passage, 2000), width: Number(w.width) || undefined };
+    db.feedback.add(me ? me.id : null, me ? me.name : guest ? "a guest" : "a reader", kind, text, where);
+    console.log("  " + (me ? me.name : "guest") + "  " + kind + ": " + text.slice(0, 80).replace(/\s+/g, " "));
+    return json(200, {});
   }
 
   /* Everything below needs a signed-in user, except the page itself, and
@@ -453,17 +503,27 @@ async function serve(req, res) {
     return json(200, { name: r.key.name, owner: r.key.owner, kind: r.key.kind });
   }
 
+  if (req.method === "GET" && path === "/api/feedback") {
+    if (!me.admin) throw halt(403, "Only the host reads feedback.");
+    return json(200, { items: db.feedback.list(300) });
+  }
+
   /* ── sharing: freeze a primer, list a primer's links, take one back ── */
   if (req.method === "POST" && path === "/api/share") {
     const b = await readBody(req, 8e6);
-    const snap = b.doc;
-    if (!snap || typeof snap !== "object" || !Array.isArray(snap.blocks) || !snap.blocks.length) throw halt(400, "Nothing to share.");
     const of = String(b.of || "").slice(0, 40);
     if (!of) throw halt(400, "Which primer?");
+    /* A live link follows the primer; a frozen one is a copy of it now. */
+    if (b.live) {
+      const s = db.shares.live(me.id, of, String(b.title || "Primer").slice(0, 200));
+      if (!s.reused) console.log("  " + me.name + "  public link " + s.id);
+      return json(200, s);
+    }
+    const snap = b.doc;
+    if (!snap || typeof snap !== "object" || !Array.isArray(snap.blocks) || !snap.blocks.length) throw halt(400, "Nothing to share.");
     const title = String(snap.title || "Primer").slice(0, 200);
     /* The image files this copy shows, so they can be served to its readers. */
-    const media = [...new Set(snap.blocks.map(x => x && typeof x.src === "string" && x.src.startsWith("/media/") ? x.src.slice(7) : "")
-      .filter(n => MEDIA_NAME.test(n)))];
+    const media = mediaOf(snap.blocks);
     const s = db.shares.create(me.id, of, title, JSON.stringify(snap), media);
     console.log("  " + me.name + "  share " + s.id + (s.reused ? "  (unchanged, same link)" : ""));
     return json(200, s);
@@ -595,12 +655,13 @@ async function serve(req, res) {
   if (path.startsWith("/s/")) {
     const s = SHARE_ID.test(path.slice(3)) && db.shares.get(path.slice(3));
     let html = await readFile(new URL("primer.html", ROOT), "utf8");
-    if (s) html = html.replace("<title>primer</title>", "<title>" + escapeHtml(s.title) + " · primer</title>");
+    const live = s && s.live && liveSnapshot(s);
+    if (s) html = html.replace("<title>primer</title>", "<title>" + escapeHtml(live ? live.title : s.title) + " · primer</title>");
     res.writeHead(200, { "content-type": TYPES.html, "cache-control": "no-cache" });
     return res.end(html);
   }
-  /* The setup guide is the same page at its own address. */
-  const name = path === "/" || path === "/guide" ? "primer.html" : decode(path.slice(1));
+  /* The guide, Settings and a primer are the same page at their own addresses. */
+  const name = PAGE_PATH.test(path) ? "primer.html" : decode(path.slice(1));
   if (name.includes("..") || name.startsWith("/")) throw halt(400, "Bad path.");
   const from = name.startsWith("media/") ? new URL(name.slice(6), MEDIA) : new URL(name, ROOT);
   /* An image is private to the people signed in, and guests, unless a shared primer shows it. */

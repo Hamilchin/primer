@@ -14,3 +14,12 @@
 ~~Whenever a user asks for something, the left colored bar, when hovered over, should highlight the part that the user highlighted when they asked.~~
 ~~Make the primer logo/word slightly bigger.~~
 ~~Add a word count to the library for each prompt. Add a search bar for the library. Add an arrow that says "more" and hides the rest of the library if more than 15 items.~~
+~~Settings should have no horizontal bars between individual settings, not sure why those are there. Still a problem~~
+~~"What you already know" and "instructions" are both super narrow height wise until you write in them.~~
+~~Remove "Every primer is written on a key: an Anthropic API key or a Claude subscription token, your own or one someone shared with you. A subscription token comes from running claude setup-token."~~
+~~Remove the user prompts that the user won't really edit. Why would they?~~
+~~The title of the tab should be the current page/primer. The back button on the browser should navigate to the previous page.~~
+~~Display all three fields on the homescreen, not just when the user starts typing in the primer generator.~~
+~~There should be a setting that allows you to change the location/existence of the table of contents.~~
+~~There should be a default "edit" function in the revise selector that edits the selected portion (diagrams, prose, sections, and all) to the user's direction.~~
+~~Add a "Bug reporting and feedback" tab to the top that is very apparent. This product will be sent to my beta testers. One sentence in a hover-over text box is enough! Also add a "complain" option to the selction/revision menu, saying "this feedback will be sent to alexander"~~
