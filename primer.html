@@ -121,26 +121,31 @@ main{padding:1.5rem var(--gutter) 8rem}
   .cover:has(.shelf){max-width:72rem;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 3.5rem;align-items:start}
   .cover:has(.shelf) .library{margin-top:0;padding-left:3.5rem;border-left:1px solid var(--rule)}
 }
+.title.hello{display:flex;align-items:center;gap:.6rem;margin:0 0 1.4rem;padding:0;border:0}
+.hello svg{width:.78em;height:.78em;flex:0 0 auto}
+/* The fields are boxes, so a box is what asks to be typed in. */
 .topic{
   width:100%; display:block; font-size:1.6rem; line-height:1.25; font-weight:500; letter-spacing:-.015em; color:var(--fg);
-  background:none; border:0; border-bottom:1px solid var(--fg); padding:.1rem 0 .55rem; resize:none; overflow:hidden; border-radius:0;
+  background:none; border:1px solid var(--rule-2); border-radius:3px; padding:.55rem .75rem .6rem; resize:none; overflow:hidden;
 }
 .topic::placeholder{color:var(--fg-3);font-weight:400}
-.topic:focus{outline:none;border-bottom-color:var(--accent)}
-.composer .more{margin-top:1.6rem}
+.topic:focus{outline:none;border-color:var(--accent)}
+.composer .more{margin-top:1.5rem}
+.composer .lab{color:var(--fg-2)}
+.composer .lab .opt{color:var(--fg-3)}
 .known{
   width:100%; display:block; font-size:16px; line-height:1.5; color:var(--fg);
-  background:none; border:0; border-bottom:1px solid var(--rule-2); padding:.15rem 0 .45rem;
-  resize:none; overflow:hidden; border-radius:0;
+  background:none; border:1px solid var(--rule-2); border-radius:3px; padding:.4rem .65rem .45rem;
+  resize:none; overflow:hidden;
 }
-.known:focus{outline:none;border-bottom-color:var(--accent)}
+.known:focus{outline:none;border-color:var(--accent)}
 .known + .lab,.field + .lab,.invite + .lab{margin-top:1.4rem}
 /* Signing in: the same fields as the composer, one word each. */
 .field{
   width:100%; display:block; font-size:16px; line-height:1.5; color:var(--fg);
-  background:none; border:0; border-bottom:1px solid var(--rule-2); padding:.15rem 0 .45rem; border-radius:0;
+  background:none; border:1px solid var(--rule-2); border-radius:3px; padding:.4rem .65rem .45rem;
 }
-.field:focus{outline:none;border-bottom-color:var(--accent)}
+.field:focus{outline:none;border-color:var(--accent)}
 .login .composer-foot{display:flex;gap:1.5rem;align-items:center}
 .invite{margin-top:1.4rem}
 .login .title{margin-bottom:1.8rem}
@@ -155,10 +160,10 @@ main{padding:1.5rem var(--gutter) 8rem}
 .page .body h2{margin-top:2.2rem}
 .page .body h2:first-child{margin-top:0}
 /* Common instructions, one click each; they add up and toggle back off. */
-.chips{display:flex;flex-wrap:wrap;gap:.35rem 1rem;margin-top:.6rem;font-size:13.5px}
-.chip{color:var(--fg-2);text-decoration:underline;text-decoration-thickness:1px;text-decoration-color:var(--rule-2);text-underline-offset:3px}
-.chip:hover{color:var(--fg);text-decoration-color:currentColor}
-.chip.on{color:var(--accent);text-decoration-color:currentColor}
+.chips{display:flex;flex-wrap:wrap;gap:.3rem .8rem;margin-top:.55rem;font-size:13px}
+.chip{color:var(--fg-3)}
+.chip:hover{color:var(--fg)}
+.chip.on{color:var(--accent)}
 .composer-foot{margin-top:1.75rem}
 .go{
   font-size:14px; font-weight:500; color:var(--bg); background:var(--fg);
@@ -741,7 +746,7 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 </style>
 
 <header class="head" id="head">
-  <button class="wordmark" id="homeBtn" aria-label="primer, home"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5.5 25.5H26.5M9 17.5H23M12.5 9.5H19.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="4"/></svg>primer</button>
+  <button class="wordmark" id="homeBtn" aria-label="primer, home">primer</button>
   <nav class="acts">
     <button class="act hide back" id="backBtn" aria-label="Back" title="Back">&larr;</button>
     <button class="act hide" id="newBtn">New primer</button>
@@ -1132,13 +1137,13 @@ const word = edit => String(edit && edit.label || "").toLowerCase();
    makes a definition: no planner, and a writer that reads Wikipedia. */
 const BRIEFS = [
   { label:"Short",           text:"Keep it short: the fewest sections that cover the subject, and no more than a few paragraphs in each." },
-  { label:"A few paragraphs",text:"Write it as a single section of three or four paragraphs. No diagrams and no images." },
+  { label:"One section",     text:"Write it as a single section of three or four paragraphs. No diagrams and no images." },
   { label:"Minimal",         text:"A minimal primer: the central idea, what it is for, and nothing else." },
   { label:"Definition",      text:"Define it: one short section modelled on the first paragraph of its Wikipedia page, read first. No diagrams or images.", define:true },
-  { label:"With derivations",text:"Derive every result step by step instead of stating it, saying what justifies each step." },
-  { label:"Worked examples", text:"Give every idea a concrete worked example with real numbers." },
+  { label:"Derivations",     text:"Derive every result step by step instead of stating it, saying what justifies each step." },
+  { label:"Examples",        text:"Give every idea a concrete worked example with real numbers." },
   { label:"Rigorous",        text:"Be precise: exact definitions, stated assumptions, and proofs or proof sketches for the central results." },
-  { label:"No pictures",     text:"Text only. Do not request any diagrams or images." }
+  { label:"Text only",       text:"Text only. Do not request any diagrams or images." }
 ];
 
 /* Ways to rewrite a primer as a new one. Each becomes a row in the Rewrite
@@ -1175,6 +1180,9 @@ const aside = () => route === "settings" || route === "inspector" || route === "
 const onDoc = () => !!doc && (route === "doc" || route === "shared" || route === "inspector");
 
 const $ = s => document.querySelector(s);
+/* The mark: three bars, drawn once here and put wherever it is shown. */
+const LOGO = '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5.5 25.5H26.5M9 17.5H23M12.5 9.5H19.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="4"/></svg>';
+$("#homeBtn").insertAdjacentHTML("afterbegin", LOGO);
 const main=$("#main"), pen=$("#tools"), pop=$("#pop"), shareMenu=$("#share"), rewriteMenu=$("#rewrite"),
       toastEl=$("#toast"), backBtn=$("#backBtn"), newBtn=$("#newBtn"), settingsBtn=$("#settingsBtn"), askInput=$("#askInput");
 
@@ -1577,20 +1585,27 @@ function renderLogin(){
 }
 
 /* ── cover: composer + library ────────────── */
+/* The home page's title: the time of day, and who is signed in. */
+function greeting(){
+  const h = new Date().getHours();
+  return "Good " + (h < 12 ? "morning" : h < 18 ? "afternoon" : "evening") + (me && !me.guest ? ", " + me.name : "");
+}
 function renderCover(){
   const c = el("section", "cover");
   c.innerHTML = `<form class="composer" id="composer">
-      <textarea id="cTopic" class="topic" rows="1" autocomplete="off" placeholder="What do you want to understand?" aria-label="Topic"></textarea>
+      <h1 class="title hello">${LOGO}<span id="hello"></span></h1>
+      <textarea id="cTopic" class="topic" rows="1" autocomplete="off" placeholder="A topic or a question" aria-label="Topic"></textarea>
       <div class="more">
-        <label class="lab" for="cKnown">What you already know</label>
-        <textarea id="cKnown" class="known" rows="1" placeholder="Optional"></textarea>
-        <label class="lab" for="cInstr">Instructions</label>
-        <textarea id="cInstr" class="known" rows="1" placeholder="Optional. Shorter, deeper, no pictures…"></textarea>
+        <label class="lab" for="cKnown">What you already know <span class="opt">optional</span></label>
+        <textarea id="cKnown" class="known" rows="1"></textarea>
+        <label class="lab" for="cInstr">Instructions <span class="opt">optional</span></label>
+        <textarea id="cInstr" class="known" rows="1" placeholder="Shorter, deeper, no pictures…"></textarea>
         <div class="chips" id="cChips"></div>
         <div class="composer-foot"><button class="go" type="submit">Write<kbd>↵</kbd></button></div>
       </div>
     </form>
     <section class="library" id="library"></section>`;
+  c.querySelector("#hello").textContent = greeting();
   main.replaceChildren(c);
 
   const form = $("#composer"), topic = $("#cTopic"), known = $("#cKnown"), instr = $("#cInstr");
