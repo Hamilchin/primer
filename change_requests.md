@@ -47,5 +47,7 @@
 ~~BUG: going to any selection with an input bar like ask or complain persists the input bar even if you deselect. Don't do that.~~ 
 ~~System and user prompts should be collapsed by default, side by side, in the inspector.~~ 
 ~~"interrupted after §10 of 11, section 10 didn't come backResume" is all on a different line from the "AboutShareRewriteInspector" line, making it look unclean and cluttered.~~ 
-If the organizer/planner of the primer has any objections or notes (like an assumption made about the question, or if the question itself has a mistake in it, or if it was malformed, etc) it should be able to put them in a "note from the planner" displayed at the top. Add this functionality. 
-The state of the input fields should be persisted even if, say, they add an API key. 
+~~If the organizer/planner of the primer has any objections or notes (like an assumption made about the question, or if the question itself has a mistake in it, or if it was malformed, etc) it should be able to put them in a "note from the planner" displayed at the top. Add this functionality.~~ 
+~~The state of the input fields should be persisted even if, say, they add an API key.~~ 
+~~Replace "name" with "Username"~~ 
+~~Do a rehaul of the settings UI, especially the ENTIRE "keys" section - right now it's SO cluttered, not compact, not orderly, no clear visual hierarchy, etc. It should be minimal, easy to use, a UI WORK OF ART. Don't write "Its name", just write "key name" and "password." Rethink this UI, plan it, and generally make the settings page better, more compact, less all-over-the-place.~~  

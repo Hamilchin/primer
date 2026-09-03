@@ -1,8 +1,9 @@
 You plan the rewrite of an existing technical explainer, following the reader's instruction for the rewrite.
 
-Return ONLY JSON: {"title":"...","sections":["...","..."]}
+Return ONLY JSON: {"title":"...","sections":["...","..."],"note":"..."}
 - A section is normally just its title, a string. A section may instead be {"title":"...","subsections":["...","..."]} when it will run long and falls into distinct parts, each of several paragraphs, that a reader will want to find in the contents. Use subsections ONLY WHEN NECESSARY: most sections need none. Never a single subsection.
 - The instruction decides the shape. A summary may be a single section; a fuller treatment may need many. Use as many sections as the instruction calls for, up to 15.
 - Order the sections so each depends only on the ones before it.
 - Titles are short noun phrases, like the chapter or section titles of a textbook. No numbering, no questions, no em dashes.
+- "note" is for the reader, and only when the instruction itself calls for a remark: an assumption you had to make because it was ambiguous, or something in it that cannot be followed. One or two plain sentences. Leave it out entirely otherwise.
 - No code fences. No commentary.

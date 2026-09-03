@@ -366,6 +366,7 @@ function snapshot(user, docId) {
   });
   const out = { title: String(d.title || d.topic || "Primer").slice(0, 200), topic: d.topic, known: d.known || "", instruction: d.instruction || "",
                 created: d.created, status: d.status || "done", blocks, view: { sources: st.showSources !== false, marks: st.showMarks !== false } };
+  if (d.note) out.note = String(d.note).slice(0, 600);
   if (d.researched) out.researched = d.researched;
   if (d.rewrite) out.rewrite = { ofTitle: d.rewrite.ofTitle, instruction: d.rewrite.instruction };
   if (d.define && d.define.from) out.define = { term: d.define.term, from: { title: d.define.from.title } };
@@ -435,13 +436,13 @@ async function serve(req, res) {
     const name = String(b.name || "").trim().toLowerCase(), password = String(b.password || "");
     let user;
     if (path === "/api/signup") {
-      if (!NAME.test(name)) throw halt(400, "A name is 2 to 32 letters, digits, dots, dashes or underscores.");
+      if (!NAME.test(name)) throw halt(400, "A username is 2 to 32 letters, digits, dots, dashes or underscores.");
       if (password.length < 8) throw halt(400, "A password is at least 8 characters.");
       if (String(b.invite || "").trim() !== db.invite) throw halt(403, "That invite code isn't right.");
       try { user = db.users.create(name, password); } catch (e) { throw halt(409, e.message); }
     } else {
       user = NAME.test(name) && password ? db.users.check(name, password) : null;
-      if (!user) throw halt(401, "Wrong name or password.");
+      if (!user) throw halt(401, "Wrong username or password.");
     }
     setCookie(db.sessions.create(user.id));
     return json(200, { name: user.name, key: user.key, admin: user.admin });

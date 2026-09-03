@@ -196,6 +196,10 @@ main{padding:1.5rem var(--gutter) 8rem}
 /* ══ document ═════════════════════════════════════════════════ */
 .doc{position:relative;max-width:var(--col);margin:1.5rem auto 0}
 .doc-head{margin:0 0 2.5rem}
+/* What the planner had to say about the request, above the first section. */
+.pnote{margin:1.6rem 0 0;padding:.1rem 0 .1rem .8rem;border-left:2px solid var(--accent)}
+.pnote .lab{margin-bottom:.2rem}
+.pnote p{margin:0;font-size:15px;line-height:1.55;color:var(--fg-2)}
 .title{
   margin:0 0 .8rem; padding-bottom:.55rem; border-bottom:1px solid var(--rule);
   font-family:var(--disp); font-size:2.3rem; line-height:1.15; font-weight:400; text-wrap:balance;
@@ -500,17 +504,19 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 /* ══ picker ═══════════════════════════════════════════════════
    Two choices on one line, each with a chevron; the chosen one's form
    opens under the line and the chevron turns. */
-.pick-row{display:flex;flex-wrap:wrap;gap:.4rem 1.8rem;padding:.5rem 0}
-.pick-b{font-size:16px;color:var(--fg-2);display:inline-flex;align-items:baseline;gap:.6rem}
+.pick-row{display:flex;flex-wrap:wrap;gap:.4rem 1.6rem;align-items:baseline;padding:.75rem 0 .2rem}
+.pick-b{font-size:14px;color:var(--fg-2);display:inline-flex;align-items:baseline;gap:.5rem}
 .pick-b:hover{color:var(--accent)}
 .pick-b:hover::after{border-color:var(--accent)}
 .pick-b.on{color:var(--fg)}
-.pick-b::after{
-  content:""; flex:0 0 auto; margin-left:auto; width:.38em; height:.38em; position:relative; top:-.12em;
+.pick-b::after,.krow summary::after{
+  content:""; flex:0 0 auto; width:.38em; height:.38em; position:relative; top:-.12em;
   border-right:1.5px solid var(--fg-3); border-bottom:1.5px solid var(--fg-3); transform:rotate(-45deg); transition:transform .15s;
 }
-.pick-b.on::after{transform:rotate(45deg);top:-.2em}
-.pick-form .kform{padding:.3rem 0 1.1rem}
+.pick-b.on::after,.krow details[open] summary::after{transform:rotate(45deg);top:-.2em}
+.pick-row .tail{margin-left:auto;font-size:14px;color:var(--fg-3);text-decoration:none}
+.pick-row .tail:hover{color:var(--accent)}
+.pick-form .kform{padding:.2rem 0 .5rem}
 /* ── prompts: one folded row each; an edited prompt keeps a rule in the
       margin and its Reset, open or closed ── */
 /* A subsection heading on Settings, numbered in the margin like a primer's. */
@@ -529,31 +535,32 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 .p-text:focus{outline:none;border-color:var(--accent);color:var(--fg)}
 
 /* ══ settings page ════════════════════════════════════════════
-   Laid out like a primer: numbered sections, a contents list, and native
-   controls coloured with the accent and otherwise left alone.          */
+   Laid out like a primer: numbered sections, a contents list, and one
+   kind of row throughout: a label on the left, its control on the right.
+   The forms under Keys are made of the same rows.                     */
 /* A touch left of centre: with its numbers hanging in the margin the page
    reads right-heavy when centred exactly. */
 @media (min-width:1000px){ .settings{translate:-1.25rem 0} }
 .ssec{position:relative;margin:2.6rem 0 0;scroll-margin-top:calc(var(--head) + 1.25rem)}
 .doc-head + .ssec{margin-top:0}
 .ssec .sub{margin-top:0}
-.srow{display:flex;justify-content:space-between;gap:2rem;align-items:flex-start;padding:.8rem 0}
+.srow{display:flex;justify-content:space-between;gap:2rem;align-items:center;padding:.7rem 0}
 .srow .lab{font-size:16px;color:var(--fg);margin:0}
-.switch{flex:0 0 auto;width:2.5rem;height:1.45rem;border-radius:999px;background:var(--rule-2);position:relative;margin-top:.15rem;transition:background .2s}
+.switch{flex:0 0 auto;width:2.5rem;height:1.45rem;border-radius:999px;background:var(--rule-2);position:relative;transition:background .2s}
 .switch i{position:absolute;top:.15rem;left:.15rem;width:1.15rem;height:1.15rem;border-radius:50%;background:var(--bg);box-shadow:0 1px 2px rgba(0,0,0,.25);transition:left .2s}
 .switch[aria-checked="true"]{background:var(--accent)}
 .switch[aria-checked="true"] i{left:1.2rem}
-.seg{display:flex;gap:1rem;flex:0 0 auto;font-size:14px;margin-top:.2rem}
+.seg{display:flex;gap:1rem;flex:0 0 auto;font-size:14px}
 .seg label{display:flex;gap:.4rem;align-items:center;color:var(--fg-2)}
 .seg input{accent-color:var(--accent);margin:0}
-.sfield{flex:0 1 18rem;background:none;border:0;border-bottom:1px solid var(--rule-2);padding:.2rem .1rem .3rem;font-size:15px;border-radius:0}
-.sfield:focus{outline:none;border-bottom-color:var(--accent)}
+.srow .field{flex:0 1 18rem;width:auto;font-size:15px;padding:.3rem .55rem .35rem}
 /* A row that runs full width: its label above, its control below. */
 .srow.wide{flex-direction:column;align-items:stretch;gap:.9rem}
 .keys{font-size:14px}
 .keys .warn{margin:0 0 .9rem;padding-left:.8rem;border-left:2px solid var(--accent);color:var(--fg);font-size:14px;line-height:1.5}
-.klist{list-style:none;margin:0;padding:0}
-.krow{display:flex;gap:.8rem;align-items:flex-start;padding:.5rem 0}
+/* The keys, one to a row, ruled like the library. */
+.klist{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
+.krow{display:flex;gap:.8rem;align-items:flex-start;padding:.6rem 0;border-bottom:1px solid var(--rule)}
 .krow input[type="radio"]{accent-color:var(--accent);margin:.35rem 0 0;flex:0 0 auto}
 .krow details,.krow .kinfo{flex:1;min-width:0}
 .krow summary,.krow .kinfo{list-style:none;display:flex;flex-wrap:wrap;gap:.15rem 1rem;align-items:baseline}
@@ -563,26 +570,20 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 .krow .kname{color:var(--fg);font-size:16px}
 .krow .kmeta{color:var(--fg-3);font-size:13px}
 .krow .kuse{color:var(--fg-2);font-size:13px;margin-left:auto;white-space:nowrap;font-variant-numeric:tabular-nums}
-.krow .kbody{margin:.7rem 0 .3rem}
-.krow .kbody .usage{font-size:13px;margin-bottom:1rem}
-.krow .kbody .empty{margin:0 0 .8rem}
+.krow .kbody{margin:.3rem 0 .4rem}
+.krow .kbody>.lab{font-size:13px;color:var(--fg-3);margin:1rem 0 .4rem}
+.krow .kbody .usage{font-size:13px}
 .krow .unlink{font-size:13px;color:var(--fg-3);flex:0 0 auto;margin-top:.2rem}
 .krow .unlink:hover{color:var(--accent)}
-.kform{display:flex;flex-wrap:wrap;gap:.6rem 1.2rem;align-items:baseline}
-.kform .sfield{flex:1 1 11rem;min-width:0}
-.kform .chk{display:flex;gap:.4rem;align-items:center;color:var(--fg-2);font-size:14px;white-space:nowrap}
-.kform input[type="checkbox"]{accent-color:var(--accent);margin:0}
-.kform .seg{margin:0}
-.kform button{font-size:13px;color:var(--accent);white-space:nowrap}
-.kform button:hover{text-decoration:underline;text-underline-offset:3px}
-.kform button.danger{color:var(--fg-3)}
-.kform button.danger:hover{color:var(--accent)}
-.kform .confirm{display:flex;gap:1rem;align-items:baseline;color:var(--fg-2);font-size:13px}
+/* A form of rows: the labels a step quieter than the page's own rows. */
+.kform .srow{padding:.4rem 0}
+.kform .srow .lab{font-size:14px;color:var(--fg-2)}
+.kform .acts{display:flex;gap:1.25rem;align-items:center;padding:.65rem 0 .25rem}
+.quiet{font-size:14px;color:var(--fg-3)}
+.quiet:hover{color:var(--accent)}
+.kform .confirm{display:flex;gap:1rem;align-items:baseline;color:var(--fg-2);font-size:14px}
 .kform .confirm .danger{color:var(--accent)}
-.keys .guidelink{margin:1.2rem 0 0}
-.account{font-size:14px;color:var(--fg-2);display:flex;gap:1rem;align-items:baseline;margin-top:.2rem}
-.account button{color:var(--accent);font-size:13px}
-.account button:hover{text-decoration:underline;text-underline-offset:3px}
+.account{flex:1;display:flex;justify-content:space-between;align-items:baseline;gap:1rem;font-size:16px}
 
 /* ══ inspector: the calls ═════════════════════════════════════ */
 .call{border-top:1px solid var(--rule)}
@@ -672,8 +673,9 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
   .shelf .words{display:none}
   .status-row>span{flex-basis:100%;padding-left:0;border-left:0}
   .srow{gap:1rem}
-  .srow:has(.seg){flex-direction:column;gap:.6rem}
-  .krow .kuse{margin-left:0;flex-basis:100%}
+  .srow:has(.seg),.kform .srow{flex-direction:column;align-items:stretch;gap:.5rem}
+  .srow .field{flex:1 1 auto}
+  .krow .kuse{margin-left:0}
   .colophon .fill{flex-basis:100%}
   .call summary{flex-wrap:wrap;row-gap:.15rem}
   .call .what{flex:1 1 calc(100% - 3rem)}
@@ -1528,7 +1530,7 @@ function renderLogin(){
   const c = el("section", "cover login");
   c.innerHTML = `<form id="loginForm">
       <h1 class="title">Sign in</h1>
-      <label class="lab" for="lName">Name</label>
+      <label class="lab" for="lName">Username</label>
       <input id="lName" class="field" autocomplete="username" autocapitalize="off" spellcheck="false">
       <label class="lab" for="lPass">Password</label>
       <input id="lPass" class="field" type="password" autocomplete="current-password">
@@ -1619,10 +1621,23 @@ function renderCover(){
   instr.addEventListener("input", () =>
     chips.querySelectorAll(".chip").forEach(c => c.classList.toggle("on", instr.value.includes(c.dataset.text))));
 
+  /* What was typed stays put through a trip to Settings or a reload of the
+     tab, until a primer is started from it. */
+  const DRAFT = "primer:draft";
+  try{
+    const d = JSON.parse(sessionStorage.getItem(DRAFT) || "null");
+    if(d){ topic.value = d.topic || ""; known.value = d.known || ""; instr.value = d.instr || ""; }
+  }catch(e){}
+  if(instr.value) instr.dispatchEvent(new Event("input"));
+  form.addEventListener("input", () => {
+    try{ sessionStorage.setItem(DRAFT, JSON.stringify({ topic:topic.value, known:known.value, instr:instr.value })); }catch(e){}
+  });
+
   form.onsubmit = e => {
     e.preventDefault();
     const t = topic.value.trim(); if(!t){ topic.focus(); return; }
     if(me && !me.key){ goto("settings"); toast("Add a key, or link to a shared one, first"); return; }
+    try{ sessionStorage.removeItem(DRAFT); }catch(e){}
     startDoc({ topic:t, known:known.value.trim(), instruction:instr.value.trim() });
   };
   shelfSig = null; libQuery = "";
@@ -1723,6 +1738,11 @@ function renderDoc(){
   a.querySelector(".title").textContent = doc.title;
   const head = a.querySelector(".doc-head");
   head.append(barNode(doc), metaNode(doc), docToc(doc), docToc(doc, true));
+  if(doc.note){
+    const note = el("aside", "pnote");
+    note.append(el("span", "lab", "Note from the planner"), el("p", null, doc.note));
+    head.append(note);
+  }
 
   let n = 0, m = 0, fi = 0;
   doc.blocks.forEach(b => {
@@ -2391,6 +2411,10 @@ async function build(d){
     return;
   }
   d.title = trimTitle(plan.title, 110, d.topic);
+  /* A remark the planner had for the reader: an assumption it made, or a
+     fault in the question. Most plans have none. */
+  const note = String(plan.note || "").replace(/\s+/g, " ").trim().slice(0, 600);
+  if(note) d.note = note; else delete d.note;
   d.blocks = [];
   plan.sections.forEach((raw, i) => {
     /* A section is its title, or {title, subsections} where the planner
@@ -3517,13 +3541,7 @@ function promptRow(k){
 /* ══ settings page ════════════════════════════════════════════
    Drawn from SETTINGS. One control per type; add a type here to use it. */
 const CONTROLS = {
-  bool(k, s, onChange){
-    const b = btn("switch"); b.setAttribute("role", "switch"); b.setAttribute("aria-label", s.label);
-    const paint = () => b.setAttribute("aria-checked", String(!!setting(k)));
-    b.onclick = () => { onChange(!setting(k)); paint(); };
-    b.append(el("i")); paint();
-    return b;
-  },
+  bool(k, s, onChange){ return switchBtn(s.label, setting(k), onChange); },
   select(k, s, onChange){
     const g = el("div", "seg"); g.setAttribute("role", "radiogroup"); g.setAttribute("aria-label", s.label);
     (s.options || []).forEach(o => {
@@ -3535,7 +3553,7 @@ const CONTROLS = {
     return g;
   },
   text(k, s, onChange){
-    const i = el("input", "sfield"); i.value = setting(k) || ""; i.placeholder = s.placeholder || ""; i.setAttribute("aria-label", s.label);
+    const i = el("input", "field"); i.value = setting(k) || ""; i.setAttribute("aria-label", s.label);
     let t = null;
     i.oninput = () => { clearTimeout(t); t = setTimeout(() => onChange(i.value), 300); };
     return i;
@@ -3569,32 +3587,51 @@ const CONTROLS = {
     const a = el("div", "account");
     if(isGuest()){
       a.append(el("span", null, "A guest. Primers and prompt edits are kept only in this browser."),
-               btn(null, "Sign in", () => { me = null; route = "login"; render(); scrollTo(0, 0); }));
+               btn("quiet", "Sign in", () => { me = null; route = "login"; render(); scrollTo(0, 0); }));
       return a;
     }
-    a.append(el("span", null, "Signed in as " + me.name), btn(null, "Sign out", async () => { try{ await api("/api/logout", {}); }catch(e){} signedOut(); }));
+    a.append(el("span", null, "Signed in as " + me.name), btn("quiet", "Sign out", async () => { try{ await api("/api/logout", {}); }catch(e){} signedOut(); }));
     return a;
   }
 };
 
-/* ── named keys ── */
-const kindWord = k => k === "key" ? "API key" : "subscription";
-/* A field in a key form; a password field never autofills. */
-function kfield(ph, type){
-  const i = el("input", "sfield"); i.placeholder = ph; i.type = type || "text";
-  i.autocomplete = type === "password" ? "new-password" : "off"; i.spellcheck = false; i.setAttribute("aria-label", ph);
+/* ── named keys ──
+   Every form on this page is made of the page's own rows: a label on the
+   left, its control on the right, and the buttons in a row of their own. */
+function srow(label, control){
+  const r = el("div", "srow"), l = el("label", "lab", label);
+  if(control.id) l.htmlFor = control.id;
+  r.append(l, control);
+  return r;
+}
+const acts = (...b) => { const a = el("div", "acts"); a.append(...b); return a; };
+/* A text field for a row; a password field never autofills. */
+let fieldN = 0;
+function kfield(type){
+  const i = el("input", "field"); i.type = type || "text"; i.id = "kf" + (++fieldN);
+  i.autocomplete = type === "password" ? "new-password" : "off"; i.spellcheck = false;
   return i;
 }
+/* An on/off switch, the one the settings rows use. */
+function switchBtn(label, on, onChange){
+  const b = btn("switch"); b.setAttribute("role", "switch"); b.setAttribute("aria-label", label);
+  const paint = v => b.setAttribute("aria-checked", String(!!v));
+  b.onclick = () => { const v = b.getAttribute("aria-checked") !== "true"; paint(v); onChange(v); };
+  b.append(el("i")); paint(on);
+  return b;
+}
+const kindWord = k => k === "key" ? "API key" : "subscription";
 /* Name and password of someone's shared key; submit(name, password) links to it. */
 function linkForm(submit){
-  const f = el("form", "kform"), name = kfield("Its name"), pass = kfield("Its password", "password"), go = btn(null, "Link"); go.type = "submit";
-  f.append(name, pass, go);
+  const f = el("form", "kform"), name = kfield(), pass = kfield("password"), go = btn("go", "Link"); go.type = "submit";
+  f.append(srow("Key name", name), srow("Password", pass), acts(go));
   f.onsubmit = async e => { e.preventDefault(); go.disabled = true; await submit(name.value.trim(), pass.value); go.disabled = false; };
   return f;
 }
 /* Two forms behind one line of choices: press one and its form opens
-   under the line; press the other and it takes the place. */
-function picker(items){
+   under the line; press the other and it takes the place. `tail` sits at
+   the line's far end. */
+function picker(items, tail){
   const w = el("div", "pick"), row = el("div", "pick-row"), slot = el("div", "pick-form");
   items.forEach(it => {
     const b = btn("pick-b", it.title, () => {
@@ -3607,15 +3644,15 @@ function picker(items){
     });
     row.append(b);
   });
+  if(tail){ tail.classList.add("tail"); row.append(tail); }
   w.append(row, slot);
   return w;
 }
 /* A link to the setup guide, a real address that also works in place. */
 function guideLink(){
-  const p = el("p", "lab guidelink"), a = el("a", null, "Setup guide"); a.href = "/guide";
+  const a = el("a", null, "Setup guide"); a.href = "/guide";
   a.onclick = inPlace(() => goto("guide"));
-  p.append(a);
-  return p;
+  return a;
 }
 /* A guest keeps one credential in this browser: a key or token of their
    own, checked once with Anthropic, or someone's shared key by name and
@@ -3633,8 +3670,8 @@ function guestKeysControl(){
       li.append(info, btn("unlink", "Forget", () => { setGuestCred(null); draw(); toast("Forgotten"); }));
       ul.append(li); g.append(ul);
     }
-    const f = el("form", "kform"), value = kfield("API key or subscription token", "password"), go = btn(null, "Use"); go.type = "submit";
-    f.append(value, go);
+    const f = el("form", "kform"), value = kfield("password"), go = btn("go", "Use"); go.type = "submit";
+    f.append(srow("API key or subscription token", value), acts(go));
     f.onsubmit = async e => {
       e.preventDefault(); go.disabled = true;
       const v = value.value.trim();
@@ -3644,7 +3681,7 @@ function guestKeysControl(){
     g.append(picker([{ title: c ? "Use a different key" : "Use a key", form:f }, { title:"Link to a shared key", form:linkForm(async (name, password) => {
       try{ const r = await api("/api/guest/link", { name, password }); setGuestCred({ name:r.name, password, owner:r.owner, kind:r.kind }); draw(); toast("Linked to “" + r.name + "”"); }
       catch(err){ toast(err.message, { err:true }); }
-    }) }]), guideLink());
+    }) }], guideLink()));
   };
   draw();
   return g;
@@ -3660,7 +3697,6 @@ function keysControl(){
     catch(e){ toast(e.message, { err:true }); return false; }
   };
   const today = () => new Date().toISOString().slice(0, 10);
-  const check = (label, on) => { const l = el("label", "chk"), i = el("input"); i.type = "checkbox"; i.checked = !!on; l.append(i, label); return { l, i }; };
   const radio = key => {
     const r = el("input"); r.type = "radio"; r.name = "s-active"; r.checked = !!st.key && st.key.id === key.id;
     r.setAttribute("aria-label", "Run on " + key.name);
@@ -3674,7 +3710,15 @@ function keysControl(){
     return usageTable([{ text:"Day" }, { text:"Calls", cls:"n" }, { text:"Tokens", cls:"n" }, { text:"Searches", cls:"n" }, { text:"Cost", cls:"n" }],
       u.days.map(d => row(d.day === today() ? "Today" : shortDate(Date.parse(d.day + "T12:00:00")), d)), row("In all", u.total));
   };
-  /* One of your own keys: its use, and a form to rename, share or re-password it. */
+  /* A key's sharing: the switch, and the password row it opens. */
+  const sharing = (on, pwLabel) => {
+    const pw = kfield("password"), pwRow = srow(pwLabel, pw); pwRow.hidden = !on;
+    const s = { on, pw, pwRow };
+    s.row = srow("Shared with a password", switchBtn("Shared with a password", on, v => { s.on = v; pwRow.hidden = !v; if(v) pw.focus(); }));
+    return s;
+  };
+  /* One of your own keys: what it has been used for, and a form to
+     rename, share or re-password it, folded under its row. */
   const mineRow = key => {
     const li = el("li", "krow"), d = el("details"), sum = el("summary");
     const spent = (key.usage.days.find(x => x.day === today()) || {}).cost || 0;
@@ -3682,27 +3726,24 @@ function keysControl(){
                el("span", "kmeta", kindWord(key.kind) + " · " + (key.shared ? "shared" : "personal")),
                el("span", "kuse", usd(spent) + " today · " + usd(key.usage.total.cost) + " in all"));
     const body = el("div", "kbody");
-    body.append(key.usage.days.length ? dayTable(key.usage) : el("p", "empty", "Not used yet."));
-    const f = el("form", "kform");
-    const name = kfield("Name"); name.value = key.name;
-    const sh = check("Shared", key.shared);
-    const pw = kfield(key.shared ? "New password (unlinks everyone)" : "Password for others", "password"); pw.hidden = !key.shared;
-    sh.i.onchange = () => { pw.hidden = !sh.i.checked; if(sh.i.checked) pw.focus(); };
-    const save = btn(null, "Save"); save.type = "submit";
+    const f = el("form", "kform"), name = kfield(); name.value = key.name;
+    const sh = sharing(key.shared, key.shared ? "New password" : "Password");
+    const save = btn("go", "Save"); save.type = "submit";
     const del = el("span");
-    del.append(btn("danger", "Delete", () => confirmRow(del, key.name,
+    del.append(btn("quiet", "Delete", () => confirmRow(del, key.name,
       async () => { if(await call("/api/keys/" + key.id, null, "DELETE")) toast("Deleted “" + key.name + "”"); })));
-    f.append(name, sh.l, pw, save, del);
+    f.append(srow("Key name", name), sh.row, sh.pwRow, acts(save, del));
     f.onsubmit = async e => {
       e.preventDefault();
-      const patch = { name:name.value.trim(), shared:sh.i.checked };
-      if(pw.value) patch.password = pw.value;
-      if(patch.shared && !key.shared && !patch.password){ toast("Set a password for the people you share it with", { err:true }); pw.focus(); return; }
+      const patch = { name:name.value.trim(), shared:sh.on };
+      if(sh.pw.value) patch.password = sh.pw.value;
+      if(patch.shared && !key.shared && !patch.password){ toast("Set a password for the people you share it with", { err:true }); sh.pw.focus(); return; }
       const unsharing = key.shared && !patch.shared;
       if(await call("/api/keys/" + key.id, patch, "PUT"))
         toast(patch.password && key.shared ? "Password changed. Everyone linked has to link again." : unsharing ? "No longer shared. Everyone linked has lost it." : "Saved");
     };
     body.append(f);
+    if(key.usage.days.length) body.append(el("span", "lab", "Usage"), dayTable(key.usage));
     d.append(sum, body);
     li.append(radio(key), d);
     return li;
@@ -3725,24 +3766,19 @@ function keysControl(){
       st.linked.forEach(x => ul.append(linkedRow(x)));
       g.append(ul);
     }
-    const f = el("form", "kform");
-    const name = kfield("Name, e.g. work");
     /* API key or subscription token: the server tells which from the value. */
-    const value = kfield("API key or subscription token", "password");
-    const sh = check("Share it with a password", false);
-    const pw = kfield("Password for others", "password"); pw.hidden = true;
-    sh.i.onchange = () => { pw.hidden = !sh.i.checked; if(sh.i.checked) pw.focus(); };
-    const go = btn(null, "Add"); go.type = "submit";
-    f.append(name, value, sh.l, pw, go);
+    const f = el("form", "kform"), name = kfield(), value = kfield("password"), sh = sharing(false, "Password");
+    const go = btn("go", "Add"); go.type = "submit";
+    f.append(srow("Key name", name), srow("API key or subscription token", value), sh.row, sh.pwRow, acts(go));
     f.onsubmit = async e => {
       e.preventDefault(); go.disabled = true;
-      const ok = await call("/api/keys", { name:name.value.trim(), value:value.value.trim(), shared:sh.i.checked, password:pw.value }, "POST");
+      const ok = await call("/api/keys", { name:name.value.trim(), value:value.value.trim(), shared:sh.on, password:sh.pw.value }, "POST");
       go.disabled = false;
       if(ok) toast("Added “" + name.value.trim() + "”");
     };
     g.append(picker([{ title:"Add a key", form:f }, { title:"Link to a shared key", form:linkForm(async (name, password) => {
       if(await call("/api/keys/link", { name, password }, "POST")) toast("Linked to “" + name + "”");
-    }) }]), guideLink());
+    }) }], guideLink()));
   };
   call("/api/keys");
   return g;
@@ -4030,6 +4066,7 @@ function docMarkdown(d){
   if(d.topic && d.topic !== d.title) asked.push("Asked for: " + d.topic);
   if(d.known) asked.push("Already knew: " + d.known);
   if(d.instruction) asked.push("Asked to: " + d.instruction.replace(/\s*\n+\s*/g, " "));
+  if(d.note) asked.push("Note from the planner: " + d.note);
   if(d.rewrite) asked.push("Rewrite of “" + d.rewrite.ofTitle + "”: " + d.rewrite.instruction);
   if(d.define && d.define.from) asked.push("Defines “" + d.define.term + "” in “" + d.define.from.title + "”");
   if(asked.length) parts.push(asked.map(l => "> " + l).join("\n>\n"));
