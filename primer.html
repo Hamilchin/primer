@@ -118,7 +118,8 @@ main{padding:1.5rem var(--gutter) 8rem}
    a topic to write about.                                               */
 .cover{max-width:var(--col);margin:3.5rem auto 0}
 @media (min-width:1100px){
-  .cover:has(.shelf){max-width:72rem;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 3.5rem;align-items:start}
+  /* The two columns share a first baseline: the library's head sits on the greeting's line. */
+  .cover:has(.shelf){max-width:72rem;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 3.5rem;align-items:baseline}
   .cover:has(.shelf) .library{margin-top:0;padding-left:3.5rem;border-left:1px solid var(--rule)}
 }
 .title.hello{display:flex;align-items:center;gap:.6rem;margin:0 0 1.4rem;padding:0;border:0}
@@ -813,8 +814,24 @@ const store = {
   async del(k){
     if(isGuest()) return local.del(k);
     try{ await api("/api/store/" + encodeURIComponent(k), null, "DELETE"); }catch(e){}
+  },
+  /* The library's list is changed an entry at a time, never written whole,
+     so two tabs saving at once keep each other's primers. What comes back
+     is the list as it now stands, with whatever another tab added. */
+  async index(id, entry){
+    if(isGuest()){ const l = mergedIndex(local.get("primer:index") || [], id, entry); local.set("primer:index", l); return l; }
+    try{ const l = await api("/api/index/" + encodeURIComponent(id), entry, entry ? "PUT" : "DELETE"); saveWarned = false; return l; }
+    catch(e){ if(!saveWarned){ saveWarned = true; toast("Couldn't save: " + e.message, { err:true }); } return mergedIndex(index, id, entry); }
   }
 };
+/* An entry replaced in place, or added at the top, or taken out. */
+function mergedIndex(list, id, entry){
+  list = Array.isArray(list) ? list.filter(x => x && x.id) : [];
+  const i = list.findIndex(x => x.id === id);
+  if(!entry) return list.filter(x => x.id !== id);
+  if(i < 0) list.unshift(entry); else list[i] = entry;
+  return list;
+}
 /* A guest's credential, kept in this browser and sent with each call:
    {kind, value, hint} for a key of their own, {name, password, owner, kind}
    for someone's shared key. Under its own prefix, so signing in later
@@ -1310,12 +1327,17 @@ async function traceOf(id){
    seconds, so a closed page still leaves what had arrived by then. */
 function saveTrace(id, streaming){
   if(traceSaveT.has(id)) return;
-  traceSaveT.set(id, setTimeout(() => {
-    traceSaveT.delete(id);
-    const t = traces.get(id); if(!t) return;
-    if(t.length > TRACE_MAX) t.splice(0, t.length - TRACE_MAX);
-    store.set("primer:raw:"+id, t.map(c => ({ ...c, output:clip(c.output), system:clip(c.system), user:clip(c.user) })));
-  }, streaming ? 2500 : 600));
+  traceSaveT.set(id, setTimeout(() => { traceSaveT.delete(id); writeTrace(id); }, streaming ? 2500 : 600));
+}
+/* At once: when a run ends, so a page closed the next moment keeps its last calls. */
+function flushTrace(id){
+  clearTimeout(traceSaveT.get(id)); traceSaveT.delete(id);
+  return writeTrace(id);
+}
+function writeTrace(id){
+  const t = traces.get(id); if(!t) return;
+  if(t.length > TRACE_MAX) t.splice(0, t.length - TRACE_MAX);
+  return store.set("primer:raw:"+id, t.map(c => ({ ...c, output:clip(c.output), system:clip(c.system), user:clip(c.user) })));
 }
 /* The key a block's calls are filed under in the trace, so a failed piece
    can find the call behind it after a retry or a reload: the outline,
@@ -1589,7 +1611,7 @@ function renderCover(){
         <label class="lab" for="cInstr">Instructions (optional)</label>
         <textarea id="cInstr" class="field" rows="1"></textarea>
         <div class="chips" id="cChips"></div>
-        <div class="composer-foot"><button class="go" type="submit">Write<kbd>↵</kbd></button></div>
+        <div class="composer-foot"><button class="go" type="submit">Write new primer<kbd>↵</kbd></button></div>
       </div>
     </form>
     <section class="library" id="library"></section>`;
@@ -1982,7 +2004,8 @@ function blockEl(b, n){
   }
   if(b.kind === "note"){
     const q = btn("side-q");
-    q.textContent = b.edit ? "“" + (b.edit.note || b.edit.quote) + "”" : "";
+    const asked = b.edit && (b.edit.note || b.edit.quote);
+    q.textContent = asked ? "“" + asked + "”" : "";
     q.onclick = ev => { ev.stopPropagation(); if(b.edit) showPop(q, provNodes(b)); };
     askedOnHover(q, e, b);
     e.appendChild(q);
@@ -2173,18 +2196,16 @@ async function countWords(){
   const todo = index.filter(it => it.words == null);
   if(!todo.length) return;
   for(const it of todo){
-    try{ const d = await store.get("primer:doc:" + it.id); it.words = d ? wordCount(d) : 0; }
+    let words;
+    try{ const d = await store.get("primer:doc:" + it.id); words = d ? wordCount(d) : 0; }
     catch(e){ return; }
+    index = await store.index(it.id, { ...(index.find(x => x.id === it.id) || it), words });
   }
-  await store.set("primer:index", index);
   if(route === "cover") renderLibrary();
 }
 async function persist(d){
   await store.set("primer:doc:"+d.id, { ...d, blocks: d.blocks.map(cleanBlock) });
-  const i = index.findIndex(x => x.id===d.id);
-  const entry = { id:d.id, title:d.title, updated:Date.now(), status:d.status || "done", short:gaps(d).length, words:wordCount(d) };
-  if(i>-1) index[i] = entry; else index.unshift(entry);
-  await store.set("primer:index", index);
+  index = await store.index(d.id, { id:d.id, title:d.title, updated:Date.now(), status:d.status || "done", short:gaps(d).length, words:wordCount(d) });
   if(route === "cover") renderLibrary();
 }
 function save(d, now){
@@ -2253,8 +2274,7 @@ function docContext(d){
 async function deleteDoc(id){
   const d = docs.get(id);
   if(d) stopRun(d);
-  index = index.filter(x => x.id !== id);
-  await store.set("primer:index", index);
+  index = await store.index(id, null);
   await store.del("primer:doc:"+id);
   await store.del("primer:raw:"+id);
   docs.delete(id); traces.delete(id); runs.delete(id);
@@ -2407,7 +2427,7 @@ async function build(d){
     d.blocks = [{ id:uid(), kind:"prose", md:"", stopped:!!e.stopped,
       error: e.stopped ? "Stopped before the outline was planned." : "Couldn't plan this explainer. " + e.message }];
     run.active = false;
-    rerender(d); save(d); tidyRun(d);
+    settle(d);
     return;
   }
   d.title = trimTitle(plan.title, 110, d.topic);
@@ -2476,7 +2496,7 @@ async function writeAll(d){
     await run.side;
     d.status = "interrupted"; d.statusNote = "section " + halted + " didn't come back";
     run.active = false;
-    rerender(d); save(d); tidyRun(d);
+    settle(d);
     return;
   }
   if(!run.cancelled){
@@ -2494,7 +2514,12 @@ async function finish(d){
     d.status = "stopped";
   }else{ d.status = "done"; d.statusNote = ""; }
   run.active = false;
-  rerender(d); save(d); tidyRun(d);
+  settle(d);
+}
+/* A run's end, whichever way it ended: shown, and written at once rather
+   than soon, so a page closed the next moment reopens as it was. */
+function settle(d){
+  rerender(d); flushTrace(d.id); save(d, true); tidyRun(d);
 }
 /* A pending block whose call will never come: shown stopped, with Retry. */
 function markStopped(d, b){
@@ -2752,7 +2777,7 @@ async function researchAll(d){
   d.status = run.cancelled ? "stopped" : "done";
   d.statusNote = run.cancelled ? "while checking sources" : "";
   run.active = false;
-  rerender(d); save(d); tidyRun(d);
+  settle(d);
 }
 
 /* ══ define ═══════════════════════════════════════════════════
@@ -3104,7 +3129,7 @@ function provNodes(b){
     nodes.push(el("div", "s", e.note || "The research agent corrected this block."));
     nodes.push(linkRow([ e.url && { label:"Source", href:e.url } ]));
   }else{
-    nodes.push(el("div", "q", e.note ? e.note : "“" + e.quote + "”"));
+    if(e.note || e.quote) nodes.push(el("div", "q", e.note ? e.note : "“" + e.quote + "”"));
     if(!readonly()) nodes.push(linkRow([{ label:"Remove", onclick:() => {
       snapshot();
       doc.blocks = doc.blocks.filter(x => x.id!==b.id);
@@ -4200,6 +4225,12 @@ async function loadMine(){
   }catch(e){ toast("Couldn't reach the server: " + e.message, { err:true }); }
   applySettings();
 }
+/* Back to this tab after another wrote a primer: the library catches up. */
+document.addEventListener("visibilitychange", async () => {
+  if(document.visibilityState !== "visible" || !me || route === "login") return;
+  try{ index = mergedIndex(await store.get("primer:index")); }catch(e){ return; }
+  if(route === "cover") renderLibrary();
+});
 async function enter(){
   await loadMine();
   doc = null; route = "cover"; render(); scrollTo(0, 0);
@@ -4221,7 +4252,12 @@ async function migrateLocal(){
   try{ keys = Object.keys(localStorage).filter(k => k.startsWith("primer:") && k !== "primer:theme"); }catch(e){}
   if(!keys.length || index.length) return;
   for(const k of keys){
-    try{ await store.set(k, JSON.parse(localStorage.getItem(k))); localStorage.removeItem(k); }catch(e){}
+    try{
+      const v = JSON.parse(localStorage.getItem(k));
+      if(k === "primer:index"){ for(const it of mergedIndex(v).reverse()) await store.index(it.id, it); }
+      else await store.set(k, v);
+      localStorage.removeItem(k);
+    }catch(e){}
   }
   index = (await store.get("primer:index")) || [];
   overrides = (await store.get("primer:prompts")) || overrides;

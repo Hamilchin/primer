@@ -51,3 +51,6 @@
 ~~The state of the input fields should be persisted even if, say, they add an API key.~~ 
 ~~Replace "name" with "Username"~~ 
 ~~Do a rehaul of the settings UI, especially the ENTIRE "keys" section - right now it's SO cluttered, not compact, not orderly, no clear visual hierarchy, etc. It should be minimal, easy to use, a UI WORK OF ART. Don't write "Its name", just write "key name" and "password." Rethink this UI, plan it, and generally make the settings page better, more compact, less all-over-the-place.~~  
+~~The "write" button should be "write new primer."~~ 
+~~The library is visually high compared to the new primer creation menu, that should be fixed~~ 
+

@@ -362,6 +362,12 @@ function snapshot(user, docId) {
   try { st = JSON.parse(db.kv.get(user, "primer:settings")) || {}; } catch {}
   const blocks = d.blocks.filter(b => b && (b.md || b.src)).map(({ by, origin, slot, fail, checked, ...r }) => {
     if (r.md) r.md = String(r.md).replace(/\[([^\]]*)\]\(primer:\w+\)/g, "$1");
+    /* A revision's mark stays, without the words the reader typed to ask
+       for it; a research correction keeps its reason and its source. */
+    if (r.edit && typeof r.edit === "object") {
+      const e = r.edit;
+      r.edit = e.by === "research" ? { label: e.label, ts: e.ts, by: "research", note: e.note, url: e.url } : { label: e.label, ts: e.ts };
+    }
     return r;
   });
   const out = { title: String(d.title || d.topic || "Primer").slice(0, 200), topic: d.topic, known: d.known || "", instruction: d.instruction || "",
@@ -371,6 +377,15 @@ function snapshot(user, docId) {
   if (d.rewrite) out.rewrite = { ofTitle: d.rewrite.ofTitle, instruction: d.rewrite.instruction };
   if (d.define && d.define.from) out.define = { term: d.define.term, from: { title: d.define.from.title } };
   return out;
+}
+/* What the library's list keeps of a primer, in the page's own shape. */
+const DOC_ID = /^[\w-]{1,40}$/;
+function indexEntry(id, b) {
+  b = b && typeof b === "object" ? b : {};
+  const e = { id, title: String(b.title || "").slice(0, 200), updated: Number(b.updated) || Date.now(),
+              status: String(b.status || "done").slice(0, 20), short: Number(b.short) || 0 };
+  if (b.words != null) e.words = Number(b.words) || 0;
+  return e;
 }
 const NAME = /^[a-z0-9][a-z0-9._-]{1,31}$/;
 const KEY_NAME = /^[^\s"“”][^"“”]{0,39}$/;
@@ -391,14 +406,19 @@ async function readBody(req, max = 4e6) {
   try { return JSON.parse(text || "{}"); } catch { throw halt(400, "Bad JSON body."); }
 }
 
-/* Sign-in attempts per address, so a password cannot be guessed at speed. */
-const tries = new Map();
-function slow(ip) {
+/* Failed attempts within the minute, by what was tried and from where: past
+   a bucket's limit the next try waits. A password is guessed no faster than
+   eight times a minute whatever the addresses, while the many people behind
+   one address share a looser bucket that only their failures fill. */
+const strikes = new Map();
+function guard(key, max) {
   const now = Date.now();
-  for (const [k, v] of tries) if (now - v.at > 6e4) tries.delete(k);
-  const t = tries.get(ip) || { n: 0 };
-  t.n++; t.at = now; tries.set(ip, t);
-  if (t.n > 8) throw halt(429, "Too many attempts. Wait a minute.");
+  for (const [k, v] of strikes) if (now - v.at > 6e4) strikes.delete(k);
+  const t = strikes.get(key);
+  if (t && t.n >= max) throw halt(429, "Too many attempts. Wait a minute.");
+}
+function strike(...keys) {
+  for (const k of keys) { const t = strikes.get(k) || { n: 0 }; t.n++; t.at = Date.now(); strikes.set(k, t); }
 }
 
 createServer(async (req, res) => {
@@ -427,22 +447,24 @@ async function serve(req, res) {
   const guest = !me && isGuest(token);
   const setCookie = t => res.setHeader("set-cookie",
     "primer=" + (t || "") + "; Path=/; HttpOnly; SameSite=Lax" + (secure(req) ? "; Secure" : "") + (t ? "; Max-Age=31536000" : "; Max-Age=0"));
-  const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "";
+  /* Fly's proxy names the caller; anything the caller sent itself is not trusted. */
+  const ip = req.headers["fly-client-ip"] || req.socket.remoteAddress || "";
 
   /* ── accounts ── */
   if (req.method === "POST" && (path === "/api/signup" || path === "/api/login")) {
     const b = await readBody(req);
-    slow(ip);
     const name = String(b.name || "").trim().toLowerCase(), password = String(b.password || "");
     let user;
     if (path === "/api/signup") {
+      guard("signup:" + ip, 8);
       if (!NAME.test(name)) throw halt(400, "A username is 2 to 32 letters, digits, dots, dashes or underscores.");
       if (password.length < 8) throw halt(400, "A password is at least 8 characters.");
-      if (String(b.invite || "").trim() !== db.invite) throw halt(403, "That invite code isn't right.");
+      if (String(b.invite || "").trim() !== db.invite) { strike("signup:" + ip); throw halt(403, "That invite code isn't right."); }
       try { user = db.users.create(name, password); } catch (e) { throw halt(409, e.message); }
     } else {
+      guard("login:" + ip, 40); guard("login:" + name, 8);
       user = NAME.test(name) && password ? db.users.check(name, password) : null;
-      if (!user) throw halt(401, "Wrong username or password.");
+      if (!user) { strike("login:" + ip, "login:" + name); throw halt(401, "Wrong username or password."); }
     }
     setCookie(db.sessions.create(user.id));
     return json(200, { name: user.name, key: user.key, admin: user.admin });
@@ -472,7 +494,7 @@ async function serve(req, res) {
   /* ── feedback: from anyone on the page, to whoever hosts ── */
   if (req.method === "POST" && path === "/api/feedback") {
     const b = await readBody(req);
-    if (!me) slow(ip);
+    if (!me) { guard("feedback:" + ip, 20); strike("feedback:" + ip); }
     const text = String(b.text || "").trim().slice(0, 4000);
     if (!text) throw halt(400, "Say something first.");
     const kind = b.kind === "complaint" ? "complaint" : "feedback";
@@ -495,10 +517,10 @@ async function serve(req, res) {
     return json(200, { kind: await identify(value) });
   }
   if (req.method === "POST" && path === "/api/guest/link") {
-    const b = await readBody(req);
-    slow(ip);
-    const r = db.keys.sharedEnv(String(b.name || "").trim(), String(b.password || ""));
-    if (!r) throw halt(403, "No shared key with that name and password.");
+    const b = await readBody(req), name = String(b.name || "").trim();
+    guard("link:" + ip, 40); guard("link:" + name, 8);
+    const r = db.keys.sharedEnv(name, String(b.password || ""));
+    if (!r) { strike("link:" + ip, "link:" + name); throw halt(403, "No shared key with that name and password."); }
     console.log("  guest  linked to “" + r.key.name + "”");
     return json(200, { name: r.key.name, owner: r.key.owner, kind: r.key.kind });
   }
@@ -568,8 +590,8 @@ async function serve(req, res) {
   }
   if (req.method === "POST" && path === "/api/keys/link") {
     const b = await readBody(req), name = String(b.name || "").trim();
-    slow(ip);
-    try { db.keys.link(me.id, name, String(b.password || "")); } catch (e) { throw halt(403, e.message); }
+    guard("link:" + ip, 40); guard("link:" + name, 8);
+    try { db.keys.link(me.id, name, String(b.password || "")); } catch (e) { strike("link:" + ip, "link:" + name); throw halt(403, e.message); }
     console.log("  " + me.name + "  linked to “" + name + "”");
     return answerKeys();
   }
@@ -580,10 +602,30 @@ async function serve(req, res) {
     return answerKeys();
   }
 
+  /* ── the library's list ──
+     Changed an entry at a time and merged here, so two tabs saving at once
+     keep each other's primers. Each change answers with the list as it now
+     stands: a new entry goes to the top, a known one keeps its place. */
+  if (path.startsWith("/api/index/") && (req.method === "PUT" || req.method === "DELETE")) {
+    const id = decode(path.slice("/api/index/".length));
+    if (!DOC_ID.test(id)) throw halt(400, "Bad id.");
+    const entry = req.method === "PUT" ? indexEntry(id, await readBody(req)) : null;
+    let list = [];
+    try { list = JSON.parse(db.kv.get(me.id, "primer:index")); } catch {}
+    list = Array.isArray(list) ? list.filter(x => x && typeof x === "object" && x.id) : [];
+    const i = list.findIndex(x => x.id === id);
+    if (!entry) list = list.filter(x => x.id !== id);
+    else if (i < 0) list.unshift(entry);
+    else list[i] = entry;
+    db.kv.set(me.id, "primer:index", JSON.stringify(list));
+    return json(200, list);
+  }
+
   /* ── the page's storage ── */
   if (path.startsWith("/api/store/")) {
     const k = decode(path.slice("/api/store/".length));
     if (!k || k.length > 200) throw halt(400, "Bad key.");
+    if (k === "primer:index" && req.method === "PUT") throw halt(400, "The library's list is changed an entry at a time, at /api/index/<id>.");
     if (req.method === "GET") {
       const v = db.kv.get(me.id, k);
       if (v == null) throw halt(404, "Nothing stored under that key.");
@@ -648,7 +690,7 @@ async function serve(req, res) {
   }
 
   /* ── files: the page and what it needs, and the images that were found ── */
-  if (req.method !== "GET") throw halt(405, "method not allowed");
+  if (req.method !== "GET" && req.method !== "HEAD") throw halt(405, "method not allowed");
   /* A shared primer is the same page, titled after the primer so the link
      unfurls and the tab reads right; the page does the rest from the URL. */
   if (path.startsWith("/s/")) {
