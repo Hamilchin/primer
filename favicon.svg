@@ -1,4 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Primer">
-  <rect width="32" height="32" fill="#1a1a1a"/>
-  <path d="M5.5 25.5H26.5M9 17.5H23M12.5 9.5H19.5" fill="none" stroke="#fff" stroke-linecap="round" stroke-width="4"/>
+  <style>path{stroke:#1a1a1a}@media (prefers-color-scheme:dark){path{stroke:#fff}}</style>
+  <path d="M5.5 24H26.5M9 16H23M12.5 8H19.5" fill="none" stroke-linecap="round" stroke-width="4"/>
 </svg>

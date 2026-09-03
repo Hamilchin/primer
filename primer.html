@@ -16,6 +16,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.14/purify.min.js"></script>
 
 <style>
 /* ══ tokens ═══════════════════════════════════════════════════
@@ -91,8 +92,8 @@ a:hover{text-decoration-color:currentColor}
   font-size:13px;
 }
 .head.scrolled{border-bottom-color:var(--rule)}
-.wordmark{display:inline-flex;align-items:center;gap:.55rem;color:var(--fg);font-family:var(--disp);font-size:19px;line-height:1}
-.wordmark svg{width:18px;height:18px;display:block;flex:0 0 auto}
+.wordmark{display:inline-flex;align-items:center;gap:.55rem;color:var(--fg);font-family:var(--disp);font-size:20px;line-height:1}
+.wordmark svg{width:19px;height:19px;display:block;flex:0 0 auto}
 .wordmark:hover{color:var(--accent)}
 .acts{display:flex;align-items:center;gap:1.1rem}
 .act{color:var(--fg-2);white-space:nowrap}
@@ -149,10 +150,10 @@ main{padding:1.5rem var(--gutter) 8rem}
 .login .guest .act{color:var(--fg);margin-right:.5rem}
 .login .guest .act:hover{color:var(--accent)}
 /* ══ setup guide ══════════════════════════════════════════════ */
-.guide .body{margin-top:1.5rem}
-.guide .body h2{margin-top:2.2rem}
-.guide .body h2:first-child{margin-top:0}
-.guide .caution{padding-left:1rem;border-left:2px solid var(--accent);color:var(--fg-2)}
+/* A page of plain prose under a title: the guide, a link that leads nowhere. */
+.page .body{margin-top:1.5rem}
+.page .body h2{margin-top:2.2rem}
+.page .body h2:first-child{margin-top:0}
 /* Common instructions, one click each; they add up and toggle back off. */
 .chips{display:flex;flex-wrap:wrap;gap:.35rem 1rem;margin-top:.6rem;font-size:13.5px}
 .chip{color:var(--fg-2);text-decoration:underline;text-decoration-thickness:1px;text-decoration-color:var(--rule-2);text-underline-offset:3px}
@@ -178,10 +179,12 @@ main{padding:1.5rem var(--gutter) 8rem}
 .more-lib{display:block;margin-top:.6rem;font-size:13px;color:var(--fg-2)}
 .more-lib:hover{color:var(--accent)}
 .shelf{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
-.shelf li{display:flex;align-items:baseline;gap:1rem;border-bottom:1px solid var(--rule)}
+.shelf li{display:flex;align-items:baseline;gap:1rem;border-bottom:1px solid var(--rule);position:relative}
+/* Delete waits beside the row, outside it, where there is a pointer to hover with. */
+@media (hover:hover){ .shelf .x{position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:1rem;padding:0} }
 .shelf .open{
   flex:1; min-width:0; padding:.7rem 0 .75rem; font-size:16px; line-height:1.4;
-  display:flex; align-items:baseline; gap:1rem; color:var(--fg);
+  display:flex; align-items:baseline; gap:1rem; color:var(--fg); text-decoration:none;
 }
 .shelf .open>span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .shelf .open:hover>span:first-child{color:var(--accent)}
@@ -352,7 +355,7 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 .block.pending::before{background:var(--rule)}
 .status{color:var(--fg-3)}
 .block.busy .body{opacity:.6}
-::highlight(pen){background-color:var(--accent-bg)}
+::highlight(pen){background-color:color-mix(in srgb, var(--accent) 28%, transparent)}
 .block.pending .body{min-height:3.2em}
 .block.pending.queued{opacity:.5}
 /* The model's raw output so far, while we wait. */
@@ -465,14 +468,15 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 .share{width:min(20rem,90vw)}
 .share .pub{display:flex;align-items:center;gap:.7rem;padding:.4rem .6rem .1rem;font-size:14px;color:var(--fg)}
 .share .pub span{flex:1}
-.share .pub .switch,.share .pub .switch:hover{display:block;width:2.5rem;padding:0;margin:0;background:var(--rule-2)}
+.share .pub .switch,.share .pub .switch:hover{display:block;width:2.5rem;height:1.45rem;padding:0;margin:0;border-radius:999px;background:var(--rule-2)}
 .share .pub .switch[aria-checked="true"],.share .pub .switch[aria-checked="true"]:hover{background:var(--accent)}
 .share .hint.under{padding-top:0;padding-bottom:.3rem}
 .share .linkrow{display:flex;align-items:baseline}
 .share .linkrow button:first-child{flex:1}
 .share .linkrow .rm{width:auto;flex:0 0 auto;font-size:13px;color:var(--fg-3)}
 .share .linkrow .rm:hover{color:var(--accent);background:none}
-.share .url{display:block;padding:.35rem .6rem .1rem;font-family:var(--mono);font-size:12.5px;line-height:1.5;color:var(--fg);word-break:break-all;user-select:all}
+.share .url{display:block;padding:.35rem .6rem .3rem;font-family:var(--mono);font-size:12.5px;line-height:1.5;color:var(--fg);word-break:break-all;user-select:all;text-decoration:none;cursor:pointer}
+.share .url:hover{color:var(--accent)}
 
 /* ── toast ── */
 .toast{
@@ -502,20 +506,20 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 .usage .dim{color:var(--fg-3)}
 .usage .total td{border-bottom:0;color:var(--fg)}
 .usage .total td:first-child{font-weight:500}
-/* ══ folded rows ══════════════════════════════════════════════
-   A line to press; what it holds opens under it. No rules between rows:
-   a chevron at the right end says the line opens, and turns when it has. */
-.fold{margin:0}
-.fold summary{display:flex;align-items:baseline;gap:1rem;padding:.5rem 0;cursor:pointer;list-style:none;font-size:16px;color:var(--fg)}
-.fold summary::-webkit-details-marker{display:none}
-.fold summary::after{
+/* ══ picker ═══════════════════════════════════════════════════
+   Two choices on one line, each with a chevron; the chosen one's form
+   opens under the line and the chevron turns. */
+.pick-row{display:flex;flex-wrap:wrap;gap:.4rem 1.8rem;padding:.5rem 0}
+.pick-b{font-size:16px;color:var(--fg-2);display:inline-flex;align-items:baseline;gap:.6rem}
+.pick-b:hover{color:var(--accent)}
+.pick-b:hover::after{border-color:var(--accent)}
+.pick-b.on{color:var(--fg)}
+.pick-b::after{
   content:""; flex:0 0 auto; margin-left:auto; width:.38em; height:.38em; position:relative; top:-.12em;
   border-right:1.5px solid var(--fg-3); border-bottom:1.5px solid var(--fg-3); transform:rotate(-45deg); transition:transform .15s;
 }
-.fold[open] > summary::after{transform:rotate(45deg);top:-.2em}
-.fold summary:hover{color:var(--accent)}
-.fold summary:hover::after{border-color:var(--accent)}
-.fold .kform{padding:.3rem 0 1.1rem}
+.pick-b.on::after{transform:rotate(45deg);top:-.2em}
+.pick-form .kform{padding:.3rem 0 1.1rem}
 /* ── prompts: one folded row each; an edited prompt keeps a rule in the
       margin and its Reset, open or closed ── */
 /* A subsection heading on Settings, numbered in the margin like a primer's. */
@@ -536,12 +540,14 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 /* ══ settings page ════════════════════════════════════════════
    Laid out like a primer: numbered sections, a contents list, and native
    controls coloured with the accent and otherwise left alone.          */
+/* A touch left of centre: with its numbers hanging in the margin the page
+   reads right-heavy when centred exactly. */
+@media (min-width:1000px){ .settings{translate:-1.25rem 0} }
 .ssec{position:relative;margin:2.6rem 0 0;scroll-margin-top:calc(var(--head) + 1.25rem)}
 .doc-head + .ssec{margin-top:0}
 .ssec .sub{margin-top:0}
 .srow{display:flex;justify-content:space-between;gap:2rem;align-items:flex-start;padding:.8rem 0}
 .srow .lab{font-size:16px;color:var(--fg);margin:0}
-.srow .help{margin:.2rem 0 0;font-size:14px;line-height:1.5;color:var(--fg-2);max-width:30rem;text-wrap:pretty}
 .switch{flex:0 0 auto;width:2.5rem;height:1.45rem;border-radius:999px;background:var(--rule-2);position:relative;margin-top:.15rem;transition:background .2s}
 .switch i{position:absolute;top:.15rem;left:.15rem;width:1.15rem;height:1.15rem;border-radius:50%;background:var(--bg);box-shadow:0 1px 2px rgba(0,0,0,.25);transition:left .2s}
 .switch[aria-checked="true"]{background:var(--accent)}
@@ -551,9 +557,8 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 .seg input{accent-color:var(--accent);margin:0}
 .sfield{flex:0 1 18rem;background:none;border:0;border-bottom:1px solid var(--rule-2);padding:.2rem .1rem .3rem;font-size:15px;border-radius:0}
 .sfield:focus{outline:none;border-bottom-color:var(--accent)}
-/* A row that runs full width: its help above, its control below. */
+/* A row that runs full width: its label above, its control below. */
 .srow.wide{flex-direction:column;align-items:stretch;gap:.9rem}
-.srow.wide .help{max-width:none}
 .keys{font-size:14px}
 .keys .warn{margin:0 0 .9rem;padding-left:.8rem;border-left:2px solid var(--accent);color:var(--fg);font-size:14px;line-height:1.5}
 .klist{list-style:none;margin:0;padding:0}
@@ -616,8 +621,19 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 .call-body .why.soft{border-left-color:var(--rule-2);color:var(--fg-3)}
 .call.running .st::before{content:"";display:inline-block;width:.4em;height:.4em;border-radius:50%;background:var(--accent);margin-right:.45em;vertical-align:middle;position:relative;top:-.08em;animation:pulse 1.6s ease-in-out infinite}
 .call-body{padding:0 0 1.25rem}
-.call-body h4{font-size:12.5px;font-weight:500;color:var(--fg-3);margin:.9rem 0 .3rem;display:flex;justify-content:space-between;align-items:baseline}
-.call-body h4 button{font-size:12.5px;color:var(--fg-3)}
+/* A part of a call is headed the same way whether it always shows (h4) or
+   folds (a prompt's summary); the two prompts share a row until one opens. */
+.call-body h4,.call-body .prompt summary{font-size:12.5px;font-weight:500;color:var(--fg-3);display:flex;justify-content:space-between;align-items:baseline}
+.call-body h4{margin:.9rem 0 .3rem}
+.call-body h4 button,.call-body .prompt summary button{font-size:12.5px;color:var(--fg-3)}
+.call-body .prompts{display:grid;grid-template-columns:1fr 1fr;gap:0 1.25rem;margin-top:.9rem}
+.call-body .prompt{min-width:0}
+.call-body .prompt[open]{grid-column:1 / -1}
+.call-body .prompt summary{padding:.2rem 0 .3rem;cursor:pointer;list-style:none}
+.call-body .prompt summary::-webkit-details-marker{display:none}
+.call-body .prompt summary>span::before{content:"▸";display:inline-block;width:1em}
+.call-body .prompt[open] summary>span::before{content:"▾"}
+@media (max-width:700px){ .call-body .prompts{grid-template-columns:1fr} }
 .call-body h4 button:hover{color:var(--accent)}
 .call-body pre{
   margin:0; padding:.7rem .9rem; background:var(--bg-2); border:1px solid var(--rule); border-radius:3px;
@@ -728,6 +744,7 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
   <button class="wordmark" id="homeBtn" aria-label="primer, home"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5.5 25.5H26.5M9 17.5H23M12.5 9.5H19.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="4"/></svg>primer</button>
   <nav class="acts">
     <button class="act hide back" id="backBtn" aria-label="Back" title="Back">&larr;</button>
+    <button class="act hide" id="newBtn">New primer</button>
     <button class="act feedback" id="feedbackBtn">Feedback</button>
     <button class="act hide" id="settingsBtn">Settings</button>
   </nav>
@@ -838,14 +855,10 @@ const SECTIONS = [
 ];
 const SETTINGS = {
   keys: { type:"keys", section:"keys", wide:true },
-  research: { type:"bool", section:"writing", def:false, label:"Research after writing",
-    help:"Once a primer is written, an agent checks its key claims on the web: confirmed claims get a source, wrong ones are corrected. Off, Research at the foot of a primer runs the same check on demand." },
-  showSources: { type:"bool", section:"display", def:true, attr:"sources", label:"Show sources",
-    help:"A small numeral after each cited claim. Hover it for the source." },
-  showMarks: { type:"bool", section:"display", def:true, attr:"marks", label:"Show margin annotations",
-    help:"Revisions, corrections and found images noted in the margin. Off, the primer reads clean; the Inspector still keeps every call." },
+  research: { type:"bool", section:"writing", def:false, label:"Research after writing" },
+  showSources: { type:"bool", section:"display", def:true, attr:"sources", label:"Show sources" },
+  showMarks: { type:"bool", section:"display", def:true, attr:"marks", label:"Show margin annotations" },
   contents: { type:"select", section:"display", def:"margin", attr:"contents", label:"Contents",
-    help:"Where the table of contents goes. In the margin it stays beside the primer as you read, on a screen wide enough; on a narrower one it sits under the title.",
     options:[{ value:"margin", label:"Margin" }, { value:"top", label:"Under the title" }, { value:"off", label:"Off" }] },
   theme: { type:"select", section:"display", def:"system", label:"Theme",
     options:[{ value:"system", label:"System" }, { value:"light", label:"Light" }, { value:"dark", label:"Dark" },
@@ -957,10 +970,18 @@ function fixEscapes(s){
     return m;
   });
 }
+/* Where the JSON begins in an answer that may open with prose: the first
+   bracket that starts a structure, an array of things or an object with
+   a key, rather than a brace inside the prose's TeX. */
+function jsonStart(s){
+  const m = /\[\s*[{\["\d]|\{\s*"/.exec(s);
+  if(m) return m.index;
+  const a = s.indexOf("["), o = s.indexOf("{");
+  return (a<0)?o : (o<0)?a : Math.min(a,o);
+}
 function parseJSON(txt){
   let s = String(txt).trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
-  const a = s.indexOf("["), o = s.indexOf("{");
-  const start = (a<0)?o : (o<0)?a : Math.min(a,o);
+  const start = jsonStart(s);
   if(start>0) s = s.slice(start);
   s = fixEscapes(s);
   try{ return JSON.parse(s); }catch(e){ return repairJSON(s); }
@@ -976,7 +997,11 @@ async function askJSON(system, user, role, o){
     raws.push(text);
     try{ return { value: parseJSON(text), raws }; }
     catch(e){
-      if(attempt === 1 || (o.signal && o.signal.aborted)) throw e;
+      if(o.signal && o.signal.aborted) throw e;
+      /* A writer that answers a section in plain prose, with no element in
+         it at all, still wrote the section: on its last try, take the prose. */
+      if(attempt === 1 && role === "section" && !/"kind"\s*:/.test(text) && text.trim().length > 200) return { value:[{ kind:"prose", md:text.trim() }], raws };
+      if(attempt === 1) throw e;
       if(o.onEvent) o.onEvent({ kind:"retry", reason:e.message, output:text });
     }
   }
@@ -1145,13 +1170,13 @@ const uid = () => Math.random().toString(36).slice(2,9);
    but nothing on it can be changed or retried. */
 const readonly = () => route === "shared";
 /* The pages a step away from wherever you were, with Back in the top bar. */
-const aside = () => route === "settings" || route === "inspector" || route === "guide";
+const aside = () => route === "settings" || route === "inspector" || route === "guide" || route === "missing";
 /* The routes that show a primer under its title, with its toolbar. */
 const onDoc = () => !!doc && (route === "doc" || route === "shared" || route === "inspector");
 
 const $ = s => document.querySelector(s);
 const main=$("#main"), pen=$("#tools"), pop=$("#pop"), shareMenu=$("#share"), rewriteMenu=$("#rewrite"),
-      toastEl=$("#toast"), backBtn=$("#backBtn"), settingsBtn=$("#settingsBtn"), askInput=$("#askInput");
+      toastEl=$("#toast"), backBtn=$("#backBtn"), newBtn=$("#newBtn"), settingsBtn=$("#settingsBtn"), askInput=$("#askInput");
 
 function el(tag, cls, text){
   const e = document.createElement(tag);
@@ -1160,6 +1185,9 @@ function el(tag, cls, text){
   return e;
 }
 function btn(cls, text, onclick){ const b = el("button", cls, text); b.type = "button"; if(onclick) b.onclick = onclick; return b; }
+/* A link Primer answers in place, unless a modifier key or the middle
+   button asks the browser to open it its own way. */
+const inPlace = fn => e => { if(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button) return; e.preventDefault(); fn(e); };
 function timeAgo(ts){
   const d = Date.now()-ts, m = Math.round(d/6e4), h = Math.round(d/36e5), dd = Math.round(d/864e5);
   if(m < 1) return "just now";
@@ -1174,6 +1202,13 @@ function shortDate(ts){
   return d.toLocaleDateString(undefined, o);
 }
 const host = u => { try{ return new URL(u).host.replace(/^www\./,""); }catch(e){ return String(u||""); } };
+/* A link out to the web, in a new tab. A URL the model or a reader supplied
+   that is not http(s) is shown as plain text and leads nowhere. */
+function webLink(text, url){
+  const a = el("a", null, text);
+  if(/^https?:\/\//i.test(url)){ a.href = url; a.target = "_blank"; a.rel = "noopener"; }
+  return a;
+}
 /* Fit a textarea to its text. Hidden, it measures nothing; leave it to
    its rows until it can be seen. */
 function grow(ta){ ta.style.height = "auto"; const h = ta.scrollHeight; ta.style.height = h ? h + "px" : ""; }
@@ -1220,27 +1255,42 @@ function proseBlocks(md, base){
 
 /* ══ markdown + math ══════════════════════════════════════════ */
 marked.setOptions({breaks:false, gfm:true});
-const MATH_RE = /\$\$[\s\S]*?\$\$|\$(?:\\.|[^$\\\n])+?\$/g;
+/* Inline math opens at a $ that touches what follows and closes at one that
+   touches what precedes and is not followed by a digit, so "$1000 in the
+   bank … you have $1100" is money, not a formula. */
+const MATH_RE = /\$\$[\s\S]*?\$\$|\$(?!\s)(?:\\.|[^$\\\n])+?(?<!\s)\$(?!\d)/g;
+/* Math is handed to KaTeX in its \( \) and \[ \] forms, so a dollar sign
+   left in the prose is only ever a dollar sign. It goes into the HTML as
+   text, so a < in a formula is never the start of a tag. */
+const escHtml = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const texForm = m => escHtml(m.startsWith("$$") ? "\\[" + m.slice(2, -2) + "\\]" : "\\(" + m.slice(1, -1) + "\\)");
+/* Nothing the model wrote reaches the page as HTML until DOMPurify has
+   been over it. Prose keeps what marked makes of it and its links to
+   other primers; a diagram keeps its SVG and nothing that could run,
+   restyle the page or reach outside it. Math is typeset in the DOM
+   afterwards.                                                          */
+const SAFE_URI = /^(?:(?:https?|mailto|primer):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i;
+const safeHtml = html => DOMPurify.sanitize(html, { USE_PROFILES:{ html:true }, FORBID_TAGS:["style"], ALLOWED_URI_REGEXP:SAFE_URI });
+const safeSvg = svg => DOMPurify.sanitize(String(svg), { USE_PROFILES:{ svg:true, svgFilters:true }, FORBID_TAGS:["style", "image"], ADD_ATTR:["role"] });
 
 function mdToHtml(md){
   const parts = String(md).split(/(```[\s\S]*?```)/g);
   const stash = [];
   const masked = parts.map(p => p.startsWith("```") ? p :
-    p.replace(MATH_RE, m => { stash.push(m); return "@@PM"+(stash.length-1)+"@@"; })
+    p.replace(MATH_RE, m => { stash.push(texForm(m)); return "@@PM"+(stash.length-1)+"@@"; })
   ).join("");
-  let html = marked.parse(masked);
-  return html.replace(/@@PM(\d+)@@/g, (_,i) => stash[+i]);
+  const html = marked.parse(masked);
+  return safeHtml(html.replace(/@@PM(\d+)@@/g, (_,i) => stash[+i]));
 }
 function mdInline(md){
   const stash = [];
-  const masked = String(md).replace(MATH_RE, m => { stash.push(m); return "@@PM"+(stash.length-1)+"@@"; });
-  return marked.parseInline(masked).replace(/@@PM(\d+)@@/g, (_,i) => stash[+i]);
+  const masked = String(md).replace(MATH_RE, m => { stash.push(texForm(m)); return "@@PM"+(stash.length-1)+"@@"; });
+  return safeHtml(marked.parseInline(masked).replace(/@@PM(\d+)@@/g, (_,i) => stash[+i]));
 }
 function typeset(el){
   try{
     renderMathInElement(el,{ throwOnError:false, delimiters:[
-      {left:"$$",right:"$$",display:true},{left:"\\[",right:"\\]",display:true},
-      {left:"$",right:"$",display:false},{left:"\\(",right:"\\)",display:false}]});
+      {left:"\\[",right:"\\]",display:true},{left:"\\(",right:"\\)",display:false}]});
   }catch(e){}
 }
 
@@ -1250,7 +1300,7 @@ function typeset(el){
    under primer:raw:<id> and shown in the Inspector.                     */
 const traces = new Map();          // docId → [record]
 const traceSaveT = new Map();
-const TRACE_MAX = 150, TRACE_TEXT = 60000;
+const TRACE_MAX = 150, TRACE_TEXT = 20000;
 const clip = s => (s && s.length > TRACE_TEXT) ? s.slice(0, TRACE_TEXT) + "\n…[" + (s.length - TRACE_TEXT) + " more characters]" : s;
 async function traceOf(id){
   if(!traces.has(id)){
@@ -1289,6 +1339,12 @@ function usageOf(d){
     t.calls++; t.in += r.usage.in || 0; t.out += r.usage.out || 0; t.cost += r.usage.cost || 0; t.searches += r.usage.searches || 0;
   }
   return t;
+}
+/* The About panel's cost line is drawn with the page; a call that ends
+   after that, a revision say, redraws it so it agrees with the Inspector. */
+function usagePaint(d){
+  if(doc !== d || route !== "doc") return;
+  main.querySelectorAll(".doc .meta").forEach(m => m.replaceWith(metaNode(d)));
 }
 const kTok = n => n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? Math.round(n / 1e3) + "k" : String(n);
 const usd = c => c >= 100 ? "$" + c.toFixed(0) : c >= 0.01 ? "$" + c.toFixed(2) : c > 0 ? "<$0.01" : "$0";
@@ -1354,7 +1410,7 @@ async function agent(d, s){
       onEvent: ev => {
         rec.events.push({ t:Date.now(), ...ev });
         if(ev.kind === "start") rec.model = ev.model;
-        if(ev.kind === "usage"){ rec.usage = { in:ev.in, out:ev.out, cost:ev.cost, searches:ev.searches, turns:ev.turns }; return; }
+        if(ev.kind === "usage"){ rec.usage = { in:ev.in, out:ev.out, cost:ev.cost, searches:ev.searches, turns:ev.turns }; usagePaint(d); return; }
         if(ev.kind === "tool") job.note = toolNote(ev);
         if(ev.kind === "result") job.note = ev.ok ? job.note : "tool failed, trying another way";
         if(ev.kind === "retry"){ rec.output = ""; job.note = "answer didn't parse, asking again"; }
@@ -1421,6 +1477,7 @@ function render(){
   if(route === "login") renderLogin();
   else if(route === "settings") renderSettings();
   else if(route === "guide") renderGuide();
+  else if(route === "missing") renderMissing();
   else if(route === "inspector" && doc) renderInspector();
   else if((route === "doc" || route === "shared") && doc) renderDoc();
   else { route = me ? "cover" : "login"; document.body.dataset.route = route; if(me) renderCover(); else renderLogin(); }
@@ -1435,6 +1492,7 @@ const settled = d => !!(d && !running(d) && d.blocks.some(b => b.md && b.kind !=
 /* The top bar holds what is not about any one primer. */
 function paintHeader(){
   backBtn.classList.toggle("hide", !aside());
+  newBtn.classList.toggle("hide", !me || route === "cover" || route === "login");
   settingsBtn.classList.toggle("hide", !me || route === "login");
   settingsBtn.classList.toggle("on", route === "settings");
   toolsPaint();
@@ -1488,16 +1546,14 @@ function renderLogin(){
       <p class="oops" hidden></p>
       <div class="composer-foot">
         <button class="go" type="submit">Sign in<kbd>↵</kbd></button>
-        <button class="act switch" type="button">Create an account</button>
+        <button class="act swap" type="button">Create an account</button>
       </div>
       <p class="guest"><button class="act asGuest" type="button">Continue as a guest</button> A guest's primers and prompt edits are kept only in this browser.</p>
-      <p class="guest"><a href="/guide" class="guide-link">Setup guide</a></p>
     </form>`;
   main.replaceChildren(c);
   const form = $("#loginForm"), name = $("#lName"), pass = $("#lPass"), invite = $("#lInvite"),
-        oops = c.querySelector(".oops"), go = c.querySelector(".go"), sw = c.querySelector(".switch"), title = c.querySelector(".title");
+        oops = c.querySelector(".oops"), go = c.querySelector(".go"), sw = c.querySelector(".swap"), title = c.querySelector(".title");
   c.querySelector(".asGuest").onclick = () => enterGuest();
-  c.querySelector(".guide-link").onclick = e => { e.preventDefault(); goto("guide"); };
   let creating = false;
   const mode = () => {
     title.textContent = creating ? "Create an account" : "Sign in";
@@ -1619,7 +1675,9 @@ function renderLibrary(){
   if(!shown.length) list.appendChild(el("li", "none", "Nothing matches “" + libQuery.trim() + "”"));
   shown.forEach(it => {
     const li = el("li");
-    const open = btn("open", null, () => openDoc(it.id));
+    /* A real link, so it can be opened in a new tab or copied. */
+    const open = el("a", "open"); open.href = "/p/" + it.id;
+    open.onclick = inPlace(() => openDoc(it.id));
     open.append(el("span", null, it.title));
     const s = shelfState(it);
     if(s){
@@ -1899,12 +1957,6 @@ function blockEl(b, n){
     m.onclick = ev => { ev.stopPropagation(); showPop(m, provNodes(b)); };
     if(b.edit.by === "research") hoverable(m, () => provNodes(b));
     e.appendChild(m);
-  }else if(b.kind === "image" && b.src && !b.error){
-    const m = btn("marg mark quiet", "found");
-    m.setAttribute("aria-label", "Image source");
-    m.onclick = ev => { ev.stopPropagation(); showPop(m, sourceNodes(b)); };
-    hoverable(m, () => sourceNodes(b));
-    e.appendChild(m);
   }
   if(b.kind === "note"){
     const q = btn("side-q");
@@ -1929,7 +1981,7 @@ function blockEl(b, n){
     body.appendChild(errNode(b));
   }else if(b.kind === "figure"){
     const fig = el("figure");
-    fig.innerHTML = String(b.md).replace(/<script[\s\S]*?<\/script>/gi,"");
+    fig.innerHTML = safeSvg(b.md);
     if(b.caption){
       const fc = el("figcaption");
       fc.innerHTML = mdInline(b.caption);
@@ -1951,12 +2003,20 @@ function blockEl(b, n){
   }
   return e;
 }
+/* What can be done about a piece that never arrived follows from the piece
+   itself: a section is written again, a diagram or image is made again or
+   taken out, and anything else means planning the outline again. */
 function errNode(b){
   const x = el("div", "err" + (b.stopped ? " soft" : ""), b.error);
   if(readonly()) return x;
-  if(b.retry) x.appendChild(btn(null, "Retry", () => b.retry()));
-  if(b.remove) x.appendChild(btn(null, "Remove", () => b.remove()));
-  x.appendChild(btn(null, "Inspect", () => inspectBlock(doc, b)));
+  const d = doc;
+  if(b.slot) x.appendChild(btn(null, "Retry", () => retrySection(d, b.sec)));
+  else if(b.kind === "figure" || b.kind === "image"){
+    if(b.brief) x.appendChild(btn(null, "Retry", () => retryVisual(d, b, true)));
+    x.appendChild(btn(null, "Remove", () => { swapBlock(d, b.id, []); save(d); }));
+  }
+  else x.appendChild(btn(null, "Retry", () => build(d)));
+  x.appendChild(btn(null, "Inspect", () => inspectBlock(d, b)));
   return x;
 }
 /* The call behind a failed piece, in the Inspector. */
@@ -1969,16 +2029,13 @@ function imageNode(b){
   const fig = el("figure");
   const img = el("img");
   img.src = b.src; img.alt = b.title || b.caption || ""; img.loading = "lazy";
-  img.onerror = () => {
-    const d = doc;
-    fig.replaceChildren(errNode({ ...b, error:"The image file is missing.", retry:() => retryVisual(d, b, true), remove:() => { swapBlock(d, b.id, []); save(d); } }));
-  };
+  img.onerror = () => fig.replaceChildren(errNode({ ...b, error:"The image file is missing." }));
   fig.appendChild(img);
   const fc = el("figcaption");
   if(b.caption) fc.innerHTML = mdInline(b.caption);
   if(b.credit || b.page){
     const c = el("span", "credit");
-    if(b.page){ const a = el("a", null, b.credit || host(b.page)); a.href = b.page; a.target = "_blank"; a.rel = "noopener"; c.appendChild(a); }
+    if(b.page) c.appendChild(webLink(b.credit || host(b.page), b.page));
     else c.textContent = b.credit;
     fc.appendChild(c);
   }
@@ -2004,7 +2061,7 @@ function addCites(body, cites){
     const k = num(c);
     if(!k) return;
     const sup = el("sup", "cite");
-    const a = el("a", null, String(k)); a.href = c.url; a.target = "_blank"; a.rel = "noopener";
+    const a = webLink(String(k), c.url);
     a.setAttribute("aria-label", "Source " + k + (c.title ? ": " + c.title : ""));
     sup.appendChild(a);
     hoverable(sup, () => citeNodes(c, k));
@@ -2082,7 +2139,7 @@ if(document.fonts && document.fonts.ready) document.fonts.ready.then(layoutSiden
    A document is saved the moment it is created, and after every change,
    so nothing that was asked for can vanish: a primer stopped, or closed,
    mid-way is in the library with its state, and can be resumed.       */
-const TRANSIENT = ["busy","hl","pending","queued","error","stopped","retry","remove","fresh","plan","draw","find","live","liveRole","status","again"];
+const TRANSIENT = ["busy","hl","pending","queued","error","stopped","fresh","plan","draw","find","live","liveRole","status","again"];
 function cleanBlock(b){ const r = { ...b }; TRANSIENT.forEach(k => delete r[k]); return r; }
 const saveT = new Map();
 /* The words a reader would read: prose, headings, notes and captions. */
@@ -2136,10 +2193,10 @@ async function openDoc(id){
   return d;
 }
 
-/* A document back from storage: give every unfinished piece its error,
-   its Retry, and a state the status row can explain. The reason comes
-   from the trace: the call that failed, the one the closing page cut
-   off, or no call at all because its turn never came.               */
+/* A document back from storage: give every unfinished piece its error
+   and a state the status row can explain. The reason comes from the
+   trace: the call that failed, the one the closing page cut off, or no
+   call at all because its turn never came.                          */
 async function resumable(d){
   const t = await traceOf(d.id);
   const because = (b, what) => {
@@ -2154,7 +2211,7 @@ async function resumable(d){
     const why = d.status === "failed"
       ? { error: "Couldn't plan this explainer." + (d.statusNote ? " " + d.statusNote : ""), stopped:false }
       : because({}, "The outline was never planned.");
-    d.blocks = [{ id:uid(), kind:"prose", md:"", ...why, retry:() => build(d) }];
+    d.blocks = [{ id:uid(), kind:"prose", md:"", ...why }];
   }
   /* Sections after the first missing one were waiting for it, not lost. */
   const first = Math.min(...d.blocks.filter(b => b.slot && !b.md).map(b => b.sec));
@@ -2163,11 +2220,8 @@ async function resumable(d){
     if(b.slot){
       if(b.sec > first && !callFor(t, b)) Object.assign(b, { error:"Waits for section " + (first+1) + ".", stopped:true });
       else Object.assign(b, because(b, "Section " + (b.sec+1) + " wasn't written."));
-      b.retry = () => retrySection(d, b.sec);
     }else if((b.kind === "figure" || b.kind === "image") && b.brief){
       Object.assign(b, because(b, b.kind === "figure" ? "Diagram wasn't drawn." : "Image wasn't found."));
-      b.retry = () => retryVisual(d, b, true);
-      b.remove = () => { swapBlock(d, b.id, []); save(d); };
     }
   });
   if(d.status === "planning" || d.status === "writing" || d.status === "researching"){
@@ -2213,18 +2267,10 @@ function liveTail(s){ return s.length > LIVE_TAIL ? "…" + s.slice(-LIVE_TAIL) 
    or a revision streams, show the prose inside its "md" strings, the last of
    them still open; while an outline streams, its title and section names.
    Anything else (a diagram's SVG, a finder's answer) shows as it is. */
-const STR = /"((?:[^"\\]|\\.)*)"/g;
-const unesc = s => s.replace(/\\(u[0-9a-fA-F]{4}|.)/g, (m, c) => c === "n" ? "\n" : c === "t" ? "\t" : c[0] === "u" ? String.fromCharCode(parseInt(c.slice(1), 16)) : c);
+const unesc =s => s.replace(/\\(u[0-9a-fA-F]{4}|.)/g, (m, c) => c === "n" ? "\n" : c === "t" ? "\t" : c[0] === "u" ? String.fromCharCode(parseInt(c.slice(1), 16)) : c);
 function liveText(raw, role){
   raw = String(raw || "");
-  if(role === "outline"){
-    const strs = [...raw.matchAll(STR)].map(m => m[1]);
-    const open = /"((?:[^"\\]|\\.)*)$/.exec(raw);
-    if(open) strs.push(open[1]);
-    const vals = strs.filter(x => x !== "title" && x !== "sections").map(unesc);
-    if(!vals.length) return null;
-    return { prose:true, text: vals.map((v, i) => i ? (i) + ". " + v : v).join("\n") };
-  }
+  if(role === "outline") return outlineLive(raw);
   if(role === "section" || role === "edit" || role === "define"){
     const parts = [...raw.matchAll(/"md"\s*:\s*"((?:[^"\\]|\\.)*)"/g)].map(m => m[1]);
     const open = /"md"\s*:\s*"((?:[^"\\]|\\.)*)$/.exec(raw);
@@ -2233,6 +2279,37 @@ function liveText(raw, role){
     return { prose:true, text: parts.map(unesc).join("\n\n") };
   }
   return { prose:false, text: liveTail(raw) };
+}
+/* The outline as it streams in: the title, then each section as it is
+   named, and a section's subsections under it. Walks the partial JSON
+   by nesting, so a string is placed by where it sits, not what it says. */
+function outlineLive(raw){
+  const stack = [], secs = [], colon = /\s*:/y;
+  let key = null, title = null, i = 0;
+  while(i < raw.length){
+    const c = raw[i];
+    if(c === "{" || c === "["){ stack.push(c); i++; continue; }
+    if(c === "}" || c === "]"){ stack.pop(); key = null; i++; continue; }
+    if(c !== '"'){ i++; continue; }
+    let j = i + 1;
+    while(j < raw.length && raw[j] !== '"'){ if(raw[j] === "\\") j++; j++; }
+    const str = raw.slice(i + 1, j), closed = j < raw.length; i = j + 1;
+    colon.lastIndex = i;
+    if(closed && stack[stack.length - 1] === "{" && colon.test(raw)){ key = str; continue; }
+    const v = unesc(str), at = stack.join("");
+    if(at === "{" && key === "title") title = v;
+    else if(at === "{[") secs.push({ title:v, subs:[] });
+    else if(at === "{[{" && key === "title") secs.push({ title:v, subs:[] });
+    else if(at === "{[{[" && secs.length) secs[secs.length - 1].subs.push(v);
+    key = null;
+  }
+  if(title == null && !secs.length) return null;
+  const lines = title == null ? [] : [title];
+  secs.forEach((s, n) => {
+    lines.push((n + 1) + ". " + s.title);
+    s.subs.forEach((x, m) => lines.push("   " + (n + 1) + "." + (m + 1) + " " + x));
+  });
+  return { prose:true, text: lines.join("\n") };
 }
 function livePre(b){
   const v = liveText(b.live, b.liveRole);
@@ -2310,7 +2387,7 @@ async function build(d){
     if(!plan || !Array.isArray(plan.sections) || !plan.sections.length) throw new Error("The outline came back empty.");
   }catch(e){
     d.status = e.stopped ? "stopped" : "failed"; d.statusNote = e.stopped ? "" : e.message;
-    d.blocks = [{ id:uid(), kind:"prose", md:"", stopped:!!e.stopped, retry:() => build(d),
+    d.blocks = [{ id:uid(), kind:"prose", md:"", stopped:!!e.stopped,
       error: e.stopped ? "Stopped before the outline was planned." : "Couldn't plan this explainer. " + e.message }];
     run.active = false;
     rerender(d); save(d); tidyRun(d);
@@ -2363,7 +2440,7 @@ async function writeAll(d){
     let slot = d.blocks.find(b => b.slot && b.sec===i);
     if(!slot || slot.md) continue;
     for(let attempt = 0; ; attempt++){
-      Object.assign(slot, { pending:true, queued:false, error:"", stopped:false, retry:null, raw:"", live:"" });
+      Object.assign(slot, { pending:true, queued:false, error:"", stopped:false, raw:"", live:"" });
       patch(d, slot);
       await genSection(d, i, titles[i], outline, reader);
       /* The slot is gone once the section has landed; a failure leaves a new one. */
@@ -2402,16 +2479,12 @@ async function finish(d){
 function markStopped(d, b){
   b.pending = false; b.queued = false; b.stopped = true; b.live = "";
   b.error = "Stopped.";
-  if(b.slot) b.retry = () => retrySection(d, b.sec);
-  else if(b.brief){ b.retry = () => retryVisual(d, b, true); b.remove = () => { swapBlock(d, b.id, []); save(d); }; }
-  else b.retry = () => build(d);
   patch(d, b);
 }
 /* A section whose turn cannot come until section n is written. */
 function markWaiting(d, b, n){
   b.pending = false; b.queued = false; b.stopped = true; b.live = "";
   b.error = "Waits for section " + n + ".";
-  b.retry = () => resume(d);
   patch(d, b);
 }
 
@@ -2471,8 +2544,7 @@ async function genSection(d, i, title, outline, reader, by){
       sideLater(d, b, () => b.draw ? genFigure(d, b, title, outline, reader) : genImage(d, b, title)));
   }catch(e){
     replaceSlot(d, i, [{ id:uid(), kind:"prose", md:"", sec:i, slot:true, stopped:!!e.stopped,
-      error: e.stopped ? "Stopped." : "Section "+(i+1)+" didn't come back. "+e.message,
-      retry:() => retrySection(d, i) }]);
+      error: e.stopped ? "Stopped." : "Section "+(i+1)+" didn't come back. "+e.message }]);
     save(d);
   }
 }
@@ -2507,12 +2579,9 @@ function sideLater(d, b, fn){
 /* A visual keeps its first id as `origin` through every retry, and `by`,
    the section call that asked for it, so its calls stay filed together. */
 function failedVisual(d, f, e){
-  const b = { id:uid(), origin:f.origin || f.id, by:f.by, kind:f.kind, md:"", sec:f.sec, brief:f.brief, stopped:!!e.stopped,
+  return { id:uid(), origin:f.origin || f.id, by:f.by, kind:f.kind, md:"", sec:f.sec, brief:f.brief, stopped:!!e.stopped,
     error: e.stopped ? "Stopped."
          : (f.kind === "figure" ? "Diagram didn't come back. " : e.notFound ? "No suitable image was found. " : "The image search didn't come back. ") + e.message };
-  b.retry = () => retryVisual(d, b, true);
-  b.remove = () => { swapBlock(d, b.id, []); save(d); };
-  return b;
 }
 /* byYou: a person clicked Retry, rather than the run picking up leftovers. */
 function retryVisual(d, b, byYou){
@@ -2910,7 +2979,7 @@ document.addEventListener("selectionchange", () => {
   clearTimeout(selT); selT = setTimeout(showForSelection, 350);
 });
 document.addEventListener("mousedown", e => {
-  if(!pen.contains(e.target) && !pen.classList.contains("asking")) hideTools();
+  if(!pen.contains(e.target) && !pop.contains(e.target)) hideTools();
   if(!pop.contains(e.target)) closePop();
   if(!menuOwns(shareMenu, e.target)) closeMenu(shareMenu);
   if(!menuOwns(rewriteMenu, e.target)) closeMenu(rewriteMenu);
@@ -2997,7 +3066,7 @@ function linkRow(items){
   const row = el("div", "row");
   items.forEach(x => {
     if(!x) return;
-    if(x.href){ const a = el("a", null, x.label); a.href = x.href; a.target = "_blank"; a.rel = "noopener"; a.append(el("span", "host", host(x.href))); row.append(a); }
+    if(x.href){ const a = webLink(x.label, x.href); a.append(el("span", "host", host(x.href))); row.append(a); }
     else row.append(btn(null, x.label, x.onclick));
   });
   return row;
@@ -3097,7 +3166,7 @@ function goBack(){
    /settings, the guide at /guide, a shared primer at /s/<id>. Back and
    Forward move between them, and a reload reopens the same page.      */
 function pageUrl(){
-  if(route === "shared") return doc && doc.shared ? "/s/" + doc.shared.id : location.pathname;
+  if(route === "shared" || route === "missing") return doc && doc.shared ? "/s/" + doc.shared.id : location.pathname;
   if(route === "guide") return "/guide";
   if(route === "settings") return "/settings";
   if((route === "doc" || route === "inspector") && doc) return "/p/" + doc.id + (route === "inspector" ? "/inspector" : "");
@@ -3106,6 +3175,7 @@ function pageUrl(){
 function pageTitle(){
   if(route === "settings") return "Settings · primer";
   if(route === "guide") return "Setup guide · primer";
+  if(route === "missing") return "Link not found · primer";
   if(route === "login") return "Sign in · primer";
   if(route === "inspector" && doc) return "Inspector · " + doc.title + " · primer";
   if(onDoc()) return doc.title + " · primer";
@@ -3157,6 +3227,7 @@ async function openLanding(){
 }
 settingsBtn.onclick = () => goto("settings");
 backBtn.onclick = goBack;
+newBtn.onclick = goHome;
 $("#homeBtn").onclick = goHome;
 function goHome(){
   if(route === "login") return;
@@ -3171,28 +3242,12 @@ function goHome(){
 const SHARE_PATH = /^\/s\/([\w-]+)$/;
 function sharePath(){ const m = SHARE_PATH.exec(location.pathname); return m ? m[1] : null; }
 const shareUrl = id => location.origin + "/s/" + id;
-/* What the reader gets: the finished pieces, the display switches that
-   shape them, and what the About panel says. Not the trace, not the
-   pieces that never arrived, not the other primer a rewrite came from. */
-function snapshotOf(d){
-  const blocks = d.blocks.filter(b => !b.pending && !unfilled(b)).map(b => {
-    const r = cleanBlock(b);
-    ["by", "origin", "slot", "fail"].forEach(k => delete r[k]);
-    if(r.md) r.md = plainLinks(r.md);
-    return r;
-  });
-  const s = { title:d.title, topic:d.topic, known:d.known || "", instruction:d.instruction || "", created:d.created,
-              status:d.status || "done", blocks, view:{ sources:!!setting("showSources"), marks:!!setting("showMarks") } };
-  if(d.researched) s.researched = d.researched;
-  if(d.rewrite) s.rewrite = { ofTitle:d.rewrite.ofTitle, instruction:d.rewrite.instruction };
-  if(d.define && d.define.from) s.define = { term:d.define.term, from:{ title:d.define.from.title } };
-  const use = usageText(usageOf(d));
-  if(use) s.usage = use;
-  return s;
-}
+/* A frozen link: the server copies the primer as it is stored this moment,
+   so it is saved first. What a reader gets of it is the server's to say;
+   only the cost line, which comes from the trace, goes along. */
 async function shareDoc(d, anchor){
   let s;
-  try{ s = await api("/api/share", { doc:snapshotOf(d), of:d.id }); }
+  try{ await save(d, true); s = await api("/api/share", { of:d.id, usage:usageText(usageOf(d)) }); }
   catch(e){ toast("Couldn't make a link: " + e.message, { err:true }); return; }
   copyLink(shareUrl(s.id), anchor);
 }
@@ -3217,7 +3272,7 @@ async function openShare(anchor){
   const pub = el("div", "pub"), sw = btn("switch"), lab = el("span", null, "Public link");
   sw.setAttribute("role", "switch"); sw.setAttribute("aria-label", "Public link"); sw.append(el("i"));
   const pubLink = el("div", "links"), links = el("div", "links");
-  const hint = el("span", "hint under", "Anyone with it reads this primer as it stands, and as it changes.");
+  const hint = el("span", "hint under", "Live updating");
   pub.append(lab, sw);
   const freeze = menuItem(shareMenu, "Copy a frozen link", () => shareDoc(d, anchor));
   freeze.title = "A copy of the primer as it is this moment; later changes never reach it.";
@@ -3228,8 +3283,11 @@ async function openShare(anchor){
     sw.setAttribute("aria-checked", String(!!live));
     pubLink.replaceChildren();
     if(!live) return;
-    const u = el("span", "url", shareUrl(live.id));
-    pubLink.append(u, linkRow([{ label:"Copy", onclick:() => copyLink(shareUrl(live.id), anchor) }, { label:"Open", href:shareUrl(live.id) }]));
+    /* The address is the whole control: a click copies it; a middle click
+       or a right click opens it as any link. */
+    const u = el("a", "url", shareUrl(live.id)); u.href = shareUrl(live.id); u.title = "Copy";
+    u.onclick = ev => { ev.preventDefault(); copyLink(shareUrl(live.id), anchor); };
+    pubLink.append(u);
   };
   sw.onclick = async () => {
     sw.disabled = true;
@@ -3273,8 +3331,10 @@ async function openShared(id){
   let s;
   try{ s = await api("/api/share/" + id); }
   catch(e){
-    doc = null; route = me ? "cover" : "login"; render();
-    toast(e.status === 404 ? "That link doesn't lead to a primer any more." : "Couldn't open that link: " + e.message, { err:true });
+    doc = null;
+    if(e.status === 404){ route = "missing"; render(); return; }
+    route = me ? "cover" : "login"; render();
+    toast("Couldn't open that link: " + e.message, { err:true });
     return;
   }
   doc = { ...s.doc, id:"share:" + s.id, shared:{ id:s.id, by:s.by, created:s.created, live:!!s.live } };
@@ -3332,8 +3392,6 @@ function startRewrite(src, instruction, sections){
    in the pen about a passage. It goes with the page it came from, and the
    account that hosts reads it on the Feedback page of Settings.       */
 const feedbackBtn = $("#feedbackBtn"), feedbackMenu = $("#feedback");
-hoverable(feedbackBtn, () => feedbackMenu.classList.contains("show") ? null :
-  [el("div", "s", "Something broken, confusing or missing? Say so in a sentence and it goes straight to Alexander, with the page you are on.")]);
 feedbackBtn.onclick = () => openFeedback(feedbackBtn);
 function openFeedback(anchor){
   const form = el("form"), ta = el("textarea"), go = btn(null, "Send");
@@ -3499,7 +3557,7 @@ const CONTROLS = {
         const src = el("div", "src");
         if(w.quote) src.append(el("q", null, w.quote));
         const at = [w.title, w.section].filter(Boolean).join(" § ") || (w.route ? "the " + w.route + " page" : "");
-        if(at){ if(w.url){ const a = el("a", null, at); a.href = w.url; a.target = "_blank"; a.rel = "noopener"; src.append(a); } else src.append(at); }
+        if(at) src.append(w.url ? webLink(at, w.url) : at);
         if(w.width) src.append((src.childNodes.length ? " · " : "") + w.width + "px wide");
         if(src.childNodes.length) li.append(src);
         ul.append(li);
@@ -3535,12 +3593,28 @@ function linkForm(submit){
   f.onsubmit = async e => { e.preventDefault(); go.disabled = true; await submit(name.value.trim(), pass.value); go.disabled = false; };
   return f;
 }
-/* A form behind a line to press. */
-function fold(title, form){ const d = el("details", "fold"); d.append(el("summary", null, title), form); return d; }
+/* Two forms behind one line of choices: press one and its form opens
+   under the line; press the other and it takes the place. */
+function picker(items){
+  const w = el("div", "pick"), row = el("div", "pick-row"), slot = el("div", "pick-form");
+  items.forEach(it => {
+    const b = btn("pick-b", it.title, () => {
+      const on = b.classList.contains("on");
+      row.querySelectorAll(".on").forEach(x => x.classList.remove("on"));
+      slot.replaceChildren();
+      if(on) return;
+      b.classList.add("on"); slot.append(it.form);
+      const f = it.form.querySelector("input,textarea"); if(f) f.focus();
+    });
+    row.append(b);
+  });
+  w.append(row, slot);
+  return w;
+}
 /* A link to the setup guide, a real address that also works in place. */
 function guideLink(){
   const p = el("p", "lab guidelink"), a = el("a", null, "Setup guide"); a.href = "/guide";
-  a.onclick = e => { e.preventDefault(); goto("guide"); };
+  a.onclick = inPlace(() => goto("guide"));
   p.append(a);
   return p;
 }
@@ -3556,7 +3630,7 @@ function guestKeysControl(){
     else{
       const ul = el("ul", "klist"), li = el("li", "krow"), info = el("div", "kinfo");
       info.append(el("span", "kname", c.name || (c.kind === "key" ? "API key" : "Subscription token")),
-                  el("span", "kmeta", c.name ? kindWord(c.kind) + " · shared by " + c.owner : c.hint + " · kept in this browser"));
+                  el("span", "kmeta", c.name ? kindWord(c.kind) + " · shared by " + c.owner : "kept in this browser"));
       li.append(info, btn("unlink", "Forget", () => { setGuestCred(null); draw(); toast("Forgotten"); }));
       ul.append(li); g.append(ul);
     }
@@ -3568,10 +3642,10 @@ function guestKeysControl(){
       try{ const { kind } = await api("/api/guest/check", { value:v }); setGuestCred({ kind, value:v, hint:"…" + v.slice(-4) }); draw(); toast("Using your " + kindWord(kind)); }
       catch(err){ toast(err.message, { err:true }); go.disabled = false; }
     };
-    g.append(fold(c ? "Use a different key" : "Use a key", f), fold("Link to a shared key", linkForm(async (name, password) => {
+    g.append(picker([{ title: c ? "Use a different key" : "Use a key", form:f }, { title:"Link to a shared key", form:linkForm(async (name, password) => {
       try{ const r = await api("/api/guest/link", { name, password }); setGuestCred({ name:r.name, password, owner:r.owner, kind:r.kind }); draw(); toast("Linked to “" + r.name + "”"); }
       catch(err){ toast(err.message, { err:true }); }
-    })), guideLink());
+    }) }]), guideLink());
   };
   draw();
   return g;
@@ -3606,7 +3680,7 @@ function keysControl(){
     const li = el("li", "krow"), d = el("details"), sum = el("summary");
     const spent = (key.usage.days.find(x => x.day === today()) || {}).cost || 0;
     sum.append(el("span", "kname", key.name),
-               el("span", "kmeta", kindWord(key.kind) + " " + key.hint + " · " + (key.shared ? "shared" : "personal")),
+               el("span", "kmeta", kindWord(key.kind) + " · " + (key.shared ? "shared" : "personal")),
                el("span", "kuse", usd(spent) + " today · " + usd(key.usage.total.cost) + " in all"));
     const body = el("div", "kbody");
     body.append(key.usage.days.length ? dayTable(key.usage) : el("p", "empty", "Not used yet."));
@@ -3672,9 +3746,9 @@ function keysControl(){
       go.disabled = false;
       if(ok) toast("Added “" + name.value.trim() + "”");
     };
-    g.append(fold("Add a key", f), fold("Link to a shared key", linkForm(async (name, password) => {
+    g.append(picker([{ title:"Add a key", form:f }, { title:"Link to a shared key", form:linkForm(async (name, password) => {
       if(await call("/api/keys/link", { name, password }, "POST")) toast("Linked to “" + name + "”");
-    })), guideLink());
+    }) }]), guideLink());
   };
   call("/api/keys");
   return g;
@@ -3682,36 +3756,43 @@ function keysControl(){
 /* ══ setup guide ══════════════════════════════════════════════
    How to get a key of your own, at /guide, for anyone. */
 function renderGuide(){
-  const page = el("article", "doc guide");
+  const page = el("article", "doc page");
   page.innerHTML = `<header class="doc-head"><h1 class="title">Setup guide</h1></header>
   <div class="body">
-    <h2>What a key is</h2>
-    <p>Every primer is written by Claude, and Claude has to be paid for. A <em>key</em> is what pays: either an <strong>Anthropic API key</strong>, billed per token, or a <strong>Claude subscription token</strong>, which uses the Claude plan you already pay for. You add one in Settings under Keys, give it a name, and pick it as the key you run on. Which kind it is gets worked out from the key itself.</p>
+    <p>Give Primer a topic and Claude plans an outline, writes each section, draws the diagrams and finds the images, then checks its claims on the web. Select any passage to revise it, have it explained, or get a primer on it.</p>
+    <p>Each primer runs on a key: your Claude subscription, an Anthropic API key, or a key someone shared with you. Add or link one in Settings, under Keys.</p>
 
     <h2>Your Claude subscription</h2>
     <ol>
-      <li>Install Claude Code on your own computer: <code>npm install -g @anthropic-ai/claude-code</code>. It needs Node.js, from <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a>.</li>
-      <li>Run <code>claude</code> once and sign in with your Claude account when it asks. Pick your plan (Pro or Max), not the API.</li>
-      <li>Run <code>claude setup-token</code>. It prints a long token beginning <code>sk-ant-oat01-</code>. Copy the whole thing.</li>
-      <li>Here, open Settings, and under Keys paste it into <em>Add a key</em> with a name such as <em>my plan</em>. It is checked with Anthropic and kept encrypted.</li>
+      <li>Install Claude Code: <code>npm install -g @anthropic-ai/claude-code</code></li>
+      <li>Run <code>claude</code> and sign in with your Claude account.</li>
+      <li>Run <code>claude setup-token</code> and copy the token it prints.</li>
+      <li>Paste it under Keys, <em>Add a key</em>.</li>
     </ol>
-    <p>The token is good until you sign out of Claude Code on that computer or revoke it at <a href="https://claude.ai/settings" target="_blank" rel="noopener">claude.ai</a>. Usage counts against your plan's limits; when a limit is hit, primers stop until it resets, and Settings says so.</p>
-    <p class="caution">Anthropic's terms allow a subscription to be used through Claude Code and claude.ai. Using its token here is your own call; an API key is the path Anthropic supports without question.</p>
+    <p>Primers count against your plan's limits. Anthropic's terms cover Claude Code and claude.ai; using the token here is your own call.</p>
 
     <h2>An Anthropic API key</h2>
     <ol>
-      <li>At <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a>, create an account or sign in, and add some credit under Billing. A primer with research and images costs a dollar or two; a short one, cents.</li>
-      <li>Under API keys, create a key. It begins <code>sk-ant-api03-</code> and is shown once. Copy it.</li>
-      <li>Here, open Settings, and under Keys paste it into <em>Add a key</em> with a name.</li>
+      <li>At <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a>, add credit under Billing and create a key under API keys.</li>
+      <li>Paste it under Keys, <em>Add a key</em>.</li>
     </ol>
-    <p>The Inspector on each primer shows what it cost at API rates, and each key in Settings shows its spend by day.</p>
+    <p>A short primer costs cents; one with research and images, a dollar or two.</p>
 
-    <h2>Sharing a key</h2>
-    <p>Tick <em>Share it with a password</em> when adding a key, or later in its row. Tell people the key's name and that password; they link to it in Settings, or as a guest, and run on it. You see what the key is used for in total, by day. Change the password and everyone linked is dropped until they link again; delete the key and it is gone for everyone.</p>
+    <h2>Someone else's key</h2>
+    <p>Ask them for the key's name and password, then link to it under Keys.</p>
 
-    <h2>Without an account</h2>
-    <p>Continue as a guest from the sign-in page. A guest pastes a key, or links to a shared one, the same way, but nothing is kept on the server: primers, prompt edits and the key stay in that browser. Create an account later and the primers move into it.</p>
+    <h2>Sharing yours</h2>
+    <p>Tick <em>Share it with a password</em> on your key and give people its name and password. Change the password and everyone is dropped; delete the key and it is gone for everyone.</p>
   </div>`;
+  main.replaceChildren(page);
+}
+/* A shared link that leads nowhere: taken back, or never there. */
+function renderMissing(){
+  const page = el("article", "doc page");
+  page.innerHTML = `<header class="doc-head"><h1 class="title">Link not found</h1></header>
+  <div class="body"><p>Nothing is shared at this address. The link may have been removed, or was never right.</p></div>`;
+  const home = btn("act", me ? "Home" : "Sign in", goHome);
+  page.querySelector(".body").append(home);
   main.replaceChildren(page);
 }
 function renderSettings(){
@@ -3725,12 +3806,7 @@ function renderSettings(){
   }));
   Object.keys(SETTINGS).forEach(k => {
     const s = SETTINGS[k], row = el("div", "srow" + (s.wide ? " wide" : "")); row.dataset.key = k;
-    if(s.label || s.help){
-      const text = el("div", "stext");
-      if(s.label) text.append(el("span", "lab", s.label));
-      if(s.help) text.append(el("p", "help", s.help));
-      row.append(text);
-    }
+    if(s.label) row.append(el("span", "lab", s.label));
     if(!secs.has(s.section)) return;
     row.append(CONTROLS[s.type](k, s, v => setSetting(k, v)));
     secs.get(s.section).append(row);
@@ -3881,14 +3957,21 @@ function callEl(rec, i, t){
     p.append(el("span", "k", "Usage"), kTok(u.in) + " tokens in · " + kTok(u.out) + " out" + (u.searches ? " · " + u.searches + (u.searches === 1 ? " search" : " searches") : "") + (u.turns > 1 ? " · " + u.turns + " turns" : "") + " · " + usd(u.cost));
     body.append(p);
   }
+  const copyBtn = pre => btn(null, "copy", ev => { ev.preventDefault(); ev.stopPropagation(); copyText(pre.textContent, pre); });
   const part = (title, text, cls) => {
     const h = el("h4", null, title), pre = el("pre", cls, text || "");
-    h.append(btn(null, "copy", () => copyText(pre.textContent, pre)));
+    h.append(copyBtn(pre));
     body.append(h, pre);
     return pre;
   };
-  part("System", rec.system);
-  part("User", rec.user);
+  /* The two prompts side by side, folded until asked for. */
+  const prompt = (title, text) => {
+    const f = el("details", "prompt"), s = el("summary"), pre = el("pre", null, text || "");
+    s.append(el("span", null, title), copyBtn(pre));
+    f.append(s, pre);
+    return f;
+  };
+  const prompts = el("div", "prompts"); prompts.append(prompt("System", rec.system), prompt("User", rec.user)); body.append(prompts);
   body.append(el("h4", null, "Events"));
   const ol = el("ol", "events"); rec.events.forEach(ev => ol.append(evNode(ev))); body.append(ol);
   part("Output", rec.output, "out");

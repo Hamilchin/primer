@@ -11,8 +11,9 @@
 //   kv         everything the page keeps, per user, by key: primers, prompt
 //              edits, settings. The client already talks to storage as
 //              get/set/del by key, so the server stores it the same way.
-//   shares     a primer as it was when its owner made a link to it: a
-//              frozen copy, readable by anyone with the id, never updated
+//   shares     a link to a primer, readable by anyone with the id: a frozen
+//              copy of it as it was, or a live one that the server makes
+//              afresh from the stored primer each time it is opened
 //   share_media  the image files a share refers to, so they can be served
 //              to a reader who is not signed in
 //   meta       the server's own few facts: its secret, its invite code

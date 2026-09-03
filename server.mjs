@@ -38,10 +38,12 @@
 // someone's shared key. POST /api/guest/check {value} says which kind a
 // credential is; POST /api/guest/link {name, password} confirms a shared key.
 //
-// Sharing: POST /api/share {doc, of} freezes a primer as it is and answers
-// {id}; GET /s/:id is that primer as a page and GET /api/share/:id as JSON,
-// for anyone, signed in or not. The copy never changes afterwards. GET
-// /api/shares?doc= lists a primer's links, DELETE /api/share/:id removes one.
+// Sharing: POST /api/share {of} freezes a primer as it is stored and answers
+// {id}; with live:true it answers the one link that follows the primer as
+// it changes. GET /s/:id is that primer as a page and GET /api/share/:id as
+// JSON, for anyone, signed in or not. What a link shows is `snapshot`, the
+// one place the server reads inside a stored primer. GET /api/shares?doc=
+// lists a primer's links, DELETE /api/share/:id removes one.
 //
 // Environment (all optional):
 //   PORT=8787  HOST=127.0.0.1  DATA_DIR=./data  INVITE=...  PRIMER_SECRET=...  ADMIN=name,name
@@ -190,36 +192,7 @@ function brief(content) {
 /* The CLI's own word for what went wrong, turned into a sentence that names
    the key and says where to fix it. `key` is the key the call ran on; `own`
    whether the caller owns it (else it is someone's shared key). */
-/* The image files among a primer's blocks, by name. */
-const mediaOf = blocks => [...new Set(blocks.map(x => x && typeof x.src === "string" && x.src.startsWith("/media/") ? x.src.slice(7) : "")
-  .filter(n => MEDIA_NAME.test(n)))];
-/* What a live link shows: the owner's primer as stored, without the pieces
-   still being made or never made, links to their other primers made plain,
-   and their display switches. The same shape the page makes for a frozen
-   copy. Null once the primer is gone. */
-function liveSnapshot(s) {
-  let d, st = {};
-  try { d = JSON.parse(db.kv.get(s.user, "primer:doc:" + s.doc)); } catch { return null; }
-  if (!d || !Array.isArray(d.blocks)) return null;
-  try { st = JSON.parse(db.kv.get(s.user, "primer:settings")) || {}; } catch {}
-  const unfilled = b => !b.md && !b.src && (b.slot || ((b.kind === "figure" || b.kind === "image") && b.brief));
-  const drop = ["by", "origin", "slot", "fail", "busy", "hl", "queued", "error", "stopped", "fresh", "plan", "draw", "find", "live", "liveRole", "status", "again", "checked"];
-  const blocks = d.blocks.filter(b => b && !b.pending && !unfilled(b)).map(b => {
-    const r = { ...b };
-    drop.forEach(k => delete r[k]);
-    if (r.md) r.md = String(r.md).replace(/\[([^\]]*)\]\(primer:\w+\)/g, "$1");
-    return r;
-  });
-  const out = { title: d.title, topic: d.topic, known: d.known || "", instruction: d.instruction || "", created: d.created,
-                status: d.status || "done", blocks, view: { sources: st.showSources !== false, marks: st.showMarks !== false } };
-  if (d.researched) out.researched = d.researched;
-  if (d.rewrite) out.rewrite = { ofTitle: d.rewrite.ofTitle, instruction: d.rewrite.instruction };
-  if (d.define && d.define.from) out.define = { term: d.define.from ? d.define.term : "", from: { title: d.define.from.title } };
-  return out;
-}
-/* Addresses the page answers for itself: /, /guide, /settings, /p/<id>, /p/<id>/inspector. */
-const PAGE_PATH = /^\/(guide|settings|p\/[\w-]+(\/inspector)?)?$/;
-function explain(kind, text, key, own) {
+function failureText(kind, text, key, own) {
   const t = String(text || "").replace(/\s*·\s*(Please run \/login|Fix external API key)\s*$/i, "").trim();
   const name = "the key “" + key.name + "”", said = t ? " (" + t + ")." : ".";
   const other = " Tell " + key.owner + ", or switch to another key in Settings.";
@@ -233,7 +206,7 @@ function explain(kind, text, key, own) {
   return t || kind;
 }
 /* What a finished call cost, in the shape the page keeps per call. */
-function usageOf(r) {
+function callUsage(r) {
   if (!r || !r.usage) return null;
   const u = r.usage, m = r.modelUsage || {};
   return { in: (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0),
@@ -292,12 +265,12 @@ async function complete({ system, user, role }, env, key, own, emit, signal) {
     }
   } } catch (e) { clearTimeout(idle); if (!quiet && !signal.aborted) throw withStderr(e, stderr); }
   clearTimeout(idle);
-  const usage = usageOf(result);
+  const usage = callUsage(result);
   if (usage) emit({ usage });
   if (quiet) throw new Error("No answer from the model for " + IDLE / 60000 + " minutes. If this keeps happening, check the key or token in Settings.");
   if (signal.aborted) throw new Error("Stopped.");
   if (failure && (!last || (result && result.is_error))) {
-    const e = new Error(explain(failure.kind, failure.text, key, own));
+    const e = new Error(failureText(failure.kind, failure.text, key, own));
     if (FATAL.has(failure.kind)) e.kind = failure.kind;
     throw e;
   }
@@ -368,8 +341,36 @@ function guestClaude(c) {
 /* ── http ───────────────────────────────────────────────────── */
 const TYPES = { html: "text/html; charset=utf-8", txt: "text/plain; charset=utf-8", png: "image/png",
                 jpg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml" };
+/* Addresses the page answers for itself: /, /guide, /settings, /p/<id>, /p/<id>/inspector. */
+const PAGE_PATH = /^\/(guide|settings|p\/[\w-]+(\/inspector)?)?$/;
 const SHARE_ID = /^[\w-]{8,40}$/;
 const MEDIA_NAME = /^[0-9a-f]{20}\.(png|jpg|gif|webp)$/;
+/* The image files among a primer's blocks, by name. */
+const mediaOf = blocks => [...new Set(blocks.map(x => x && typeof x.src === "string" && x.src.startsWith("/media/") ? x.src.slice(7) : "")
+  .filter(n => MEDIA_NAME.test(n)))];
+/* What a link shows of a stored primer: its finished pieces, with links to
+   the owner's other primers made plain, and the display switches that
+   shape them. A frozen link keeps this as it is now; a live link makes it
+   afresh each time. This is the one place the server reads inside the
+   page's blobs, and it copies out only what it names: a rewrite's source
+   text, a definition's context, the calls behind the pieces and the
+   failures among them stay with the owner. Null once the primer is gone. */
+function snapshot(user, docId) {
+  let d, st = {};
+  try { d = JSON.parse(db.kv.get(user, "primer:doc:" + docId)); } catch { return null; }
+  if (!d || !Array.isArray(d.blocks)) return null;
+  try { st = JSON.parse(db.kv.get(user, "primer:settings")) || {}; } catch {}
+  const blocks = d.blocks.filter(b => b && (b.md || b.src)).map(({ by, origin, slot, fail, checked, ...r }) => {
+    if (r.md) r.md = String(r.md).replace(/\[([^\]]*)\]\(primer:\w+\)/g, "$1");
+    return r;
+  });
+  const out = { title: String(d.title || d.topic || "Primer").slice(0, 200), topic: d.topic, known: d.known || "", instruction: d.instruction || "",
+                created: d.created, status: d.status || "done", blocks, view: { sources: st.showSources !== false, marks: st.showMarks !== false } };
+  if (d.researched) out.researched = d.researched;
+  if (d.rewrite) out.rewrite = { ofTitle: d.rewrite.ofTitle, instruction: d.rewrite.instruction };
+  if (d.define && d.define.from) out.define = { term: d.define.term, from: { title: d.define.from.title } };
+  return out;
+}
 const NAME = /^[a-z0-9][a-z0-9._-]{1,31}$/;
 const KEY_NAME = /^[^\s"“”][^"“”]{0,39}$/;
 const keyId = p => { const m = /^\/api\/keys\/(\d+)$/.exec(p); return m ? Number(m[1]) : null; };
@@ -432,14 +433,14 @@ async function serve(req, res) {
     const b = await readBody(req);
     slow(ip);
     const name = String(b.name || "").trim().toLowerCase(), password = String(b.password || "");
-    if (!NAME.test(name)) throw halt(400, "A name is 2 to 32 letters, digits, dots, dashes or underscores.");
-    if (password.length < 8) throw halt(400, "A password is at least 8 characters.");
     let user;
     if (path === "/api/signup") {
+      if (!NAME.test(name)) throw halt(400, "A name is 2 to 32 letters, digits, dots, dashes or underscores.");
+      if (password.length < 8) throw halt(400, "A password is at least 8 characters.");
       if (String(b.invite || "").trim() !== db.invite) throw halt(403, "That invite code isn't right.");
       try { user = db.users.create(name, password); } catch (e) { throw halt(409, e.message); }
     } else {
-      user = db.users.check(name, password);
+      user = NAME.test(name) && password ? db.users.check(name, password) : null;
       if (!user) throw halt(401, "Wrong name or password.");
     }
     setCookie(db.sessions.create(user.id));
@@ -458,15 +459,13 @@ async function serve(req, res) {
   if (req.method === "GET" && path.startsWith("/api/share/")) {
     const id = path.slice("/api/share/".length);
     const s = SHARE_ID.test(id) && db.shares.get(id);
-    if (!s) throw halt(404, "That link doesn't lead to a primer any more.");
-    const head = '{"id":' + JSON.stringify(s.id) + ',"by":' + JSON.stringify(s.by) + ',"created":' + s.created;
+    /* A live link: the primer as its owner has it right now. */
+    const snap = s && s.live && snapshot(s.user, s.doc);
+    if (!s || (s.live && !snap)) throw halt(404, "That link doesn't lead to a primer any more.");
+    if (snap) db.shares.media(s.id, mediaOf(snap.blocks));
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-cache" });
-    if (!s.live) return res.end(head + ',"doc":' + s.body + "}");
-    /* A live link: the primer as its owner has it right now, less the pieces still being made. */
-    const snap = liveSnapshot(s);
-    if (!snap) throw halt(404, "That link doesn't lead to a primer any more.");
-    db.shares.media(s.id, mediaOf(snap.blocks));
-    return res.end(head + ',"live":true,"doc":' + JSON.stringify(snap) + "}");
+    return res.end('{"id":' + JSON.stringify(s.id) + ',"by":' + JSON.stringify(s.by) + ',"created":' + s.created
+                 + (snap ? ',"live":true,"doc":' + JSON.stringify(snap) : ',"doc":' + s.body) + "}");
   }
 
   /* ── feedback: from anyone on the page, to whoever hosts ── */
@@ -510,21 +509,20 @@ async function serve(req, res) {
 
   /* ── sharing: freeze a primer, list a primer's links, take one back ── */
   if (req.method === "POST" && path === "/api/share") {
-    const b = await readBody(req, 8e6);
+    const b = await readBody(req);
     const of = String(b.of || "").slice(0, 40);
-    if (!of) throw halt(400, "Which primer?");
+    const snap = of && snapshot(me.id, of);
+    if (!snap) throw halt(404, "That primer isn't saved.");
     /* A live link follows the primer; a frozen one is a copy of it now. */
     if (b.live) {
-      const s = db.shares.live(me.id, of, String(b.title || "Primer").slice(0, 200));
+      const s = db.shares.live(me.id, of, snap.title);
       if (!s.reused) console.log("  " + me.name + "  public link " + s.id);
       return json(200, s);
     }
-    const snap = b.doc;
-    if (!snap || typeof snap !== "object" || !Array.isArray(snap.blocks) || !snap.blocks.length) throw halt(400, "Nothing to share.");
-    const title = String(snap.title || "Primer").slice(0, 200);
-    /* The image files this copy shows, so they can be served to its readers. */
-    const media = mediaOf(snap.blocks);
-    const s = db.shares.create(me.id, of, title, JSON.stringify(snap), media);
+    if (!snap.blocks.length) throw halt(400, "Nothing to share yet.");
+    /* What the primer cost comes from the page, which keeps the trace. */
+    if (b.usage) snap.usage = String(b.usage).slice(0, 200);
+    const s = db.shares.create(me.id, of, snap.title, JSON.stringify(snap), mediaOf(snap.blocks));
     console.log("  " + me.name + "  share " + s.id + (s.reused ? "  (unchanged, same link)" : ""));
     return json(200, s);
   }
@@ -655,7 +653,7 @@ async function serve(req, res) {
   if (path.startsWith("/s/")) {
     const s = SHARE_ID.test(path.slice(3)) && db.shares.get(path.slice(3));
     let html = await readFile(new URL("primer.html", ROOT), "utf8");
-    const live = s && s.live && liveSnapshot(s);
+    const live = s && s.live && snapshot(s.user, s.doc);
     if (s) html = html.replace("<title>primer</title>", "<title>" + escapeHtml(live ? live.title : s.title) + " · primer</title>");
     res.writeHead(200, { "content-type": TYPES.html, "cache-control": "no-cache" });
     return res.end(html);
