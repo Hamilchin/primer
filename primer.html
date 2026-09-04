@@ -555,6 +555,14 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 .seg label{display:flex;gap:.4rem;align-items:center;color:var(--fg-2)}
 .seg input{accent-color:var(--accent);margin:0}
 .srow .field{flex:0 1 18rem;width:auto;font-size:15px;padding:.3rem .55rem .35rem}
+/* A choice among many, in the same box as a text field, with the chevron the folds use. */
+.sel{position:relative;display:block;flex:0 1 18rem;min-width:0}
+.sel .field{width:100%;padding-right:1.9rem;appearance:none;cursor:pointer;background:var(--bg);color:var(--fg)}
+.sel::after{content:"";position:absolute;right:.8rem;top:50%;width:.38em;height:.38em;margin-top:-.3em;border-right:1.5px solid var(--fg-3);border-bottom:1.5px solid var(--fg-3);transform:rotate(45deg);pointer-events:none}
+.msel{display:flex;align-items:center;justify-content:flex-end;gap:1rem;flex:1 1 auto;min-width:0}
+.msel .was{white-space:nowrap}
+.models .srow{padding:.5rem 0}
+.models .acts{display:flex;padding:.65rem 0 .25rem}
 /* A row that runs full width: its label above, its control below. */
 .srow.wide{flex-direction:column;align-items:stretch;gap:.9rem}
 .keys{font-size:14px}
@@ -674,8 +682,9 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
   .shelf .words{display:none}
   .status-row>span{flex-basis:100%;padding-left:0;border-left:0}
   .srow{gap:1rem}
-  .srow:has(.seg),.kform .srow{flex-direction:column;align-items:stretch;gap:.5rem}
-  .srow .field{flex:1 1 auto}
+  .srow:has(.seg),.srow:has(.msel),.kform .srow{flex-direction:column;align-items:stretch;gap:.5rem}
+  .srow .field,.sel{flex:1 1 auto}
+  .msel{flex-direction:column-reverse;align-items:stretch;gap:.3rem}
   .krow .kuse{margin-left:0}
   .colophon .fill{flex-basis:100%}
   .call summary{flex-wrap:wrap;row-gap:.15rem}
@@ -859,12 +868,13 @@ const guestMe = () => ({ guest:true, name:"Guest", key:guestKeyInfo() });
    rest, so showing or hiding a part of the page needs no code beyond one
    rule. Only values that differ from def are stored.                  */
 const SECTIONS = [
-  { id:"keys", title:"Keys" }, { id:"writing", title:"Writing" }, { id:"display", title:"Display" },
+  { id:"keys", title:"Keys" }, { id:"writing", title:"Writing" }, { id:"models", title:"Models" }, { id:"display", title:"Display" },
   { id:"account", title:"Account" }, { id:"prompts", title:"Prompts" }, { id:"inbox", title:"Feedback", admin:true }
 ];
 const SETTINGS = {
   keys: { type:"keys", section:"keys", wide:true },
   research: { type:"bool", section:"writing", def:false, label:"Research after writing" },
+  models: { type:"models", section:"models", def:{}, wide:true },   // {role: model id}, only where it differs from the server's
   showSources: { type:"bool", section:"display", def:true, attr:"sources", label:"Show sources" },
   showMarks: { type:"bool", section:"display", def:true, attr:"marks", label:"Show margin annotations" },
   contents: { type:"select", section:"display", def:"margin", attr:"contents", label:"Contents",
@@ -879,7 +889,7 @@ let settings = {};
 const setting = k => (k in settings) ? settings[k] : SETTINGS[k].def;
 async function setSetting(k, v){
   if(!("def" in SETTINGS[k])) return;
-  if(v === SETTINGS[k].def) delete settings[k]; else settings[k] = v;
+  if(JSON.stringify(v) === JSON.stringify(SETTINGS[k].def)) delete settings[k]; else settings[k] = v;
   await store.set("primer:settings", settings);
   applySettings();
 }
@@ -900,7 +910,8 @@ function applySettings(){
    server.mjs answers POST /api/complete {system, user, role} with a stream
    of newline-delimited JSON frames: {start} first, {delta} as text arrives,
    {event} when an agent uses a tool, then {done,text} or {error}. role
-   picks the model and tools server-side. o.onDelta(soFar, delta) fires per
+   picks the model and tools server-side; a model chosen for the role in
+   Settings goes along as `model`. o.onDelta(soFar, delta) fires per
    text frame, o.onEvent(event) per start/tool/result frame; o.signal aborts,
    which the server turns into a stopped model call. A guest's credential
    goes along as `cred`.                                                */
@@ -916,7 +927,7 @@ async function claude(system, user, role, o){
     let r;
     try{
       r = await fetch(ENDPOINT, { method:"POST", headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ system, user, role, cred: isGuest() ? guestCred() : undefined }), signal: o.signal });
+        body: JSON.stringify({ system, user, role, model: setting("models")[role], cred: isGuest() ? guestCred() : undefined }), signal: o.signal });
     }catch(e){
       if(e.name === "AbortError") throw stopped();
       if(attempt >= RETRIES) throw new Error("Network error. "+e.message);
@@ -3584,6 +3595,35 @@ const CONTROLS = {
     return i;
   },
   keys(){ return isGuest() ? guestKeysControl() : keysControl(); },
+  /* One row per agent: the model it runs on, chosen from those the key can
+     reach, with its own named where the choice differs; one Reset for all. */
+  models(k){
+    const g = el("div", "models"), chosen = { ...setting(k) };
+    api("/api/models", { cred: isGuest() ? guestCred() : undefined }).then(({ defaults, models }) => {
+      const nameOf = id => (models.find(m => m.id === id) || { name:id }).name;
+      const rows = Object.keys(defaults).map(role => {
+        const sel = el("select", "field"), wrap = el("span", "sel"), was = el("span", "quiet was"), ctl = el("div", "msel");
+        sel.id = "m-" + role;
+        const ids = [...new Set([...models.map(m => m.id), defaults[role], chosen[role]].filter(Boolean))];
+        ids.forEach(id => { const o = el("option", null, nameOf(id) + (id === defaults[role] ? " · default" : "")); o.value = id; sel.append(o); });
+        const paint = () => { sel.value = chosen[role] || defaults[role]; was.textContent = chosen[role] ? nameOf(defaults[role]) + " by default" : ""; };
+        sel.onchange = async () => {
+          if(sel.value === defaults[role]) delete chosen[role]; else chosen[role] = sel.value;
+          paint(); await setSetting(k, { ...chosen });
+        };
+        wrap.append(sel); ctl.append(was, wrap);
+        const row = srow(AGENTS[role] || role, ctl); row.querySelector("label").htmlFor = sel.id;
+        paint();
+        return { row, paint };
+      });
+      const reset = btn("quiet", "Reset to defaults", async () => {
+        Object.keys(chosen).forEach(r => delete chosen[r]);
+        rows.forEach(r => r.paint()); await setSetting(k, {}); toast("Every agent on its own model");
+      });
+      g.replaceChildren(...rows.map(r => r.row), acts(reset));
+    }).catch(e => g.replaceChildren(el("p", "none", e.message)));
+    return g;
+  },
   /* What readers sent, newest first, each with where it came from. */
   inbox(){
     const box = el("div", "inbox"); box.textContent = "Loading…";

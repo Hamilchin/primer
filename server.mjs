@@ -2,7 +2,8 @@
 //   npm start   →  http://localhost:8787
 //
 // Serves the app, keeps each user's primers, and answers POST /api/complete
-// through the Claude Agent SDK as a stream of newline-delimited JSON frames:
+// {system, user, role, model?} through the Claude Agent SDK as a stream of
+// newline-delimited JSON frames (model, when given, replaces the role's own):
 //   {start:{model,tools}}            first, so the client knows what ran
 //   {delta:"..."}                    as text arrives
 //   {event:{kind:"tool",...}}        an agent called a tool
@@ -13,7 +14,9 @@
 //                                    authentication_failed, rate_limit
 //                                    (a 400 with kind no_key: no key at all)
 // Closing the request aborts the call. POST /api/media {url} fetches an image
-// the finder chose into DATA_DIR/media and answers {local}.
+// the finder chose into DATA_DIR/media and answers {local}. POST /api/models
+// answers {defaults:{role:model}, models:[{id,name}]}: each role's own model,
+// and the models the caller's key can run on, newest first.
 //
 // Accounts: POST /api/signup {name,password,invite}, /api/login, /api/logout,
 // GET /api/me. Signing up needs the invite code, which is printed at boot
@@ -214,8 +217,11 @@ function callUsage(r) {
            searches: Object.values(m).reduce((n, x) => n + (x.webSearchRequests || 0), 0) };
 }
 
-async function complete({ system, user, role }, env, key, own, emit, signal) {
+const MODEL_ID = /^[a-z0-9][a-z0-9._:-]{1,63}$/i;
+async function complete({ system, user, role, model }, env, key, own, emit, signal) {
   const spec = ROLES[role] || ROLES.section;
+  /* The role's model, unless Settings named another. */
+  model = MODEL_ID.test(String(model || "")) ? String(model) : spec.model;
   const tools = spec.tools || [];
   const abortController = new AbortController();
   signal.addEventListener("abort", () => abortController.abort(), { once: true });
@@ -224,7 +230,7 @@ async function complete({ system, user, role }, env, key, own, emit, signal) {
   const options = {
     stderr: s => { stderr = (stderr + s).slice(-2000); },
     systemPrompt: String(system || ""),
-    model: spec.model,
+    model,
     abortController,
     env,
     settingSources: [],
@@ -235,7 +241,7 @@ async function complete({ system, user, role }, env, key, own, emit, signal) {
     permissionMode: "dontAsk"
   };
   if (tools.some(t => t.startsWith("mcp__primer__"))) options.mcpServers = { primer: primerTools };
-  emit({ start: { model: spec.model, tools } });
+  emit({ start: { model, tools } });
 
   let last = "", partial = "", result = null, quiet = false, failure = null;
   let idle = setTimeout(() => { quiet = true; abortController.abort(); }, IDLE);
@@ -296,14 +302,37 @@ const halt = (status, message, kind) => Object.assign(new Error(message), { stat
    minutes. So a credential is tried against the API before it is kept, with
    the one free request there is, and a call that goes silent is given up
    on. Answers the status Anthropic refused it with, or null when it passed. */
-async function refusal(kind, value) {
+function authHeaders(kind, value) {
   const headers = { "anthropic-version": "2023-06-01" };
   if (kind === "key") headers["x-api-key"] = value;
   else { headers.authorization = "Bearer " + value; headers["anthropic-beta"] = "oauth-2025-04-20"; }
+  return headers;
+}
+async function refusal(kind, value) {
   let r;
-  try { r = await fetch("https://api.anthropic.com/v1/models?limit=1", { headers, signal: AbortSignal.timeout(15000) }); }
+  try { r = await fetch("https://api.anthropic.com/v1/models?limit=1", { headers: authHeaders(kind, value), signal: AbortSignal.timeout(15000) }); }
   catch (e) { throw halt(502, "Couldn't reach Anthropic to check it: " + e.message); }
   return r.status === 401 || r.status === 403 ? r.status : null;
+}
+/* The models a credential can run on, newest first, as Anthropic lists
+   them; asked once an hour for each. The credential in an env is the one
+   variable the SDK reads it from. */
+const modelLists = new Map();   // hmac of the credential → {at, models}
+async function modelsFor(env) {
+  const kind = env.ANTHROPIC_API_KEY ? "key" : "token", value = env.ANTHROPIC_API_KEY || env.CLAUDE_CODE_OAUTH_TOKEN;
+  if (!value) return [];
+  const id = db.hmac("models:" + value), hit = modelLists.get(id);
+  if (hit && Date.now() - hit.at < 36e5) return hit.models;
+  let r;
+  try { r = await fetch("https://api.anthropic.com/v1/models?limit=100", { headers: authHeaders(kind, value), signal: AbortSignal.timeout(15000) }); }
+  catch (e) { throw halt(502, "Couldn't reach Anthropic for the list of models: " + e.message); }
+  if (!r.ok) throw halt(502, "Anthropic wouldn't list the models for this key (" + r.status + ").");
+  const data = (await r.json()).data;
+  const models = (Array.isArray(data) ? data : []).filter(m => m && MODEL_ID.test(String(m.id)))
+    .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))
+    .map(m => ({ id: String(m.id), name: String(m.display_name || m.id).slice(0, 60) }));
+  modelLists.set(id, { at: Date.now(), models });
+  return models;
 }
 /* Which kind a credential is: its prefix says, and Anthropic confirms. A
    value with neither prefix is tried both ways. */
@@ -322,7 +351,7 @@ async function identify(value) {
    server's secret, so it costs no row and survives a restart. */
 const guestToken = () => { const r = randomBytes(12).toString("hex"); return "g." + r + "." + db.hmac("guest:" + r); };
 const isGuest = t => { const m = /^g\.([0-9a-f]{24})\.([0-9a-f]{64})$/.exec(String(t || "")); return !!m && db.hmac("guest:" + m[1]) === m[2]; };
-const GUEST_OK = /^\/api\/(complete|media|guest\/)/;
+const GUEST_OK = /^\/api\/(complete|media|models|guest\/)/;
 /* The credential a guest sends with each call: {kind, value} for a key of
    their own, {name, password} for someone's shared key. */
 function guestClaude(c) {
@@ -681,6 +710,14 @@ async function serve(req, res) {
       res.end();
     }
     return;
+  }
+
+  /* Each role's own model, and the models the caller's key can run on. */
+  if (req.method === "POST" && path === "/api/models") {
+    const body = await readBody(req);
+    const claude = me ? db.users.claudeEnv(me.id) : guestClaude(body.cred);
+    const defaults = Object.fromEntries(Object.keys(ROLES).map(r => [r, ROLES[r].model]));
+    return json(200, { defaults, models: claude ? await modelsFor(claude.env) : [] });
   }
 
   if (req.method === "POST" && path === "/api/media") {
