@@ -559,8 +559,6 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 .sel{position:relative;display:block;flex:0 1 18rem;min-width:0}
 .sel .field{width:100%;padding-right:1.9rem;appearance:none;cursor:pointer;background:var(--bg);color:var(--fg)}
 .sel::after{content:"";position:absolute;right:.8rem;top:50%;width:.38em;height:.38em;margin-top:-.3em;border-right:1.5px solid var(--fg-3);border-bottom:1.5px solid var(--fg-3);transform:rotate(45deg);pointer-events:none}
-.msel{display:flex;align-items:center;justify-content:flex-end;gap:1rem;flex:1 1 auto;min-width:0}
-.msel .was{white-space:nowrap}
 .models .srow{padding:.5rem 0}
 .models .acts{display:flex;padding:.65rem 0 .25rem}
 /* A row that runs full width: its label above, its control below. */
@@ -682,9 +680,8 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
   .shelf .words{display:none}
   .status-row>span{flex-basis:100%;padding-left:0;border-left:0}
   .srow{gap:1rem}
-  .srow:has(.seg),.srow:has(.msel),.kform .srow{flex-direction:column;align-items:stretch;gap:.5rem}
+  .srow:has(.seg),.srow:has(.sel),.kform .srow{flex-direction:column;align-items:stretch;gap:.5rem}
   .srow .field,.sel{flex:1 1 auto}
-  .msel{flex-direction:column-reverse;align-items:stretch;gap:.3rem}
   .krow .kuse{margin-left:0}
   .colophon .fill{flex-basis:100%}
   .call summary{flex-wrap:wrap;row-gap:.15rem}
@@ -3596,23 +3593,23 @@ const CONTROLS = {
   },
   keys(){ return isGuest() ? guestKeysControl() : keysControl(); },
   /* One row per agent: the model it runs on, chosen from those the key can
-     reach, with its own named where the choice differs; one Reset for all. */
+     reach, its own marked in the list; one Reset for all. */
   models(k){
     const g = el("div", "models"), chosen = { ...setting(k) };
     api("/api/models", { cred: isGuest() ? guestCred() : undefined }).then(({ defaults, models }) => {
       const nameOf = id => (models.find(m => m.id === id) || { name:id }).name;
       const rows = Object.keys(defaults).map(role => {
-        const sel = el("select", "field"), wrap = el("span", "sel"), was = el("span", "quiet was"), ctl = el("div", "msel");
+        const sel = el("select", "field"), wrap = el("span", "sel");
         sel.id = "m-" + role;
         const ids = [...new Set([...models.map(m => m.id), defaults[role], chosen[role]].filter(Boolean))];
         ids.forEach(id => { const o = el("option", null, nameOf(id) + (id === defaults[role] ? " · default" : "")); o.value = id; sel.append(o); });
-        const paint = () => { sel.value = chosen[role] || defaults[role]; was.textContent = chosen[role] ? nameOf(defaults[role]) + " by default" : ""; };
+        const paint = () => { sel.value = chosen[role] || defaults[role]; };
         sel.onchange = async () => {
           if(sel.value === defaults[role]) delete chosen[role]; else chosen[role] = sel.value;
           paint(); await setSetting(k, { ...chosen });
         };
-        wrap.append(sel); ctl.append(was, wrap);
-        const row = srow(AGENTS[role] || role, ctl); row.querySelector("label").htmlFor = sel.id;
+        wrap.append(sel);
+        const row = srow(AGENTS[role] || role, wrap); row.querySelector("label").htmlFor = sel.id;
         paint();
         return { row, paint };
       });
