@@ -580,6 +580,7 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 .krow .kbody{margin:.3rem 0 .4rem}
 .krow .kbody>.lab{font-size:13px;color:var(--fg-3);margin:1rem 0 .4rem}
 .krow .kbody .usage{font-size:13px}
+.krow .kbody .kleft{margin:0;font-size:13px;color:var(--fg-2)}
 .krow .unlink{font-size:13px;color:var(--fg-3);flex:0 0 auto;margin-top:.2rem}
 .krow .unlink:hover{color:var(--accent)}
 /* A form of rows: the labels a step quieter than the page's own rows. */
@@ -3593,7 +3594,8 @@ const CONTROLS = {
   },
   keys(){ return isGuest() ? guestKeysControl() : keysControl(); },
   /* One row per agent: the model it runs on, chosen from those the key can
-     reach, its own marked in the list; one Reset for all. */
+     run, its own marked in the list; one Reset for all. A choice this key
+     cannot run is kept for one that can, and not shown. */
   models(k){
     const g = el("div", "models"), chosen = { ...setting(k) };
     api("/api/models", { cred: isGuest() ? guestCred() : undefined }).then(({ defaults, models }) => {
@@ -3601,9 +3603,9 @@ const CONTROLS = {
       const rows = Object.keys(defaults).map(role => {
         const sel = el("select", "field"), wrap = el("span", "sel");
         sel.id = "m-" + role;
-        const ids = [...new Set([...models.map(m => m.id), defaults[role], chosen[role]].filter(Boolean))];
+        const ids = [...new Set([...models.map(m => m.id), defaults[role]])];
         ids.forEach(id => { const o = el("option", null, nameOf(id) + (id === defaults[role] ? " · default" : "")); o.value = id; sel.append(o); });
-        const paint = () => { sel.value = chosen[role] || defaults[role]; };
+        const paint = () => { sel.value = ids.includes(chosen[role]) ? chosen[role] : defaults[role]; };
         sel.onchange = async () => {
           if(sel.value === defaults[role]) delete chosen[role]; else chosen[role] = sel.value;
           paint(); await setSetting(k, { ...chosen });
@@ -3682,7 +3684,7 @@ function switchBtn(label, on, onChange){
   b.append(el("i")); paint(on);
   return b;
 }
-const kindWord = k => k === "key" ? "API key" : "subscription";
+const kindWord = k => ({ subscription:"Claude subscription", anthropic:"Anthropic key", openrouter:"OpenRouter key", openai:"OpenAI key" })[k] || k;
 /* Name and password of someone's shared key; submit(name, password) links to it. */
 function linkForm(submit){
   const f = el("form", "kform"), name = kfield(), pass = kfield("password"), go = btn("go", "Link"); go.type = "submit";
@@ -3727,13 +3729,13 @@ function guestKeysControl(){
     if(!c) g.append(el("p", "warn", "No key yet. Nothing can be written until you paste one, or link to a key someone shared with you."));
     else{
       const ul = el("ul", "klist"), li = el("li", "krow"), info = el("div", "kinfo");
-      info.append(el("span", "kname", c.name || (c.kind === "key" ? "API key" : "Subscription token")),
+      info.append(el("span", "kname", c.name || kindWord(c.kind)),
                   el("span", "kmeta", c.name ? kindWord(c.kind) + " · shared by " + c.owner : "kept in this browser"));
       li.append(info, btn("unlink", "Forget", () => { setGuestCred(null); draw(); toast("Forgotten"); }));
       ul.append(li); g.append(ul);
     }
     const f = el("form", "kform"), value = kfield("password"), go = btn("go", "Use"); go.type = "submit";
-    f.append(srow("API key or subscription token", value), acts(go));
+    f.append(srow("Key or token", value), acts(go));
     f.onsubmit = async e => {
       e.preventDefault(); go.disabled = true;
       const v = value.value.trim();
@@ -3767,11 +3769,26 @@ function keysControl(){
   };
   /* What a key has been used for, one row per day, newest first. */
   const dayTable = u => {
-    const row = (day, x) => [{ text:day }, { text:String(x.calls), cls:"n" }, { text:kTok(x.tokens_in + x.tokens_out), cls:"n" },
+    const row = (day, x) => [{ text:day }, { text:String(x.calls), cls:"n" }, { text:kTok(x.tokens_in), cls:"n" }, { text:kTok(x.tokens_out), cls:"n" },
       { text: x.searches ? String(x.searches) : "—", cls:"n" + (x.searches ? "" : " dim") }, { text:usd(x.cost), cls:"n" }];
-    return usageTable([{ text:"Day" }, { text:"Calls", cls:"n" }, { text:"Tokens", cls:"n" }, { text:"Searches", cls:"n" }, { text:"Cost", cls:"n" }],
+    return usageTable([{ text:"Day" }, { text:"Calls", cls:"n" }, { text:"Tokens in", cls:"n" }, { text:"Tokens out", cls:"n" }, { text:"Searches", cls:"n" }, { text:"Cost", cls:"n" }],
       u.days.map(d => row(d.day === today() ? "Today" : shortDate(Date.parse(d.day + "T12:00:00")), d)), row("In all", u.total));
   };
+  /* What is left on a key, as its provider tells it: credit in dollars, or
+     a subscription's windows. Asked for when the row is drawn; a key whose
+     provider says nothing shows nothing. */
+  const when = ts => ts ? new Date(ts).toLocaleString(undefined, { weekday:"short", hour:"numeric", minute:"2-digit" }) : "";
+  const pct = x => Math.round(x * 100) + "%";
+  const leftOn = (key, sum, body) => api("/api/keys/" + key.id + "/left").then(r => {
+    if(r.credit){
+      sum.append(" · " + usd(r.credit.left) + " left");
+      body.append(el("span", "lab", "Left"), el("p", "kleft", usd(r.credit.left) + " of credit at " + kindWord(key.kind).replace(" key", "") + ", " + usd(r.credit.spent) + " spent there in all."));
+    }else if(r.windows && r.windows.length){
+      sum.append(" · " + r.windows.slice(0, 2).map(w => w.name.replace("-hour window", " h").toLowerCase() + " " + pct(w.used)).join(", "));
+      body.append(el("span", "lab", "Left"), usageTable([{ text:"Window" }, { text:"Used", cls:"n" }, { text:"Resets" }],
+        r.windows.map(w => [{ text:w.name }, { text:pct(w.used), cls:"n" }, { text:when(w.resets), cls: w.resets ? "" : "dim" }])));
+    }
+  }).catch(() => {});
   /* A key's sharing: the switch, and the password row it opens. */
   const sharing = (on, pwLabel) => {
     const pw = kfield("password"), pwRow = srow(pwLabel, pw); pwRow.hidden = !on;
@@ -3784,9 +3801,9 @@ function keysControl(){
   const mineRow = key => {
     const li = el("li", "krow"), d = el("details"), sum = el("summary");
     const spent = (key.usage.days.find(x => x.day === today()) || {}).cost || 0;
+    const use = el("span", "kuse", usd(spent) + " today · " + usd(key.usage.total.cost) + " in all");
     sum.append(el("span", "kname", key.name),
-               el("span", "kmeta", kindWord(key.kind) + " · " + (key.shared ? "shared" : "personal")),
-               el("span", "kuse", usd(spent) + " today · " + usd(key.usage.total.cost) + " in all"));
+               el("span", "kmeta", kindWord(key.kind) + " · " + (key.shared ? "shared" : "personal")), use);
     const body = el("div", "kbody");
     const f = el("form", "kform"), name = kfield(); name.value = key.name;
     const sh = sharing(key.shared, key.shared ? "New password" : "Password");
@@ -3806,6 +3823,7 @@ function keysControl(){
     };
     body.append(f);
     if(key.usage.days.length) body.append(el("span", "lab", "Usage"), dayTable(key.usage));
+    leftOn(key, use, body);
     d.append(sum, body);
     li.append(radio(key), d);
     return li;
@@ -3828,10 +3846,10 @@ function keysControl(){
       st.linked.forEach(x => ul.append(linkedRow(x)));
       g.append(ul);
     }
-    /* API key or subscription token: the server tells which from the value. */
+    /* Which kind of key it is, the server tells from the value. */
     const f = el("form", "kform"), name = kfield(), value = kfield("password"), sh = sharing(false, "Password");
     const go = btn("go", "Add"); go.type = "submit";
-    f.append(srow("Key name", name), srow("API key or subscription token", value), sh.row, sh.pwRow, acts(go));
+    f.append(srow("Key name", name), srow("Key or token", value), sh.row, sh.pwRow, acts(go));
     f.onsubmit = async e => {
       e.preventDefault(); go.disabled = true;
       const ok = await call("/api/keys", { name:name.value.trim(), value:value.value.trim(), shared:sh.on, password:sh.pw.value }, "POST");
@@ -3852,7 +3870,7 @@ function renderGuide(){
   page.innerHTML = `<header class="doc-head"><h1 class="title">Setup guide</h1></header>
   <div class="body">
     <p>Give Primer a topic and Claude plans an outline, writes each section, draws the diagrams and finds the images, then checks its claims on the web. Select any passage to revise it, have it explained, or get a primer on it.</p>
-    <p>Each primer runs on a key: your Claude subscription, an Anthropic API key, or a key someone shared with you. Add or link one in Settings, under Keys.</p>
+    <p>Each primer runs on a key: your Claude subscription, an Anthropic, OpenRouter or OpenAI key, or a key someone shared with you. Add or link one in Settings, under Keys.</p>
 
     <h2>Your Claude subscription</h2>
     <ol>
@@ -3869,6 +3887,13 @@ function renderGuide(){
       <li>Paste it under Keys, <em>Add a key</em>.</li>
     </ol>
     <p>A short primer costs cents; one with research and images, a dollar or two.</p>
+
+    <h2>An OpenRouter or OpenAI key</h2>
+    <ol>
+      <li>At <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener">openrouter.ai</a> or <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com</a>, add credit and create a key.</li>
+      <li>Paste it under Keys, <em>Add a key</em>.</li>
+    </ol>
+    <p>Under Models, each agent can then run on another model: any in the list with an OpenRouter key, OpenAI's with an OpenAI key.</p>
 
     <h2>Someone else's key</h2>
     <p>Ask them for the key's name and password, then link to it under Keys.</p>

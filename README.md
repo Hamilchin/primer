@@ -3,7 +3,7 @@
 Name a subject; Primer writes an explainer on it, one section at a time, and
 finds figures. Research, off unless turned on in Settings or run from the foot
 of a primer, then checks the claims against the web. Each person signs in and keeps their own
-primers, prompt edits and settings. Model calls go through the Claude Agent SDK.
+primers, prompt edits and settings.
 
 ## Run it
 
@@ -11,13 +11,24 @@ primers, prompt edits and settings. Model calls go through the Claude Agent SDK.
     npm start            # http://localhost:8787, prints the invite code
 
 The first time someone opens it they create an account with that invite code,
-then add a key in Settings: an Anthropic API key or a Claude subscription
-token (from `claude setup-token`), under a name of their choosing. Which
-kind it is comes from the value itself (`sk-ant-api03-…` or
-`sk-ant-oat01-…`), confirmed with Anthropic. Every primer is written on the
-key its writer has picked. Keys are stored encrypted, but the host can use
-them; that is the trust involved. `/guide` walks a newcomer through getting
-a key.
+then add a key in Settings, under a name of their choosing: a Claude
+subscription token (from `claude setup-token`), or an Anthropic, OpenRouter
+or OpenAI key. Which kind it is comes from the value itself, confirmed with
+its provider. Every primer is written on the key its writer has picked. Keys
+are stored encrypted, but the host can use them; that is the trust involved.
+`/guide` walks a newcomer through getting a key.
+
+A subscription's calls run through Claude Code, by way of the Claude Agent
+SDK, since only Claude Code may spend one. Every other key is spoken to
+directly, through the Vercel AI SDK. The tools are the same either way: one
+web search for everyone (Brave, with `BRAVE_SEARCH_KEY`; without it the
+agents can read pages but not search), a page reader, and the finder's eyes.
+Each agent runs on a Claude model by default; under Models in Settings it
+can be put on another from the catalogue in `agents.mjs`, as far as the key
+in use can run it. An OpenAI key, which runs no Claude model, runs GPT-5.6
+Terra where nothing is chosen. The owner of a key sees what it has been
+used for by day, and what is left on it where the provider will say:
+OpenRouter's credit, a subscription's usage windows.
 
 Anyone can also continue as a guest, without an account: a guest pastes a
 key or links to a shared one, and it is sent with each call rather than
@@ -84,3 +95,4 @@ Then send friends the URL and the invite word.
 | `INVITE` | generated once | needed to create an account |
 | `PRIMER_SECRET` | generated once | encrypts stored keys and tokens |
 | `ADMIN` | the first account | account names, comma-separated, that read feedback |
+| `BRAVE_SEARCH_KEY` | unset | the web search every agent uses, from brave.com/search/api |

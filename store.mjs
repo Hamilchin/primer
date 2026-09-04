@@ -2,9 +2,10 @@
 // node:sqlite, so there is nothing to install and nothing to run.
 //
 //   users      who can sign in, and which key their calls run on (active_key)
-//   keys       named credentials: an Anthropic API key or a Claude
-//              subscription token, owned by a user, optionally shared behind
-//              a password so others can link to it by name
+//   keys       named credentials of a kind agents.mjs knows (a Claude
+//              subscription token, an Anthropic, OpenRouter or OpenAI key),
+//              owned by a user, optionally shared behind a password so
+//              others can link to it by name
 //   key_links  which users have linked to which shared keys
 //   key_usage  what each key has been used for, summed per day
 //   sessions   a cookie per signed-in browser
@@ -69,6 +70,8 @@ export function openStore(dir) {
       pick.run(add.run(u.id, u.claude === "key" ? "My API key" : "My subscription", u.claude, u.secret, Date.now()).lastInsertRowid, u.id);
     db.exec("alter table users drop column secret; alter table users drop column claude");
   }
+  /* Kinds were once "key" and "token"; now they name the provider. */
+  db.exec("update keys set kind = case kind when 'key' then 'anthropic' when 'token' then 'subscription' else kind end");
 
   const q = {
     metaGet: db.prepare("select v from meta where k = ?"),
@@ -182,14 +185,8 @@ export function openStore(dir) {
   /* The key a user's calls run on: null when there is none, or it has
      been taken away since they picked it. */
   const activeKey = u => { const k = u.active_key ? q.keyById.get(u.active_key) : null; return canUse(u.id, k) ? k : null; };
-  /* The environment a model call runs in on a given credential. */
-  const envOf = (kind, value) => {
-    const env = { ...process.env };
-    if (kind === "key") { env.ANTHROPIC_API_KEY = value; delete env.CLAUDE_CODE_OAUTH_TOKEN; }
-    else { env.CLAUDE_CODE_OAUTH_TOKEN = value; delete env.ANTHROPIC_API_KEY; }
-    delete env.ANTHROPIC_AUTH_TOKEN;
-    return env;
-  };
+  /* A key as a call runs on it: its kind and value, with its public face. */
+  const credential = k => ({ kind: k.kind, value: open(k.secret), key: publicKey(k, false) });
   const publicUser = u => {
     const k = activeKey(u);
     return { id: u.id, name: u.name, key: k ? publicKey(k, false) : null, admin: isAdmin(u) };
@@ -207,24 +204,28 @@ export function openStore(dir) {
         const u = q.userByName.get(name);
         return u && checkPassword(password, u.pass) ? publicUser(u) : null;
       },
-      /* The environment a user's model calls should run in, and the key
-         they run on; null when there is none. */
-      claudeEnv(id) {
+      /* The key a user's calls run on, as a call runs on it, and whether it
+         is their own; null when there is none. */
+      credential(id) {
         const u = q.userById.get(id), k = u && activeKey(u);
-        return k ? { env: envOf(k.kind, open(k.secret)), key: publicKey(k, false), own: k.owner === id } : null;
+        return k ? { ...credential(k), own: k.owner === id } : null;
       }
     },
     /* A short signature with the server's secret, for tokens that need no row. */
     hmac: text => createHash("sha256").update(secret + ":" + String(text)).digest("hex"),
     keys: {
-      /* A credential a guest brings with them: nothing is stored. */
-      envFor(kind, value) { return envOf(kind, value); },
       /* Someone's shared key, for a guest who has no account to link it to:
          the name and password are checked on every call. */
-      sharedEnv(name, password) {
+      sharedCredential(name, password) {
         const k = q.keySharedNamed.get(name);
-        if (!k || !k.pass || !checkPassword(password, k.pass)) return null;
-        return { env: envOf(k.kind, open(k.secret)), key: publicKey(k, false) };
+        return k && k.pass && checkPassword(password, k.pass) ? credential(k) : null;
+      },
+      /* One of a user's own keys, as a call runs on it: to ask its provider
+         what is left on it. */
+      own(userId, id) {
+        const k = q.keyById.get(id);
+        if (!k || k.owner !== userId) throw new Error("No such key of yours.");
+        return credential(k);
       },
       /* Everything a user can see: their own keys in full, the shared keys
          they have linked to in brief, and the one they run on. */
@@ -234,9 +235,8 @@ export function openStore(dir) {
                  linked: q.linkMine.all(userId).map(k => publicKey(k, false)),
                  key: k ? publicKey(k, false) : null };
       },
-      /* kind: "key" (an Anthropic API key) or "token" (a Claude subscription
-         token from `claude setup-token`). A shared key needs a password.
-         A user with no key to run on runs on this one from now on. */
+      /* kind is one agents.mjs knows. A shared key needs a password. A user
+         with no key to run on runs on this one from now on. */
       create(userId, { name, kind, value, shared, password }) {
         if (q.keyMineNamed.get(userId, name)) throw new Error("You already have a key called that.");
         if (shared && q.keySharedNamed.get(name)) throw new Error("A shared key with that name already exists. Pick another name.");

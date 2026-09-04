@@ -2,8 +2,8 @@
 //   npm start   →  http://localhost:8787
 //
 // Serves the app, keeps each user's primers, and answers POST /api/complete
-// {system, user, role, model?} through the Claude Agent SDK as a stream of
-// newline-delimited JSON frames (model, when given, replaces the role's own):
+// {system, user, role, model?} as a stream of newline-delimited JSON frames
+// (model, when given, replaces the role's own):
 //   {start:{model,tools}}            first, so the client knows what ran
 //   {delta:"..."}                    as text arrives
 //   {event:{kind:"tool",...}}        an agent called a tool
@@ -15,25 +15,27 @@
 //                                    (a 400 with kind no_key: no key at all)
 // Closing the request aborts the call. POST /api/media {url} fetches an image
 // the finder chose into DATA_DIR/media and answers {local}. POST /api/models
-// answers {defaults:{role:model}, models:[{id,name}]}: each role's own model,
-// and the models the caller's key can run on, newest first.
+// answers {defaults:{role:model}, models:[{id,name}]}: what each role runs
+// on the caller's key when nothing is chosen, and what that key can run.
+// The agents themselves, the models and the kinds of key are in agents.mjs.
 //
 // Accounts: POST /api/signup {name,password,invite}, /api/login, /api/logout,
 // GET /api/me. Signing up needs the invite code, which is printed at boot
 // (or set INVITE). Everything the page stores goes through
 // GET/PUT/DELETE /api/store/:key, per user.
 //
-// Keys: every call runs on a named key, an Anthropic API key or a Claude
-// subscription token (from `claude setup-token`), added in Settings.
-// GET /api/keys lists yours and the ones you have linked to; POST /api/keys
-// adds one (shared keys carry a password); PUT /api/keys/:id renames,
-// shares or re-passwords it (a new password drops everyone linked); DELETE
-// /api/keys/:id removes it. POST /api/keys/link {name,password} links you
-// to someone's shared key, DELETE /api/keys/link/:id unlinks, and PUT
-// /api/keys/active {id} picks the one you run on. Each key sums what it was
-// used for, per day, for its owner. A new account has no key and is sent to
-// Settings before its first primer. Every call logs who made it and on
-// which key. See store.mjs for the database.
+// Keys: every call runs on a named key, added in Settings: a Claude
+// subscription token (from `claude setup-token`), or an Anthropic, OpenRouter
+// or OpenAI key. GET /api/keys lists yours and the ones you have linked to;
+// POST /api/keys adds one (shared keys carry a password); PUT /api/keys/:id
+// renames, shares or re-passwords it (a new password drops everyone
+// linked); DELETE /api/keys/:id removes it. POST /api/keys/link
+// {name,password} links you to someone's shared key, DELETE
+// /api/keys/link/:id unlinks, and PUT /api/keys/active {id} picks the one
+// you run on. Each key sums what it was used for, per day, for its owner. A
+// new account has no key and is sent to Settings before its first primer.
+// Every call logs who made it and on which key. See store.mjs for the
+// database.
 //
 // Guests: POST /api/guest sets a signed cookie and keeps nothing else; a
 // guest's primers stay in their browser, and each /api/complete carries
@@ -50,22 +52,22 @@
 //
 // Environment (all optional):
 //   PORT=8787  HOST=127.0.0.1  DATA_DIR=./data  INVITE=...  PRIMER_SECRET=...  ADMIN=name,name
-// No credential comes from the environment: keys are added in Settings.
+//   BRAVE_SEARCH_KEY=...   the one web search every agent uses; without it they can only read pages
+// No model credential comes from the environment: keys are added in Settings.
 //
 // Setup:
 //   npm install
-//   npm i -g @anthropic-ai/claude-code        (the SDK runs the claude CLI)
+//   npm i -g @anthropic-ai/claude-code        (runs a subscription's calls)
 //   npm start                                 (prints the invite code)
 
 import { createServer } from "node:http";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { existsSync, mkdirSync, renameSync } from "node:fs";
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
-import { query, tool, createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
-import { z } from "zod";
 import { openStore } from "./store.mjs";
+import { ROLES, PROVIDERS, halt, kindOf, identify, choices, modelFor, complete, left, fetchImage, images, keepImagesIn } from "./agents.mjs";
 
 const PORT = Number(process.env.PORT) || 8787;
 const HOST = process.env.HOST || "127.0.0.1";
@@ -75,277 +77,7 @@ const MEDIA = pathToFileURL(DATA + "/media/");
 const db = openStore(DATA);
 /* Images found before there was a data directory move into it. */
 try { const old = new URL("./media/", ROOT); if (!existsSync(MEDIA) && existsSync(old)) { mkdirSync(DATA, { recursive: true }); renameSync(old, MEDIA); } } catch (e) { console.warn("media/ not moved: " + e.message); }
-
-/* One entry per role. A role with no tools is a single completion. A role
-   with tools is an agent: it may call them for up to maxTurns turns, and
-   its answer is the text of its last message. Add a role here, and a prompt
-   pair in prompts/, to add an agent.                                      */
-const ROLES = {
-  outline:  { model: "claude-sonnet-4-6" },
-  section:  { model: "claude-sonnet-4-6" },
-  edit:     { model: "claude-sonnet-4-6" },
-  figure:   { model: "claude-fable-5" },
-  finder:   { model: "claude-sonnet-4-6", maxTurns: 40,
-              tools: ["WebSearch", "WebFetch", "mcp__primer__look_at_image"] },
-  research: { model: "claude-fable-5", maxTurns: 40,
-              tools: ["WebSearch", "WebFetch"] },
-  define:   { model: "claude-sonnet-4-6", maxTurns: 12,
-              tools: ["WebSearch", "WebFetch"] }
-};
-
-/* ── images ─────────────────────────────────────────────────────
-   Images the finder looks at are kept in media/ under a name derived from
-   their URL, so the one it picks is already on disk and the page never
-   hotlinks. The same fetch serves the look_at_image tool and /api/media. */
-const IMAGE_TYPES = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" };
-const IMAGE_MAX = 4 * 1024 * 1024;
-const images = new Map();   // url → {local, type, bytes}
-const UA = "Primer/1.0 (local explainer tool; one image at a time; https://github.com/anthropics/claude-code)";
-
-/* Wikimedia is the best source of reusable diagrams and the worst to link to:
-   a thumbnail URL only works at widths it has already rendered, so a guessed
-   .../800px-Name.svg.png is a 400 far more often than not, and an SVG cannot
-   be viewed at all. Both are fixable without the model having to get the URL
-   right: ask the API which file this is and let it name a real rendering.
-   Anything not on Wikimedia is left exactly as it was given.              */
-const WIKI_FILE = /^\/wikipedia\/([a-z-]+)\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^/]+)/;
-async function wikiThumb(u, width) {
-  let api, title;
-  const m = u.host === "upload.wikimedia.org" && WIKI_FILE.exec(u.pathname);
-  if (m) { api = m[1] === "commons" ? "commons.wikimedia.org" : m[1] + ".wikipedia.org"; title = m[2]; }
-  else if (/(^|\.)(wikipedia|wikimedia)\.org$/.test(u.host)) {
-    const p = /\/wiki\/(?:File|Image|Fichier|Datei):(.+)$/.exec(decodeURIComponent(u.pathname));
-    if (!p) return null;
-    api = u.host; title = p[1];
-  } else return null;
-
-  const q = new URL("https://" + api + "/w/api.php");
-  q.search = new URLSearchParams({ action: "query", titles: "File:" + decodeURIComponent(title),
-    prop: "imageinfo", iiprop: "url|mime", iiurlwidth: String(width), format: "json" });
-  const r = await fetch(q, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(15000) });
-  if (!r.ok) return null;
-  const pages = (((await r.json()) || {}).query || {}).pages || {};
-  const info = (Object.values(pages)[0] || {}).imageinfo;
-  if (!info || !info[0]) return null;
-  /* thumburl is a PNG rendering even when the file itself is an SVG. */
-  return info[0].thumburl || (info[0].mime !== "image/svg+xml" ? info[0].url : null) || null;
-}
-
-async function fetchImage(url) {
-  let u;
-  try { u = new URL(url); } catch { throw new Error("Not a URL."); }
-  if (!/^https?:$/.test(u.protocol)) throw new Error("Only http(s) URLs.");
-  const wiki = await wikiThumb(u, 1000).catch(() => null);
-  const r = await fetch(wiki || url, {
-    headers: { "user-agent": UA, accept: "image/*" },
-    signal: AbortSignal.timeout(20000), redirect: "follow"
-  });
-  if (!r.ok) throw new Error("HTTP " + r.status);
-  const type = (r.headers.get("content-type") || "").split(";")[0].trim();
-  const ext = IMAGE_TYPES[type];
-  if (!ext) throw new Error(type === "image/svg+xml"
-    ? "SVG cannot be viewed. Use a PNG rendering of it."
-    : "Not an image file (" + (type || "unknown type") + ").");
-  const buf = Buffer.from(await r.arrayBuffer());
-  if (buf.length > IMAGE_MAX) throw new Error("Too large (" + (buf.length / 1048576).toFixed(1) + " MB). Find a smaller rendering.");
-  const name = createHash("sha1").update(url).digest("hex").slice(0, 20) + "." + ext;
-  await mkdir(MEDIA, { recursive: true });
-  await writeFile(new URL(name, MEDIA), buf);
-  const info = { local: "/media/" + name, type, bytes: buf.length };
-  images.set(url, info);
-  return { info, buf };
-}
-
-/* The finder's eyes: it downloads a candidate and sees it as an image. */
-const primerTools = createSdkMcpServer({
-  name: "primer", version: "1.0.0",
-  tools: [
-    tool("look_at_image",
-      "Download an image file and look at it, to judge a candidate before choosing it. " +
-      "Takes a direct URL to a PNG, JPEG, GIF or WebP file up to 4 MB. On Wikimedia any " +
-      "form works, including an SVG and a File: page URL: the right PNG rendering is found for you.",
-      { url: z.string().describe("Direct URL of the image file") },
-      async ({ url }) => {
-        try {
-          const { info, buf } = await fetchImage(url);
-          return { content: [
-            { type: "image", data: buf.toString("base64"), mimeType: info.type },
-            { type: "text", text: "Loaded " + info.type + ", " + Math.round(info.bytes / 1024) + " KB." }
-          ] };
-        } catch (e) {
-          return { content: [{ type: "text", text: "Could not load that image: " + e.message }], isError: true };
-        }
-      })
-  ]
-});
-
-
-/* ── completions ────────────────────────────────────────────────
-   One system prompt, one user message. emit(frame) is called for every
-   frame but the last; the resolved value is the text of the model's last
-   message (or the assembled deltas if it never sent one). signal aborts. */
-const IDLE = 150000;
-const FATAL = new Set(["billing_error", "authentication_failed", "rate_limit"]);
-function brief(content) {
-  const s = typeof content === "string" ? content
-    : (Array.isArray(content) ? content : []).map(c => c.type === "text" ? c.text : "[" + c.type + "]").join(" ");
-  return s.length > 400 ? s.slice(0, 400) + "…" : s;
-}
-
-/* The CLI's own word for what went wrong, turned into a sentence that names
-   the key and says where to fix it. `key` is the key the call ran on; `own`
-   whether the caller owns it (else it is someone's shared key). */
-function failureText(kind, text, key, own) {
-  const t = String(text || "").replace(/\s*·\s*(Please run \/login|Fix external API key)\s*$/i, "").trim();
-  const name = "the key “" + key.name + "”", said = t ? " (" + t + ")." : ".";
-  const other = " Tell " + key.owner + ", or switch to another key in Settings.";
-  if (kind === "billing_error") return "Out of API credits on " + name + said +
-    (own ? " Add credit at console.anthropic.com, or switch to another key in Settings." : other);
-  if (kind === "authentication_failed") return "The " + (key.kind === "token" ? "subscription token" : "API key") + " behind " + name +
-    " was refused" + said + (own ? " Replace it in Settings." : other);
-  if (kind === "rate_limit") return /limit/i.test(t) && key.kind === "token"
-    ? "The Claude subscription behind " + name + " has hit its usage limit" + (t ? ": " + t : ".") + " Wait for it to reset, or switch to another key in Settings."
-    : "Anthropic rate-limited " + name + (t ? " (" + t + ")" : "") + ". Try again in a minute.";
-  return t || kind;
-}
-/* What a finished call cost, in the shape the page keeps per call. */
-function callUsage(r) {
-  if (!r || !r.usage) return null;
-  const u = r.usage, m = r.modelUsage || {};
-  return { in: (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0),
-           out: u.output_tokens || 0, cost: r.total_cost_usd || 0, turns: r.num_turns || 0,
-           searches: Object.values(m).reduce((n, x) => n + (x.webSearchRequests || 0), 0) };
-}
-
-const MODEL_ID = /^[a-z0-9][a-z0-9._:-]{1,63}$/i;
-async function complete({ system, user, role, model }, env, key, own, emit, signal) {
-  const spec = ROLES[role] || ROLES.section;
-  /* The role's model, unless Settings named another. */
-  model = MODEL_ID.test(String(model || "")) ? String(model) : spec.model;
-  const tools = spec.tools || [];
-  const abortController = new AbortController();
-  signal.addEventListener("abort", () => abortController.abort(), { once: true });
-
-  let stderr = "";
-  const options = {
-    stderr: s => { stderr = (stderr + s).slice(-2000); },
-    systemPrompt: String(system || ""),
-    model,
-    abortController,
-    env,
-    settingSources: [],
-    includePartialMessages: true,
-    maxTurns: spec.maxTurns || 1,
-    tools: tools.filter(t => !t.startsWith("mcp__")),
-    allowedTools: tools,
-    permissionMode: "dontAsk"
-  };
-  if (tools.some(t => t.startsWith("mcp__primer__"))) options.mcpServers = { primer: primerTools };
-  emit({ start: { model, tools } });
-
-  let last = "", partial = "", result = null, quiet = false, failure = null;
-  let idle = setTimeout(() => { quiet = true; abortController.abort(); }, IDLE);
-  const iter = query({ prompt: String(user || ""), options });
-  try { for await (const msg of iter) {
-    clearTimeout(idle); idle = setTimeout(() => { quiet = true; abortController.abort(); }, IDLE);
-    if (msg.type === "stream_event") {
-      const ev = msg.event;
-      if (ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta") {
-        partial += ev.delta.text;
-        emit({ delta: ev.delta.text });
-      }
-    } else if (msg.type === "assistant") {
-      if (msg.error) { failure = { kind: msg.error, text: brief(msg.message && msg.message.content) }; continue; }
-      let text = "";
-      for (const c of msg.message.content) {
-        if (c.type === "text") text += c.text;
-        else if (c.type === "tool_use") emit({ event: { kind: "tool", name: c.name, input: c.input } });
-      }
-      if (text.trim()) last = text;
-    } else if (msg.type === "user" && Array.isArray(msg.message && msg.message.content)) {
-      for (const c of msg.message.content) {
-        if (c.type === "tool_result") emit({ event: { kind: "result", ok: !c.is_error, text: brief(c.content) } });
-      }
-    } else if (msg.type === "result") {
-      result = msg;
-    }
-  } } catch (e) { clearTimeout(idle); if (!quiet && !signal.aborted) throw withStderr(e, stderr); }
-  clearTimeout(idle);
-  const usage = callUsage(result);
-  if (usage) emit({ usage });
-  if (quiet) throw new Error("No answer from the model for " + IDLE / 60000 + " minutes. If this keeps happening, check the key or token in Settings.");
-  if (signal.aborted) throw new Error("Stopped.");
-  if (failure && (!last || (result && result.is_error))) {
-    const e = new Error(failureText(failure.kind, failure.text, key, own));
-    if (FATAL.has(failure.kind)) e.kind = failure.kind;
-    throw e;
-  }
-  if (!last && result && result.subtype !== "success") {
-    throw new Error(result.subtype === "error_max_turns"
-      ? "The agent used all " + options.maxTurns + " turns without answering."
-      : "The call ended with " + result.subtype + (result.errors && result.errors.length ? ": " + result.errors.join("; ") : "."));
-  }
-  return last || partial;
-}
-/* What the CLI said on the way out, when it exited without an answer. */
-function withStderr(e, stderr) {
-  const line = String(stderr || "").split("\n").map(l => l.trim()).filter(Boolean).pop();
-  if (line && /exited with code/.test(String(e && e.message))) e.message += ": " + line.slice(0, 300);
-  return e;
-}
-
-/* ── credentials ────────────────────────────────────────────────
-   An error with a status is an answer: the handler sends it as JSON. */
-const halt = (status, message, kind) => Object.assign(new Error(message), { status, kind });
-
-/* A wrong key or token does not fail: the CLI retries it quietly for
-   minutes. So a credential is tried against the API before it is kept, with
-   the one free request there is, and a call that goes silent is given up
-   on. Answers the status Anthropic refused it with, or null when it passed. */
-function authHeaders(kind, value) {
-  const headers = { "anthropic-version": "2023-06-01" };
-  if (kind === "key") headers["x-api-key"] = value;
-  else { headers.authorization = "Bearer " + value; headers["anthropic-beta"] = "oauth-2025-04-20"; }
-  return headers;
-}
-async function refusal(kind, value) {
-  let r;
-  try { r = await fetch("https://api.anthropic.com/v1/models?limit=1", { headers: authHeaders(kind, value), signal: AbortSignal.timeout(15000) }); }
-  catch (e) { throw halt(502, "Couldn't reach Anthropic to check it: " + e.message); }
-  return r.status === 401 || r.status === 403 ? r.status : null;
-}
-/* The models a credential can run on, newest first, as Anthropic lists
-   them; asked once an hour for each. The credential in an env is the one
-   variable the SDK reads it from. */
-const modelLists = new Map();   // hmac of the credential → {at, models}
-async function modelsFor(env) {
-  const kind = env.ANTHROPIC_API_KEY ? "key" : "token", value = env.ANTHROPIC_API_KEY || env.CLAUDE_CODE_OAUTH_TOKEN;
-  if (!value) return [];
-  const id = db.hmac("models:" + value), hit = modelLists.get(id);
-  if (hit && Date.now() - hit.at < 36e5) return hit.models;
-  let r;
-  try { r = await fetch("https://api.anthropic.com/v1/models?limit=100", { headers: authHeaders(kind, value), signal: AbortSignal.timeout(15000) }); }
-  catch (e) { throw halt(502, "Couldn't reach Anthropic for the list of models: " + e.message); }
-  if (!r.ok) throw halt(502, "Anthropic wouldn't list the models for this key (" + r.status + ").");
-  const data = (await r.json()).data;
-  const models = (Array.isArray(data) ? data : []).filter(m => m && MODEL_ID.test(String(m.id)))
-    .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))
-    .map(m => ({ id: String(m.id), name: String(m.display_name || m.id).slice(0, 60) }));
-  modelLists.set(id, { at: Date.now(), models });
-  return models;
-}
-/* Which kind a credential is: its prefix says, and Anthropic confirms. A
-   value with neither prefix is tried both ways. */
-async function identify(value) {
-  const guess = /^sk-ant-oat/.test(value) ? "token" : /^sk-ant-api/.test(value) ? "key" : null;
-  let status;
-  for (const kind of guess ? [guess] : ["key", "token"]) {
-    status = await refusal(kind, value);
-    if (!status) return kind;
-  }
-  throw halt(400, guess ? "That " + (guess === "key" ? "key" : "token") + " was refused by Anthropic (" + status + ")."
-                        : "Anthropic refused that as an API key and as a subscription token.");
-}
+keepImagesIn(MEDIA);
 
 /* A guest has a cookie but no account: a random value signed with the
    server's secret, so it costs no row and survives a restart. */
@@ -353,16 +85,16 @@ const guestToken = () => { const r = randomBytes(12).toString("hex"); return "g.
 const isGuest = t => { const m = /^g\.([0-9a-f]{24})\.([0-9a-f]{64})$/.exec(String(t || "")); return !!m && db.hmac("guest:" + m[1]) === m[2]; };
 const GUEST_OK = /^\/api\/(complete|media|models|guest\/)/;
 /* The credential a guest sends with each call: {kind, value} for a key of
-   their own, {name, password} for someone's shared key. */
-function guestClaude(c) {
+   their own, whose kind its prefix confirms; {name, password} for someone's
+   shared key. The same shape the store gives a signed-in user. */
+function guestCred(c) {
   if (!c || typeof c !== "object") return null;
   if (c.value) {
-    const kind = c.kind === "token" ? "token" : "key";
-    return { env: db.keys.envFor(kind, String(c.value)), own: true,
-             key: { name: "your " + (kind === "key" ? "API key" : "subscription token"), kind, owner: "you" } };
+    const value = String(c.value), kind = kindOf(value) || (PROVIDERS[c.kind] ? c.kind : null);
+    return kind ? { kind, value, own: true, key: { name: "your " + PROVIDERS[kind].word, kind, owner: "you" } } : null;
   }
   if (!c.name) return null;
-  const r = db.keys.sharedEnv(String(c.name), String(c.password || ""));
+  const r = db.keys.sharedCredential(String(c.name), String(c.password || ""));
   if (!r) throw halt(403, "The shared key “" + c.name + "” no longer accepts that password. Link to it again in Settings.");
   return { ...r, own: false };
 }
@@ -420,6 +152,7 @@ const NAME = /^[a-z0-9][a-z0-9._-]{1,31}$/;
 const KEY_NAME = /^[^\s"“”][^"“”]{0,39}$/;
 const keyId = p => { const m = /^\/api\/keys\/(\d+)$/.exec(p); return m ? Number(m[1]) : null; };
 const linkId = p => { const m = /^\/api\/keys\/link\/(\d+)$/.exec(p); return m ? Number(m[1]) : null; };
+const keyLeft = p => { const m = /^\/api\/keys\/(\d+)\/left$/.exec(p); return m ? Number(m[1]) : null; };
 const escapeHtml = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const cookies = req => Object.fromEntries((req.headers.cookie || "").split(";").map(c => c.trim().split("=")).filter(c => c[0]));
 const secure = req => /^https/.test(req.headers["x-forwarded-proto"] || "");
@@ -461,7 +194,8 @@ createServer(async (req, res) => {
 }).listen(PORT, HOST, () => {
   console.log(`Primer  →  http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}`);
   console.log(`Invite code for new accounts: ${db.invite}`);
-  console.log("Calls run on named keys added in Settings; nothing is read from the environment.");
+  console.log("Calls run on named keys added in Settings; no model credential is read from the environment.");
+  if (!process.env.BRAVE_SEARCH_KEY) console.log("No BRAVE_SEARCH_KEY: the agents can read pages but not search the web.");
 });
 
 async function serve(req, res) {
@@ -548,7 +282,7 @@ async function serve(req, res) {
   if (req.method === "POST" && path === "/api/guest/link") {
     const b = await readBody(req), name = String(b.name || "").trim();
     guard("link:" + ip, 40); guard("link:" + name, 8);
-    const r = db.keys.sharedEnv(name, String(b.password || ""));
+    const r = db.keys.sharedCredential(name, String(b.password || ""));
     if (!r) { strike("link:" + ip, "link:" + name); throw halt(403, "No shared key with that name and password."); }
     console.log("  guest  linked to “" + r.key.name + "”");
     return json(200, { name: r.key.name, owner: r.key.owner, kind: r.key.kind });
@@ -617,6 +351,12 @@ async function serve(req, res) {
     console.log("  " + me.name + "  key #" + keyId(path) + " deleted");
     return answerKeys();
   }
+  /* What is left on one of your keys, as its provider tells it; {} where it doesn't. */
+  if (req.method === "GET" && keyLeft(path) != null) {
+    let cred;
+    try { cred = db.keys.own(me.id, keyLeft(path)); } catch (e) { throw halt(404, e.message); }
+    return json(200, await left(cred) || {});
+  }
   if (req.method === "POST" && path === "/api/keys/link") {
     const b = await readBody(req), name = String(b.name || "").trim();
     guard("link:" + ip, 40); guard("link:" + name, 8);
@@ -675,10 +415,10 @@ async function serve(req, res) {
   /* ── model calls ── */
   if (req.method === "POST" && path === "/api/complete") {
     const body = await readBody(req);
-    const claude = me ? db.users.claudeEnv(me.id) : guestClaude(body.cred);
-    if (!claude) throw halt(400, "No key to run on. Add one, or link to a shared key, in Settings.", "no_key");
+    const cred = me ? db.users.credential(me.id) : guestCred(body.cred);
+    if (!cred) throw halt(400, "No key to run on. Add one, or link to a shared key, in Settings.", "no_key");
     /* Who is calling, on which key: the record of shared use. */
-    console.log("  " + (me ? me.name : "guest") + "  " + (body.role || "?") + "  on “" + claude.key.name + "”" + (claude.own ? "" : " (" + claude.key.owner + "’s)"));
+    console.log("  " + (me ? me.name : "guest") + "  " + (body.role || "?") + "  on “" + cred.key.name + "”" + (cred.own ? "" : " (" + cred.key.owner + "’s)"));
     /* Headers go out with the first frame, so a failure before any text can
        still be a plain 500 that the client retries. After that, errors travel
        as a frame. Closing the connection aborts the model call. */
@@ -693,11 +433,11 @@ async function serve(req, res) {
     };
     const frame = obj => {
       /* What the call cost goes on the key's day, whoever made it; a guest's own key has no id. */
-      if (obj.usage && claude.key.id) { try { db.keys.addUsage(claude.key.id, obj.usage); } catch (e) { console.warn("usage not recorded: " + e.message); } }
+      if (obj.usage && cred.key.id) { try { db.keys.addUsage(cred.key.id, obj.usage); } catch (e) { console.warn("usage not recorded: " + e.message); } }
       start(); res.write(JSON.stringify(obj) + "\n");
     };
     try {
-      const text = await complete(body, claude.env, claude.key, claude.own, frame, ctrl.signal);
+      const text = await complete(body, cred, frame, ctrl.signal);
       frame({ done: true, text });
       res.end();
     } catch (e) {
@@ -712,12 +452,11 @@ async function serve(req, res) {
     return;
   }
 
-  /* Each role's own model, and the models the caller's key can run on. */
+  /* What each role runs on the caller's key when nothing is chosen, and what that key can run. */
   if (req.method === "POST" && path === "/api/models") {
-    const body = await readBody(req);
-    const claude = me ? db.users.claudeEnv(me.id) : guestClaude(body.cred);
-    const defaults = Object.fromEntries(Object.keys(ROLES).map(r => [r, ROLES[r].model]));
-    return json(200, { defaults, models: claude ? await modelsFor(claude.env) : [] });
+    const cred = me ? db.users.credential(me.id) : guestCred((await readBody(req)).cred);
+    const defaults = Object.fromEntries(Object.keys(ROLES).map(r => [r, cred ? modelFor(r, cred.kind).id : ROLES[r].model]));
+    return json(200, { defaults, models: cred ? choices(cred.kind) : [] });
   }
 
   if (req.method === "POST" && path === "/api/media") {
