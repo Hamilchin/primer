@@ -42,7 +42,7 @@ export function openStore(dir) {
                                          v text not null, updated integer not null, primary key (user, k));
     create table if not exists shares   (id text primary key, user integer not null references users(id) on delete cascade,
                                          doc text not null, title text not null, hash text not null, body text not null,
-                                         created integer not null);
+                                         live integer not null default 0, created integer not null);
     create table if not exists share_media (share text not null, name text not null, primary key (share, name));
     create table if not exists keys     (id integer primary key, owner integer not null references users(id) on delete cascade,
                                          name text not null, kind text not null, secret text not null,
@@ -56,22 +56,6 @@ export function openStore(dir) {
                                          searches integer not null default 0, cost real not null default 0,
                                          primary key (key, day));
   `);
-  /* Before there were named keys, a user's one credential sat on their row
-     (claude: key|token, secret). Such a database gets the active_key column,
-     each credential becomes its user's first named key, and the old columns go. */
-  /* A share can be live: the primer as it stands whenever the link is opened. */
-  if (!db.prepare("pragma table_info(shares)").all().some(c => c.name === "live")) db.exec("alter table shares add column live integer not null default 0");
-  const cols = db.prepare("pragma table_info(users)").all().map(c => c.name);
-  if (!cols.includes("active_key")) db.exec("alter table users add column active_key integer");
-  if (cols.includes("secret")) {
-    const add = db.prepare("insert into keys (owner, name, kind, secret, created) values (?, ?, ?, ?, ?)");
-    const pick = db.prepare("update users set active_key = ? where id = ?");
-    for (const u of db.prepare("select * from users where secret is not null and claude in ('key', 'token')").all())
-      pick.run(add.run(u.id, u.claude === "key" ? "My API key" : "My subscription", u.claude, u.secret, Date.now()).lastInsertRowid, u.id);
-    db.exec("alter table users drop column secret; alter table users drop column claude");
-  }
-  /* Kinds were once "key" and "token"; now they name the provider. */
-  db.exec("update keys set kind = case kind when 'key' then 'anthropic' when 'token' then 'subscription' else kind end");
 
   const q = {
     metaGet: db.prepare("select v from meta where k = ?"),
@@ -88,7 +72,6 @@ export function openStore(dir) {
     kvGet: db.prepare("select v from kv where user = ? and k = ?"),
     kvSet: db.prepare("insert into kv (user, k, v, updated) values (?, ?, ?, ?) on conflict(user, k) do update set v = excluded.v, updated = excluded.updated"),
     kvDel: db.prepare("delete from kv where user = ? and k = ?"),
-    kvKeys: db.prepare("select k from kv where user = ?"),
     shareAdd: db.prepare("insert into shares (id, user, doc, title, hash, body, created) values (?, ?, ?, ?, ?, ?, ?)"),
     shareAddLive: db.prepare("insert into shares (id, user, doc, title, hash, body, live, created) values (?, ?, ?, ?, 'live', '', 1, ?)"),
     shareLive: db.prepare("select id, created from shares where user = ? and doc = ? and live = 1"),
@@ -303,7 +286,6 @@ export function openStore(dir) {
       get(user, k) { const r = q.kvGet.get(user, k); return r ? r.v : null; },
       set(user, k, v) { q.kvSet.run(user, k, v, Date.now()); },
       del(user, k) { q.kvDel.run(user, k); },
-      keys(user) { return q.kvKeys.all(user).map(r => r.k); }
     },
     shares: {
       /* body is the primer as JSON text; doc is the id it was made from,

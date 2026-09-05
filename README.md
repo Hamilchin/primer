@@ -17,7 +17,7 @@ or OpenAI key. Which kind it is comes from the value itself, confirmed with
 its provider. Every primer is written on the key its writer has picked. Keys
 are stored encrypted, but the host can use them; that is the trust involved.
 `/guide` walks a newcomer through getting a key; `/guide/actions` explains the
-selection toolbar and its modes.
+selection toolbar and what its actions can do.
 
 A subscription's calls run through Claude Code, by way of the Claude Agent
 SDK, since only Claude Code may spend one. Every other key is spoken to
@@ -44,15 +44,29 @@ password, or unsharing, takes the key away from everyone linked to it; they
 have to link again. Nothing is read from the environment: to share your own
 Claude, add its token as a shared key like anyone else.
 
-Select a term in a primer and press Define, and a new primer defining
-it is written in the background, modelled on the first paragraph of its
-Wikipedia page, which the writer reads first. The words you selected
-become a link to it, narrowed to the term itself once the writer has
-named the concept; hover the link for a preview that updates as the
-definition is written. The Definition chip on the cover writes the same
-kind of primer for a typed term. The research agent can also link terms
-to Wikipedia at their first mention, when its prompt asks for it (change
-the last line of the Research prompt in Settings to yes).
+Select a passage and the pen appears: Explain, Example, Derive, Diagram,
+Tighter, Define, Edit, Ask, Complain, and any action you add under Actions
+in Settings. All but Complain go to one agent, the action agent, which is
+shown the whole primer block by block, the blocks you selected, the words
+you highlighted, your note if the action took one, and, on every block an
+earlier action made, what was asked. It answers with changes it chose:
+replace a block, insert before or after one, remove one, or define a term.
+What it adds is prose, a note in the margin, a subheading, or a brief for
+a diagram or an image, which the illustrator or the finder then makes,
+exactly as for a section being written; a diagram redrawn is shown to the
+illustrator alongside the brief. It can search the web when an ask turns
+on a fact. Every block it made carries the action's name in the margin,
+Undo takes an action back whole, and the Inspector shows each action's
+call with what was applied. `/guide/actions` explains the rest.
+
+Define asks the agent which term the selection means and which of the
+selected words name it, then writes a primer on that term exactly as the
+cover's Definition chip does, modelled on the first paragraph of its
+Wikipedia page, from the term alone: nothing of the primer it was asked
+from goes with it. The words become a link to it; hover the link for a
+preview that updates as the definition is written. The research agent can
+also link terms to Wikipedia at their first mention, when its prompt asks
+for it (change the last line of the Research prompt in Settings to yes).
 
 A section can have subsections, numbered 3.1, 3.2 in the margin and listed
 under their section in the contents. The planner divides a section only
@@ -60,8 +74,8 @@ when it would run long and fall into distinct parts, the writer follows
 that plan, and a revision can open a subsection when what it adds is too
 large for a paragraph. Most primers have none.
 
-Share on a finished primer offers two kinds of link to `/s/<id>`, readable
-by anyone, signed in or not. The public link follows the primer: readers
+Share, there from the moment a primer starts, offers two kinds of link to
+`/s/<id>`, readable by anyone, signed in or not. The public link follows the primer: readers
 see it as it stands and as it changes, and while it is still being written
 their page brings each new piece in. Turning the switch off takes the link
 back. A frozen link is a copy of the primer as it is that moment; later

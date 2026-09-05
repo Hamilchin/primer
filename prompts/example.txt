@@ -1,1 +1,1 @@
-Add the smallest concrete example that makes the highlighted part click: real numbers, a tiny case, worked through. Prefer mode "after".
+Add the smallest concrete example that makes the highlighted part click: real numbers, a tiny case, worked through. Insert it after the block, as prose, or as a figure element where the example is clearer drawn.

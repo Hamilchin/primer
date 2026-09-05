@@ -1,0 +1,1 @@
+Name the one concept the reader wants defined: the term the highlighted words point at, even when they cover half a sentence. Answer with a single define change and nothing else. term is the concept's usual name; words is the shortest run of the highlighted words that names it, copied verbatim.

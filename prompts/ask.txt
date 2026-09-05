@@ -1,1 +1,1 @@
-Answer the reader's question directly. If the answer belongs in the main thread, use mode "after" with kind "prose". If it is a side question, use mode "after" with kind "note".
+Answer the reader's question directly. A side question gets a note in the margin, inserted after the block. An answer the main thread needs gets prose after the block. If the question shows that the block itself is wrong or unclear, fix the block as well.

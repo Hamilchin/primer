@@ -62,7 +62,6 @@
 
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { existsSync, mkdirSync, renameSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -75,8 +74,6 @@ const DATA = resolve(process.env.DATA_DIR || "data");
 const ROOT = new URL("./", import.meta.url);
 const MEDIA = pathToFileURL(DATA + "/media/");
 const db = openStore(DATA);
-/* Images found before there was a data directory move into it. */
-try { const old = new URL("./media/", ROOT); if (!existsSync(MEDIA) && existsSync(old)) { mkdirSync(DATA, { recursive: true }); renameSync(old, MEDIA); } } catch (e) { console.warn("media/ not moved: " + e.message); }
 keepImagesIn(MEDIA);
 
 /* A guest has a cookie but no account: a random value signed with the
@@ -118,8 +115,8 @@ const mediaOf = blocks => [...new Set(blocks.map(x => x && typeof x.src === "str
    shape them. A frozen link keeps this as it is now; a live link makes it
    afresh each time. This is the one place the server reads inside the
    page's blobs, and it copies out only what it names: a rewrite's source
-   text, a definition's context, the calls behind the pieces and the
-   failures among them stay with the owner. Null once the primer is gone. */
+   text, the calls behind the pieces and the failures among them stay
+   with the owner. Null once the primer is gone. */
 function snapshot(user, docId) {
   let d, st = {};
   try { d = JSON.parse(db.kv.get(user, "primer:doc:" + docId)); } catch { return null; }
@@ -140,7 +137,6 @@ function snapshot(user, docId) {
   if (d.note) out.note = String(d.note).slice(0, 600);
   if (d.researched) out.researched = d.researched;
   if (d.rewrite) out.rewrite = { ofTitle: d.rewrite.ofTitle, instruction: d.rewrite.instruction };
-  if (d.define && d.define.from) out.define = { term: d.define.term, from: { title: d.define.from.title } };
   return out;
 }
 /* What the library's list keeps of a primer, in the page's own shape. */
@@ -414,7 +410,6 @@ async function serve(req, res) {
     if (req.method === "DELETE") { db.kv.del(me.id, k); return json(200, {}); }
     throw halt(405, "method not allowed");
   }
-  if (req.method === "GET" && path === "/api/store") return json(200, { keys: db.kv.keys(me.id) });
 
   /* ── model calls ── */
   if (req.method === "POST" && path === "/api/complete") {

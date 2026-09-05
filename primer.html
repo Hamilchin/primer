@@ -1076,7 +1076,7 @@ function repairJSON(s){
    are filled in at call time. `group` sorts them on the page. The
    templates marked `user` only arrange the fields into a message; they
    are loaded but not shown, there being nothing in them to change.   */
-const PROMPT_GROUPS = { base:"Base", write:"Writing a primer", revise:"Revising a selection", rewrite:"Rewriting a primer" };
+const PROMPT_GROUPS = { base:"Base", write:"Writing a primer", revise:"Actions on a selection", rewrite:"Rewriting a primer" };
 const PROMPTS = {
   house:                { group:"base",    label:"House style" },
   reader:               { group:"base",    label:"Reader" },
@@ -1093,17 +1093,18 @@ const PROMPTS = {
   research_user:        { group:"write",   label:"Research · user", user:true },
   define:               { group:"write",   label:"Definer" },
   define_user:          { group:"write",   label:"Definition · user", user:true },
-  edit:                 { group:"revise",  label:"Reviser" },
-  edit_user:            { group:"revise",  label:"Edit · user", user:true },
-  /* The instructions the selection actions send the reviser. Loaded here
+  action:               { group:"revise",  label:"Action agent" },
+  action_user:          { group:"revise",  label:"Action · user", user:true },
+  /* The instructions the pen's actions send the action agent. Loaded here
      for their defaults, but edited under Actions, not on this page. */
   explain:              { group:"revise",  label:"Explain",  act:true },
   example:              { group:"revise",  label:"Example",  act:true },
   derive:               { group:"revise",  label:"Derive",   act:true },
+  figure_action:        { group:"revise",  label:"Diagram",  act:true },
   tighter:              { group:"revise",  label:"Tighter",  act:true },
+  define_action:        { group:"revise",  label:"Define",   act:true },
   revise:               { group:"revise",  label:"Edit",     act:true },
   ask:                  { group:"revise",  label:"Ask",      act:true },
-  figure_action:        { group:"revise",  label:"Diagram",  act:true },
   rewrite_outline:      { group:"rewrite", label:"Outline" },
   rewrite_outline_user: { group:"rewrite", label:"Outline · user", user:true },
   rewrite_section_user: { group:"rewrite", label:"Section · user", user:true }
@@ -1151,32 +1152,34 @@ function instrText(d){
 /* ══ actions ══════════════════════════════════════════════════
    The selection toolbar (the pen) is a list of actions, editable under
    Actions in Settings: which ones show and in what order, their names, the
-   model each runs on, and — for the ones that revise a selection — the
-   instruction sent to the reviser. An `edit` action fills that instruction
-   into the reviser's user prompt; a `figure` one redraws through the
-   illustrator; `define` writes a small primer on the selection, and
-   `complain` sends a word to the host. `src` names the prompts/ file a
-   built-in's default instruction comes from, so Reset can return to it;
-   `input` means the action asks for a line of direction first. A label is
-   also stamped on each revised block and shown lowercased in the margin.  */
+   model each runs on, and the instruction each sends. Every action but
+   Complain is a `prompt` action: its instruction goes to the action agent,
+   one agent that sees the whole primer and answers with the changes to
+   make (applyEdit, below). Diagram and Define are prompt actions like the
+   rest: the agent asks for a figure, or names the term to define, and the
+   page does the drawing and the defining. `complain` sends a word to the
+   host instead. `src` names the prompts/ file a built-in's default
+   instruction comes from, so Reset can return to it; `input` means the
+   action asks for a line of direction first. A label is also stamped on
+   each block an action made and shown lowercased in the margin.          */
 const DEFAULT_ACTIONS = [
-  { id:"explain",  label:"Explain",  kind:"edit",     src:"explain",       builtin:true },
-  { id:"example",  label:"Example",  kind:"edit",     src:"example",       builtin:true },
-  { id:"derive",   label:"Derive",   kind:"edit",     src:"derive",        builtin:true },
-  { id:"figure",   label:"Diagram",  kind:"figure",   src:"figure_action", builtin:true },
-  { id:"tighter",  label:"Tighter",  kind:"edit",     src:"tighter",       builtin:true },
-  { id:"define",   label:"Define",   kind:"define",   builtin:true },
-  { id:"revise",   label:"Edit",     kind:"edit",     src:"revise", input:true, placeholder:"What should change?", verb:"Edit", builtin:true },
-  { id:"ask",      label:"Ask",      kind:"edit",     src:"ask",    input:true, placeholder:"Ask about this…",     verb:"Ask",  builtin:true },
+  { id:"explain",  label:"Explain",  kind:"prompt",   src:"explain",       builtin:true },
+  { id:"example",  label:"Example",  kind:"prompt",   src:"example",       builtin:true },
+  { id:"derive",   label:"Derive",   kind:"prompt",   src:"derive",        builtin:true },
+  { id:"figure",   label:"Diagram",  kind:"prompt",   src:"figure_action", builtin:true },
+  { id:"tighter",  label:"Tighter",  kind:"prompt",   src:"tighter",       builtin:true },
+  { id:"define",   label:"Define",   kind:"prompt",   src:"define_action", builtin:true },
+  { id:"revise",   label:"Edit",     kind:"prompt",   src:"revise", input:true, placeholder:"What should change?", verb:"Edit", builtin:true },
+  { id:"ask",      label:"Ask",      kind:"prompt",   src:"ask",    input:true, placeholder:"Ask about this…",     verb:"Ask",  builtin:true },
   { id:"complain", label:"Complain", kind:"complain", input:true, placeholder:"What's wrong here? This goes to Alexander.", verb:"Send", builtin:true }
 ];
 let actions = [];   // the pen, as configured; persisted at primer:actions
 const word = edit => String(edit && edit.label || "").toLowerCase();
 const actionById = id => actions.find(a => a.id === id);
 const activeActions = () => actions.filter(a => a.on);
-const editKind = a => a && (a.kind === "edit" || a.kind === "figure");
-/* An edit or figure action's instruction: the reader's own text if they
-   changed it, otherwise the file default named by `src`. */
+const prompted = a => !!a && a.kind === "prompt";
+/* A prompt action's instruction: the reader's own text if they changed it,
+   otherwise the file default named by `src`. */
 const actionPrompt = a => a && a.prompt != null ? a.prompt : (a && a.src && PROMPTS[a.src] ? PROMPTS[a.src].text : "");
 /* A fresh copy of the shipped pen, carrying over any prompt edit a built-in
    action already had under the earlier Prompts page. */
@@ -1188,20 +1191,22 @@ function defaultActions(){
   });
 }
 /* Whatever was stored, made safe: known fields only, unique ids, built-ins
-   kept whole. An empty or missing list becomes the shipped pen. */
+   kept whole. An empty or missing list becomes the shipped pen. A built-in
+   is whatever kind it ships as, and anything a reader made is a prompt
+   action, so lists stored under the earlier kinds come through unchanged. */
 function normalizeActions(stored){
   if(!Array.isArray(stored) || !stored.length) return defaultActions();
   const seen = new Set(), out = [];
   for(const s of stored){
     if(!s || typeof s !== "object" || !s.id || seen.has(s.id)) continue;
     const base = DEFAULT_ACTIONS.find(d => d.id === s.id);
-    const kind = base ? base.kind : (s.kind === "figure" ? "figure" : "edit");
+    const kind = base ? base.kind : "prompt";
     const a = { id:String(s.id).slice(0,40), kind, on:s.on !== false, builtin:!!base,
                 label:String(s.label || (base && base.label) || "Action").slice(0,40) };
     if(base && base.src) a.src = base.src;
     if(s.prompt != null) a.prompt = String(s.prompt);
     if(s.model) a.model = String(s.model);
-    if(kind === "edit" || kind === "complain"){
+    {
       if(s.input || (base && base.input)) a.input = true;
       const ph = s.placeholder != null ? s.placeholder : (base && base.placeholder);
       if(a.input && ph) a.placeholder = String(ph).slice(0,120);
@@ -1596,9 +1601,12 @@ function render(){
   paintHeader();
   markCurrent();
 }
-/* A primer can be shared, rewritten or exported once it has prose and
-   nothing is being written into it. */
-const settled = d => !!(d && !running(d) && d.blocks.some(b => b.md && b.kind !== "heading"));
+/* A primer has been written once it has prose, and is settled once nothing
+   more is being written into it. A link can be made from the moment it
+   exists, a public one following it as it is written; it can be exported
+   once written, and rewritten once settled. */
+const written = d => !!(d && d.blocks.some(b => b.md && b.kind !== "heading"));
+const settled = d => written(d) && !running(d);
 /* The top bar holds what is not about any one primer. */
 function paintHeader(){
   backBtn.classList.toggle("hide", !aside());
@@ -1614,10 +1622,10 @@ function toolsNode(d){
   const add = (label, fn, on) => { const b = btn("act" + (on ? " on" : ""), label, fn); nav.append(b); return b; };
   add("About", () => { aboutOpen = !aboutOpen; aboutPaint(); }, aboutOpen);
   /* Links need an account; a guest can still export. */
-  if(readonly() || (settled(d) && !isGuest())){
+  if(readonly() || !isGuest()){
     const s = add("Share", () => openShare(s)); s.setAttribute("aria-haspopup", "true");
   }
-  if(readonly() || settled(d)){
+  if(readonly() || written(d)){
     const x = add("Export", () => openExport(x)); x.setAttribute("aria-haspopup", "true");
   }
   if(!readonly()){
@@ -1926,12 +1934,6 @@ function metaNode(d){
     v.append(" · “" + d.rewrite.instruction + "”");
     row("Rewrite of", v);
   }
-  if(d.define && d.define.from){
-    const v = el("span", null, "“" + d.define.term + "” in ");
-    if(d.define.from.doc && !readonly()) v.append(btn("link", d.define.from.title, () => openDoc(d.define.from.doc)));
-    else v.append("“" + d.define.from.title + "”");
-    row("Defines", v);
-  }
   row("Written", shortDate(d.created));
   if(d.shared){
     row("Shared by", d.shared.live ? d.shared.by + ", as a public link that follows the primer" : d.shared.by + ", " + shortDate(d.shared.created));
@@ -2148,7 +2150,7 @@ function errNode(b){
   const x = el("div", "err" + (b.stopped ? " soft" : ""), b.error);
   if(readonly()) return x;
   const d = doc;
-  if(b.slot) x.appendChild(btn(null, "Retry", () => retrySection(d, b.sec)));
+  if(b.slot) x.appendChild(btn(null, "Retry", () => retrySection(d)));
   else if(b.kind === "figure" || b.kind === "image"){
     if(b.brief) x.appendChild(btn(null, "Retry", () => retryVisual(d, b, true)));
     x.appendChild(btn(null, "Remove", () => { swapBlock(d, b.id, []); save(d); }));
@@ -2401,7 +2403,7 @@ const unesc =s => s.replace(/\\(u[0-9a-fA-F]{4}|.)/g, (m, c) => c === "n" ? "\n"
 function liveText(raw, role){
   raw = String(raw || "");
   if(role === "outline") return outlineLive(raw);
-  if(role === "section" || role === "edit" || role === "define"){
+  if(role === "section" || role === "action" || role === "define"){
     const parts = [...raw.matchAll(/"md"\s*:\s*"((?:[^"\\]|\\.)*)"/g)].map(m => m[1]);
     const open = /"md"\s*:\s*"((?:[^"\\]|\\.)*)$/.exec(raw);
     if(open) parts.push(open[1]);
@@ -2652,9 +2654,7 @@ async function genSection(d, i, title, outline, reader, by){
                  PRIOR: priorText(d, i) || "(none yet)", INSTRUCTION: instrText(d),
                  SUBSECTIONS: subs.length ? "ITS SUBSECTIONS, FROM THE PLAN, EACH OPENED WITH A SUBHEADING ELEMENT:\n" + subs.map(x => "- " + x).join("\n") : "" };
   const df = d.define, role = df ? "define" : "section";
-  const user = df ? usr("define_user", { READER:reader, TERM:d.topic, INSTRUCTION:instrText(d),
-                      HIGHLIGHT: df.from ? df.term : "(nothing: the term was typed)",
-                      FROM: df.from ? ", IN “" + df.from.title + "”" : "", CONTEXT: df.context || "(none)" })
+  const user = df ? usr("define_user", { READER:reader, TERM:d.topic, INSTRUCTION:instrText(d) })
              : d.rewrite ? usr("rewrite_section_user", { ...vars, INSTRUCTION:d.rewrite.instruction, SOURCE:d.rewrite.source })
              : usr("section_user", vars);
   try{
@@ -2670,10 +2670,7 @@ async function genSection(d, i, title, outline, reader, by){
         return proseBlocks(x.md, { sec:i, by:callId });
       });
     if(!made.some(b => b.kind === "prose" && b.md)) throw new Error("Empty section.");
-    if(df && value && !Array.isArray(value)){
-      if(value.title) d.title = trimTitle(value.title, 110, d.title);
-      if(value.term) narrowLink(d, String(value.term).trim());
-    }
+    if(df && value && !Array.isArray(value) && value.title) d.title = trimTitle(value.title, 110, d.title);
     replaceSlot(d, i, made);
     /* New text, so the section is due a check again. */
     const h = d.blocks.find(b => b.kind==="heading" && b.sec===i);
@@ -2689,7 +2686,7 @@ async function genSection(d, i, title, outline, reader, by){
 }
 /* Retry on a section writes every missing section, in order, so a section
    is never written ahead of one that is still missing. */
-function retrySection(d, i){
+function retrySection(d){
   if(running(d)){ toast("Wait for " + docState(d).text + " first."); return; }
   resume(d);
 }
@@ -2716,16 +2713,24 @@ function sideLater(d, b, fn){
   }).catch(e => console.error(e));
 }
 /* A visual keeps its first id as `origin` through every retry, and `by`,
-   the section call that asked for it, so its calls stay filed together. */
+   the section call that asked for it, so its calls stay filed together;
+   one an action asked for keeps the action's mark, and the diagram it is
+   to replace, the same way. */
+function heir(f){
+  const h = { origin:f.origin || f.id, by:f.by, kind:f.kind, md:"", sec:f.sec, brief:f.brief };
+  if(f.edit) h.edit = f.edit;
+  if(f.replaces) h.replaces = f.replaces;
+  return h;
+}
 function failedVisual(d, f, e){
-  return { id:uid(), origin:f.origin || f.id, by:f.by, kind:f.kind, md:"", sec:f.sec, brief:f.brief, stopped:!!e.stopped,
+  return { id:uid(), ...heir(f), stopped:!!e.stopped,
     error: e.stopped ? "Stopped."
          : (f.kind === "figure" ? "Diagram didn't come back. " : e.notFound ? "No suitable image was found. " : "The image search didn't come back. ") + e.message };
 }
 /* byYou: a person clicked Retry, rather than the run picking up leftovers. */
 function retryVisual(d, b, byYou){
   const { titles, outline, reader } = docContext(d);
-  const p = { id:uid(), origin:b.origin || b.id, by:b.by, kind:b.kind, md:"", sec:b.sec, brief:b.brief, pending:true, again: byYou ? "you" : "" };
+  const p = { id:uid(), ...heir(b), pending:true, again: byYou ? "you" : "" };
   p[b.kind === "figure" ? "draw" : "find"] = true;
   swapBlock(d, b.id, [p]);
   runOf(d).cancelled = false;
@@ -2743,13 +2748,15 @@ function around(d, f){
 
 /* A figure the section writer asked for, queued as soon as that section's
    prose has landed. The illustrator sees the brief, the outline, and the
-   whole section's prose, split at the slot. */
+   whole section's prose, split at the slot; when the figure takes the place
+   of a diagram (an action redrawing one), that diagram's SVG as well. */
 async function genFigure(d, f, sectionTitle, outline, reader){
   const { idx, before, after } = around(d, f);
   if(idx<0) return;
   const user = usr("figure_user", {
     READER: reader, TITLE: d.title, OUTLINE: outline, SECTION: sectionTitle,
-    BEFORE: before || "(none)", AFTER: after || "(none)", BRIEF: f.brief
+    BEFORE: before || "(none)", AFTER: after || "(none)", BRIEF: f.brief,
+    WAS: f.replaces ? "THE DIAGRAM THIS ONE REPLACES:\n" + f.replaces : ""
   });
   try{
     const { value:out } = await agent(d, { role:"figure", label:"drawing §"+(f.sec+1), sec:f.sec, block:f, system:sys("figure"), user,
@@ -2757,7 +2764,8 @@ async function genFigure(d, f, sectionTitle, outline, reader){
     const x = ((out && out.blocks)||[]).find(b => b && b.md);
     if(!x) throw new Error("Empty response.");
     if(!/<svg[\s>]/i.test(String(x.md))) throw new Error("The answer had no <svg> in it.");
-    const made = { id:uid(), origin:f.origin || f.id, by:f.by, kind:"figure", md:x.md, sec:f.sec, brief:f.brief, fresh:true };
+    const made = { id:uid(), ...heir(f), md:x.md, fresh:true };
+    delete made.replaces;
     if(x.caption) made.caption = String(x.caption).trim();
     swapBlock(d, f.id, [made]);
     save(d);
@@ -2781,7 +2789,7 @@ async function genImage(d, f, sectionTitle){
       const e = new Error(out && out.why ? String(out.why) : "Nothing suitable was found."); e.notFound = true; throw e;
     }
     const m = await saveMedia(String(out.url));
-    const made = { id:uid(), origin:f.origin || f.id, by:f.by, kind:"image", md:"", sec:f.sec, brief:f.brief, fresh:true, src:m.local, url:String(out.url),
+    const made = { id:uid(), ...heir(f), fresh:true, src:m.local, url:String(out.url),
       page: out.page ? String(out.page) : "", title: out.title ? String(out.title).trim() : "",
       credit: out.credit ? String(out.credit).trim() : "", caption: out.caption ? String(out.caption).trim() : "",
       why: out.why ? String(out.why).trim() : "" };
@@ -2874,20 +2882,19 @@ async function researchAll(d){
 }
 
 /* ══ define ═══════════════════════════════════════════════════
-   A new primer on the highlighted words, written in the background and
-   linked from them, the way an encyclopedia links a term to its article.
-   The definer names the concept and picks the words to link; until then
-   the whole selection is the link. Links to other primers are Markdown
+   A new primer defining a term, written in the background and linked from
+   the words that named it, the way an encyclopedia links a term to its
+   article. It is made exactly as the cover's Definition chip makes one, from
+   the term alone: nothing of the primer it was asked from goes with it. The
+   action agent names the term and the words (a define change); this only
+   starts the primer and makes the link. Links to other primers are Markdown
    in the block, primer:<id>, so they survive everything a block does. */
 const DEFINE = BRIEFS.find(b => b.define);
-function defineFrom(d, blockId, text){
-  const b = d.blocks.find(x => x.id === blockId);
-  if(!b || !b.md) return;
-  const def = startDoc({ topic:text, known:d.known, instruction:DEFINE.text,
-    define:{ term:text, from:{ doc:d.id, block:b.id, title:d.title }, context:b.md } }, true);
-  snapshot();
-  if(linkWords(b, text, "primer:" + def.id)){ patch(d, b); save(d); toast("Defining “" + text + "”", { undo:true }); }
-  else toast("Defining “" + text + "”. Those exact words weren't found in the text, so there is no link.");
+function defineFrom(d, b, words, term){
+  const def = startDoc({ topic:term, known:d.known, instruction:DEFINE.text }, true);
+  const linked = !!(b && b.md && words && linkWords(b, words, "primer:" + def.id));
+  if(linked){ b.fresh = true; patch(d, b); }
+  return { doc:def, linked };
 }
 /* The first plain occurrence of `text` in a block becomes a link. */
 function linkWords(b, text, href){
@@ -2895,19 +2902,6 @@ function linkWords(b, text, href){
   if(i < 0 || b.md.lastIndexOf("[", i) > b.md.lastIndexOf("]", i)) return false;
   b.md = b.md.slice(0, i) + "[" + text + "](" + href + ")" + b.md.slice(i + text.length);
   return true;
-}
-/* Once the definer has said which words name the concept, the link in the
-   primer it came from shrinks to them. */
-async function narrowLink(d, term){
-  const f = d.define.from, was = d.define.term;
-  const at = was.indexOf(term);
-  if(!f || at < 0 || term === was) return;
-  const o = await loadDoc(f.doc), b = o && o.blocks.find(x => x.id === f.block);
-  const old = "[" + was + "](primer:" + d.id + ")", i = b ? b.md.indexOf(old) : -1;
-  if(i < 0) return;
-  b.md = b.md.slice(0, i) + was.slice(0, at) + "[" + term + "](primer:" + d.id + ")" + was.slice(at + term.length) + b.md.slice(i + old.length);
-  d.define.term = term;
-  patch(o, b); save(o);
 }
 /* Prose without its links to other primers, for anyone who cannot follow them. */
 const plainLinks = md => String(md).replace(/\[([^\]]*)\]\(primer:\w+\)/g, "$1");
@@ -2942,97 +2936,190 @@ function popLive(d){
   if(pop.classList.contains("show") && pop._anchor && pop._anchor.dataset.primer === d.id) pop.replaceChildren(...defNodes(d.id));
 }
 
-/* ══ editing ══════════════════════════════════════════════════ */
-function context(d, idx){
-  const outline = outlineText(d);
-  const before = d.blocks.slice(Math.max(0,idx-2), idx).map(b=>b.md).join("\n\n");
-  const after  = d.blocks.slice(idx+1, idx+3).map(b=>b.md).join("\n\n");
-  return { outline, before, after };
+/* ══ actions on a selection ═══════════════════════════════════
+   One agent behind every prompt action. It is shown the whole primer as
+   labelled blocks, the selection, the reader's note and the action's
+   instruction, and answers with changes: replace a block, insert before or
+   after one, remove one, define a term. Each element it adds is prose, a
+   note, a subheading, a heading title, or a brief for a diagram or an
+   image, which the illustrator or the finder then makes, as they do for
+   the section writer. The changes are applied here in order, by the labels
+   the agent was shown, and what was applied is written on the call for the
+   Inspector.                                                            */
+
+/* The primer as the agent reads it: every block labelled b1, b2, … in
+   order, with its kind and content, and on each block an action made, the
+   action and what the reader asked. A diagram is its caption and brief, and
+   its SVG when it is selected. Returns {text, ids: label → id, labels:
+   id → label}. */
+function primerView(d, selected){
+  const ids = new Map(), labels = new Map(), lines = [];
+  let n = 0, m = 0;
+  d.blocks.forEach((b, i) => {
+    const label = "b" + (i + 1); ids.set(label, b.id); labels.set(b.id, label);
+    const e = b.edit;
+    const from = !e ? "" : e.by === "research" ? ", corrected by research"
+      : ", from " + e.label + (e.note ? " “" + e.note + "”" : e.quote ? " on “" + e.quote + "”" : "");
+    const tag = kind => "[" + label + " " + kind + from + (selected.has(b.id) ? " · SELECTED" : "") + "]";
+    if(b.kind === "heading"){ n++; m = 0; lines.push(tag("heading") + " Section " + n + ": " + headingTitle(b)); }
+    else if(b.kind === "subheading"){ m++; lines.push(tag("subheading") + " Subsection " + n + "." + m + ": " + headingTitle(b)); }
+    else if(b.pending || b.error || unfilled(b)) lines.push(tag(b.kind === "figure" ? "diagram" : b.kind === "image" ? "image" : "prose") + " (not made yet" + (b.brief ? ": " + b.brief : "") + ")");
+    else if(b.kind === "figure") lines.push(tag("diagram") + (b.caption ? " Caption: " + b.caption : "") + (b.brief ? "\nBrief: " + b.brief : "") + (selected.has(b.id) && b.md ? "\nSVG:\n" + b.md : ""));
+    else if(b.kind === "image") lines.push(tag("image") + (b.title ? " " + b.title : "") + (b.caption ? "\nCaption: " + b.caption : ""));
+    else lines.push(tag(b.kind === "note" ? "note in the margin" : "prose") + "\n" + (b.md || ""));
+  });
+  return { text: lines.join("\n\n"), ids, labels };
+}
+const BLOCK_WORD = { heading:"a section heading", subheading:"a subheading", figure:"a diagram", image:"an image", note:"a note in the margin", prose:"a paragraph" };
+const blockWord = b => BLOCK_WORD[b.kind] || BLOCK_WORD.prose;
+/* Which blocks the reader selected, and where they are. */
+function whereText(d, view, blocks){
+  const at = b => "[" + view.labels.get(b.id) + "]", first = blocks[0];
+  const h = first.sec != null && d.blocks.find(x => x.kind === "heading" && x.sec === first.sec);
+  const what = blocks.length > 1 ? at(first) + " to " + at(blocks[blocks.length - 1]) + ", " + blocks.length + " blocks" : at(first) + ", " + blockWord(first);
+  return what + (h ? ", in section " + (first.sec + 1) + " (" + headingTitle(h) + ")" : "");
 }
 
+/* Run a prompt action on the block the reader selected (and any others the
+   selection runs into), with their note if the action took one. The block
+   is marked busy, with the highlighted words kept visible, until the agent
+   answers; then its changes are applied and shown, or the run is undone. */
 async function applyEdit(blockId, act, question){
   const d = doc;
-  const idx = d.blocks.findIndex(b => b.id===blockId);
-  if(idx<0) return;
-  const target = d.blocks[idx];
-  const a = actionById(act) || { id:act, label:"edit", kind:"edit" };
-  const highlighted = (sel && sel.blockId===blockId && sel.text) ? sel.text : target.md;
+  const target = d.blocks.find(b => b.id === blockId);
+  if(!target) return;
+  const a = actionById(act) || { id:act, label:"edit", kind:"prompt" };
+  const own = !!(sel && sel.blockId === blockId);
+  const spanned = own && sel.blockIds ? sel.blockIds.map(id => d.blocks.find(b => b.id === id)).filter(Boolean) : [];
+  if(!spanned.includes(target)) spanned.unshift(target);
+  const highlighted = own && sel.text ? sel.text
+    : target.kind === "figure" || target.kind === "image" ? (target.caption || target.brief || "") : (target.md || "");
 
   snapshot();
   target.busy = act;
-  target.hl = (sel && sel.blockId===blockId && sel.text) ? sel.text : "";
+  target.hl = own && sel.text ? sel.text : "";
   inFlight++;
   patch(d, target);
 
-  /* Edit on a diagram goes to the illustrator and redraws it in place; on a
-     heading it renames the section; on prose it is a revision like the rest. */
-  const drawing = a.kind==="figure" || (act==="revise" && target.kind==="figure");
-  const heading = target.kind === "heading" || target.kind === "subheading";
-  let action = actionPrompt(a);
-  if(act==="revise" && drawing) action = "Redraw this diagram as the reader directs, keeping everything they did not ask to change. Return one figure block with its caption.";
-  else if(heading) action += "\nThe target is a section heading. Return mode \"replace\" with one prose block whose md is the new heading text alone: a short noun phrase, no markdown marks.";
-  const { outline, before, after } = context(d, idx);
-  const user = usr("edit_user", {
-    READER: readerText(d.known),
-    TITLE: d.title,
-    OUTLINE: outline,
-    BEFORE: before || "(none)",
-    TARGET: target.md + (drawing && target.caption ? "\n\nCaption: " + target.caption : ""),
-    AFTER: after || "(none)",
-    HIGHLIGHT: highlighted,
-    QUESTION: question || "(nothing)",
-    ACTION: action
+  const view = primerView(d, new Set(spanned.map(b => b.id)));
+  const user = usr("action_user", {
+    READER: readerText(d.known), TITLE: d.title, TOPIC: d.topic || d.title, INSTRUCTION: instrText(d),
+    BLOCKS: view.text, WHERE: whereText(d, view, spanned),
+    HIGHLIGHT: highlighted || "(nothing: the whole block)",
+    QUESTION: question || "(none)",
+    LABEL: a.label, ACTION: actionPrompt(a) || "Do as the reader's note says."
   });
-  const role = drawing ? "figure" : "edit";
-  const secLabel = target.sec != null ? " §" + (target.sec+1) : "";
+  const secLabel = target.sec != null ? " §" + (target.sec + 1) : "";
+  const stamp = { label:a.label, note:question || "", quote:highlighted.slice(0, 220), ts:Date.now() };
+  const undone = () => { if(doc === d) undoStack.pop(); patch(d, target); toolsPaint(); tidyRun(d); livePaint(); };
 
+  let out, callId;
   try{
-    const { value:out } = await agent(d, { role, label: word(a) + secLabel, sec:target.sec, system:sys(role), user, by:"you", model:a.model });
-    const blocks = ((out && out.blocks)||[]).filter(x => x && (x.md || x.title));
-    if(!blocks.length) throw new Error("Empty response.");
-    const stamp = { label:a.label, note:question||"", quote:highlighted.slice(0,220), ts:Date.now() };
-    /* The reviser may open a subsection for what it adds; a heading it left
-       inside prose becomes one as well. */
-    const made = blocks.flatMap(x => {
-      const base = { sec:target.sec, edit:stamp };
-      if(drawing){
-        const b = { id:uid(), kind:"figure", md:x.md, fresh:true, ...base };
-        if(x.caption) b.caption = String(x.caption).trim();
-        return [b];
-      }
-      if(x.kind==="subheading") return [subBlock(x.title || x.md, base)];
-      if(x.kind==="note") return [{ id:uid(), kind:"note", md:x.md, fresh:true, ...base }];
-      return proseBlocks(x.md, base);
-    });
-    if(!made.length) throw new Error("Empty response.");
-    target.busy = false; delete target.hl; inFlight--; clearHighlight();
-    const at = d.blocks.indexOf(target);
-    const replaced = a.kind==="figure" ? false : act==="revise" && drawing ? true : out.mode==="replace";
-    let landed = made[0];
-    if(heading && replaced){
-      /* A heading stays the block it is; it takes the new title. */
-      const t = made.find(b => b.kind === "prose" && b.md);
-      target.md = (target.kind === "heading" ? "## " : "### ") + trimTitle(t ? t.md : "", 72, headingTitle(target));
-      target.edit = stamp; target.fresh = true; landed = target;
-    }
-    else if(at < 0) d.blocks.push(...made);
-    else if(replaced) d.blocks.splice(at, 1, ...made);
-    else d.blocks.splice(at+1, 0, ...made);
-    if(doc === d && route === "doc"){
-      render();
-      const first = main.querySelector(`[data-block-id="${landed.id}"]`);
-      if(first) first.scrollIntoView({block:"nearest", behavior:"smooth"});
-    }
-    save(d);
-    toast(replaced ? "Replaced" : "Added", { undo:true });
+    ({ value:out, callId } = await agent(d, { role:"action", label: word(a) + secLabel, sec:target.sec, system:sys("action"), user, by:"you", model:a.model }));
   }catch(e){
     target.busy = false; delete target.hl; inFlight--; clearHighlight();
-    if(doc === d) undoStack.pop();
-    patch(d, target);
-    toolsPaint();
-  }finally{
-    tidyRun(d); livePaint();
+    return undone();
   }
+  target.busy = false; delete target.hl; inFlight--; clearHighlight();
+  const changes = Array.isArray(out) ? out : Array.isArray(out && out.changes) ? out.changes : [];
+  const done = applyChanges(d, changes, view, stamp, callId, spanned);
+  const rec = (traces.get(d.id) || []).find(r => r.id === callId);
+  if(rec){ rec.applied = done.log; saveTrace(d.id); }
+  const said = out && !Array.isArray(out) && out.note ? String(out.note).trim() : "";
+  if(!done.did.length){
+    issue(d, cap(word(a)) + " changed nothing" + (said ? ": " + said : done.log.length ? ": " + done.log.join("; ") : "."), rec);
+    return undone();
+  }
+  if(doc === d && route === "doc"){
+    render();
+    const first = done.landed && main.querySelector(`[data-block-id="${done.landed.id}"]`);
+    if(first) first.scrollIntoView({ block:"nearest", behavior:"smooth" });
+  }
+  save(d);
+  toast(cap(done.did.join(", ")) + (said ? ". " + said : ""), { undo:true });
+  tidyRun(d); livePaint();
+}
+
+/* Apply the agent's changes to the document, in order, each by the label
+   it named. A change naming a block no longer there is skipped and said
+   so. Returns {did, landed, log}: a phrase per change made, for the toast;
+   the first block that landed, to scroll to; and a line per change, kept
+   or skipped, for the Inspector. */
+function applyChanges(d, changes, view, stamp, callId, selected){
+  const did = [], log = [], visuals = [];
+  let landed = null;
+  const at = label => { const id = view.ids.get(String(label == null ? "" : label).trim()); return id ? d.blocks.findIndex(b => b.id === id) : -1; };
+  const land = b => { if(!landed && b) landed = b; };
+  const what = list => list.map(blockWord).join(", ");
+  /* The agent's elements as blocks, in the section of the block they go
+     beside. A figure that takes a diagram's place carries that diagram's
+     SVG for the illustrator to work from. */
+  const blocksOf = (list, sec, old) => (Array.isArray(list) ? list : []).flatMap(x => {
+    if(!x || typeof x !== "object") return [];
+    const base = { sec, edit:stamp, fresh:true }, kind = String(x.kind || "prose");
+    if(kind === "figure" || kind === "image"){
+      const brief = String(x.brief || x.md || "").trim();
+      if(!brief) return [];
+      const b = { id:uid(), kind, md:"", brief, pending:true, by:callId, ...base };
+      b[kind === "figure" ? "draw" : "find"] = true;
+      if(kind === "figure" && old && old.kind === "figure" && old.md) b.replaces = old.md;
+      visuals.push(b);
+      return [b];
+    }
+    if(kind === "subheading" || kind === "heading"){ const t = x.title || x.md; return t ? [subBlock(t, base)] : []; }
+    if(kind === "note"){ const md = String(x.md || "").trim(); return md ? [{ id:uid(), kind:"note", md, ...base }] : []; }
+    return proseBlocks(String(x.md || ""), base);
+  });
+
+  for(const c of changes.slice(0, 8)){
+    if(!c || typeof c !== "object") continue;
+    const op = String(c.op || "").toLowerCase();
+    if(op === "replace"){
+      const i = at(c.block);
+      if(i < 0){ log.push("replace " + c.block + ": no such block"); continue; }
+      const old = d.blocks[i], made = blocksOf(c.with, old.sec, old);
+      if(old.kind === "heading" || old.kind === "subheading"){
+        /* A heading stays the block it is and takes the new title; anything else goes under it. */
+        const t = made.find(b => b.kind === "subheading"), rest = made.filter(b => b !== t);
+        if(!t && !rest.length){ log.push("replace " + c.block + ": no new title"); continue; }
+        if(t){ old.md = (old.kind === "heading" ? "## " : "### ") + headingTitle(t); old.edit = stamp; old.fresh = true; land(old); did.push("retitled the section"); }
+        if(rest.length){ d.blocks.splice(i + 1, 0, ...rest); land(rest[0]); did.push("added " + what(rest)); }
+        log.push((t ? "retitled " : "kept ") + c.block + (rest.length ? ", added " + what(rest) + " under it" : ""));
+        continue;
+      }
+      if(!made.length){ log.push("replace " + c.block + ": nothing to put in its place"); continue; }
+      d.blocks.splice(i, 1, ...made);
+      land(made[0]); did.push("replaced " + blockWord(old));
+      log.push("replaced " + c.block + " (" + old.kind + ") with " + what(made));
+    }else if(op === "insert"){
+      const before = c.before != null && c.after == null, ref = before ? c.before : c.after, i = at(ref);
+      if(i < 0){ log.push("insert: no such block " + ref); continue; }
+      const made = blocksOf(c.with, d.blocks[i].sec);
+      if(!made.length){ log.push("insert at " + ref + ": nothing to insert"); continue; }
+      d.blocks.splice(before ? i : i + 1, 0, ...made);
+      land(made[0]); did.push("added " + what(made));
+      log.push("inserted " + what(made) + (before ? " before " : " after ") + ref);
+    }else if(op === "remove"){
+      const i = at(c.block);
+      if(i < 0){ log.push("remove " + c.block + ": no such block"); continue; }
+      if(d.blocks[i].kind === "heading"){ log.push("remove " + c.block + ": a section heading stays"); continue; }
+      const gone = d.blocks.splice(i, 1)[0];
+      did.push("removed " + blockWord(gone));
+      log.push("removed " + c.block + " (" + gone.kind + ")");
+    }else if(op === "define"){
+      const term = String(c.term || "").trim(), words = String(c.words || term).trim();
+      if(!term){ log.push("define: no term"); continue; }
+      /* The words are linked in whichever selected block holds them. */
+      const r = defineFrom(d, selected.find(b => b.md && b.md.includes(words)) || selected[0], words, term);
+      did.push("defining “" + term + "”");
+      log.push("defining “" + term + "”" + (r.linked ? ", linked from “" + words + "”" : " with no link: “" + words + "” is not in the block"));
+    }else log.push("unknown change " + JSON.stringify(c).slice(0, 120));
+  }
+  /* Diagrams and images are drawn and found once the prose has landed. */
+  const { titles, outline, reader } = docContext(d);
+  visuals.filter(b => d.blocks.includes(b)).forEach(b => sideLater(d, b,
+    () => (b.draw ? genFigure(d, b, titles[b.sec] || "", outline, reader) : genImage(d, b, titles[b.sec] || "")).then(() => { livePaint(); tidyRun(d); })));
+  return { did, landed, log };
 }
 
 /* ══ the pen ══════════════════════════════════════════════════ */
@@ -3072,6 +3159,9 @@ function locate(root, text){
   return r;
 }
 function highlightIn(root, text){ if(canHighlight) highlightRange(locate(root, text)); }
+/* What is selected: the block the selection began in, every block it runs
+   into (in reading order, a block counting only when some of its text is
+   inside the selection), the words, and where to put the pen. */
 function readSelection(){
   if(route !== "doc") return null;
   const s = window.getSelection();
@@ -3083,7 +3173,14 @@ function readSelection(){
   const block = n && n.closest ? n.closest("[data-block-id]") : null;
   if(!block || block.classList.contains("pending") || block.classList.contains("busy")) return null;
   if(block.dataset.kind === "image") return null;
-  return { blockId: block.dataset.blockId, text, rect: s.getRangeAt(0).getBoundingClientRect() };
+  const range = s.getRangeAt(0), blockIds = [];
+  for(const e of main.querySelectorAll(".doc > [data-block-id]")){
+    if(e.classList.contains("pending") || e.classList.contains("busy")) continue;
+    const r = document.createRange(); r.selectNodeContents(e);
+    if(range.compareBoundaryPoints(Range.START_TO_END, r) > 0 && range.compareBoundaryPoints(Range.END_TO_START, r) < 0) blockIds.push(e.dataset.blockId);
+  }
+  if(!blockIds.includes(block.dataset.blockId)) blockIds.unshift(block.dataset.blockId);
+  return { blockId: block.dataset.blockId, blockIds, text, rect: range.getBoundingClientRect() };
 }
 function placeTools(rect){
   pen.classList.add("show");
@@ -3128,7 +3225,6 @@ function trigger(act){
   if(!sel) return;
   const a = actionById(act);
   if(!a) return;
-  if(a.kind==="define"){ const {blockId, text} = sel; hideTools(); defineFrom(doc, blockId, text); return; }
   /* An action that asks for a line of text first (Edit, Ask, a custom one,
      or Complain) opens the field, worded for it. A complaint goes to
      Alexander, not to the model. */
@@ -3714,15 +3810,15 @@ const CONTROLS = {
   },
   /* The selection toolbar (the pen). Each action is a row: the switch puts
      it in the pen, the fold opens its editor — name, the instruction sent to
-     the reviser, the model it runs on, whether it asks for a note first —
-     and up, down and Delete wait beside the row for the pointer. New
-     actions, Restore and the guide sit at the foot. */
+     the action agent, the model it runs on, whether it asks for a note
+     first — and up, down and Delete wait beside the row for the pointer.
+     New actions, Restore and the guide sit at the foot. */
   actions(){
     const g = el("div", "keys aset"), list = el("ul", "klist");
     let models = [], defaults = {};
     const debounced = (input, fn) => { let t; input.oninput = () => { clearTimeout(t); t = setTimeout(fn, 300); }; };
     const modelSel = a => {
-      const wrap = el("span", "sel"), sel = el("select", "field"), role = a.kind === "figure" ? "figure" : "edit";
+      const wrap = el("span", "sel"), sel = el("select", "field"), role = "action";
       const nameOf = id => (models.find(m => m.id === id) || { name:id }).name;
       const def = el("option", null, "Default" + (defaults[role] ? " · " + nameOf(defaults[role]) : "")); def.value = "";
       sel.append(def);
@@ -3754,7 +3850,7 @@ const CONTROLS = {
       const name = kfield(); name.value = a.label; name.setAttribute("aria-label", "Name");
       debounced(name, () => { const v = name.value.trim().slice(0, 40); if(v){ a.label = v; nameSpan.textContent = v; sw.setAttribute("aria-label", v); saveActions(); renderPen(); } });
       f.append(srow("Name", name));
-      if(editKind(a)){
+      if(prompted(a)){
         const ta = el("textarea", "p-text"); ta.spellcheck = false; ta.value = actionPrompt(a); ta.setAttribute("aria-label", "Instruction");
         const dflt = () => a.src && PROMPTS[a.src] ? PROMPTS[a.src].text : "";
         const rst = btn("reset", "Reset");
@@ -3799,7 +3895,7 @@ const CONTROLS = {
       if(to && !to.disabled) to.focus();
     }
     const add = btn("go", "New action", () => {
-      const a = { id:"a" + uid(), label:"New action", kind:"edit", on:true, prompt:"", builtin:false };
+      const a = { id:"a" + uid(), label:"New action", kind:"prompt", on:true, prompt:"", builtin:false };
       actions.push(a); saveActions(); renderPen(); paint(a.id);
     });
     const restore = el("span");
@@ -4095,32 +4191,34 @@ const GUIDES = {
   },
   actions: {
     title: "Actions guide",
-    intro: `<p>Select a passage in any primer and a small toolbar appears above it: the pen. Each button on it is an action, something the selection can have done to it. The first nine answer to the keys 1 to 9.</p>`,
+    intro: `<p>Select a passage in any primer and a small toolbar appears above it: the pen. Each button on it is an action, something to be done with the selection. The first nine answer to the keys 1 to 9.</p>`,
     sections: [
       { title: "The built-in actions", html: `<table>
-        <tr><td>Explain</td><td>Says the same thing more simply, in place.</td></tr>
-        <tr><td>Example</td><td>Adds the smallest concrete example, after the passage.</td></tr>
+        <tr><td>Explain</td><td>Says the same thing more simply, in place. On a diagram, adds an explanation under it.</td></tr>
+        <tr><td>Example</td><td>Adds the smallest concrete example after the passage.</td></tr>
         <tr><td>Derive</td><td>Shows the steps that were skipped, one at a time, after it.</td></tr>
-        <tr><td>Diagram</td><td>Draws what the passage describes.</td></tr>
+        <tr><td>Diagram</td><td>Draws what the passage describes. On a diagram, redraws it.</td></tr>
         <tr><td>Tighter</td><td>Same content, fewer words.</td></tr>
-        <tr><td>Define</td><td>Writes a small primer on the selected words and links them to it.</td></tr>
+        <tr><td>Define</td><td>Writes a separate primer defining the term you selected, and links the words to it.</td></tr>
         <tr><td>Edit</td><td>Asks what should change, then changes only that.</td></tr>
-        <tr><td>Ask</td><td>Asks your question and answers it, in the text or as a note in the margin.</td></tr>
+        <tr><td>Ask</td><td>Asks your question and answers it, as a note in the margin or in the text.</td></tr>
         <tr><td>Complain</td><td>Sends what is wrong to Alexander, with the passage.</td></tr>
       </table>` },
-      { title: "How an action runs", html: `<p>An action that rewrites goes to the reviser, the agent that revises one block at a time. It sees the block you selected, the blocks either side, the words you highlighted, your note if the action asked for one, and the action's instruction. It answers with one to a few blocks and a mode.</p>
-      <p>Diagram goes to the illustrator instead, and Define to the definer. Every block an action changed keeps the action's name in the margin; press it to see what was asked.</p>` },
-      { title: "Modes", html: `<p>The mode says where the answer goes.</p>
+      { title: "How an action runs", html: `<p>Every action but Complain goes to one agent. It is shown the whole primer, block by block, with the blocks you selected marked, the words you highlighted, your note if the action asked for one, and the action's instruction. On each block that an earlier action made it sees which action and what was asked, and it can search the web when the ask turns on a fact. It answers with a list of changes, which the page applies in order.</p>
+      <p>Every block an action made keeps the action's name in the margin; press it to see what was asked, or to remove the block. Undo takes the whole action back. The Inspector lists each action's call: what the agent was shown, what it answered, and what was applied.</p>` },
+      { title: "Changes", html: `<p>The agent chooses what changes and where; an instruction says what is wanted.</p>
       <ul>
-        <li><em>replace</em>: the new blocks take the place of the block you selected. For saying the same thing better, as Explain and Tighter do.</li>
-        <li><em>after</em>: they are inserted directly after it. For adding something, as Example and Derive do.</li>
+        <li><em>replace</em>: new content takes the place of a block, as Explain and Tighter do. A heading replaced is retitled.</li>
+        <li><em>insert</em>: new content goes before or after a block, as Example and Derive do.</li>
+        <li><em>remove</em>: a block is taken out.</li>
+        <li><em>define</em>: a primer on a term is written and the words are linked to it, as Define does.</li>
       </ul>
-      <p>An instruction can prefer a mode; the reviser decides from what you asked. Each block it returns is prose, a note (a short aside in the margin, for a side question) or, rarely, a subheading, which opens a new subsection in the contents.</p>` },
+      <p>What it puts in is prose, a note (a short aside in the margin), a subheading (rarely, opening a subsection), or a brief for a diagram or an image, which the illustrator or the image finder then makes, exactly as when a primer is first written. A diagram stays a diagram unless you ask otherwise, and a note stays a note.</p>` },
       { title: "Your own actions", html: `<p>Under Settings, Actions, <em>New action</em> makes one.</p>
       <ul>
         <li><em>Name</em>: what its button says, and the word left in the margin of the blocks it changes.</li>
-        <li><em>Instruction</em>: what to do with the selection, in a sentence or two. Say which mode to prefer.</li>
-        <li><em>Model</em>: what it runs on, or the reviser's default.</li>
+        <li><em>Instruction</em>: what to do with the selection, in a sentence or two. Say where the result should go if it matters.</li>
+        <li><em>Model</em>: what it runs on, or the action agent's default.</li>
         <li><em>Ask for a note first</em>: the action then waits for a line from you before it runs, as Edit and Ask do. <em>Prompt shown</em> is the hint in that field.</li>
       </ul>
       <p>A built-in's instruction can be changed the same way; <em>Reset</em> beside it returns the original. The switch on a row puts the action in the pen or takes it out. Hover a row for its arrows and Delete. <em>Restore defaults</em> brings back the nine as shipped and drops the rest.</p>` }
@@ -4189,7 +4287,7 @@ function renderSettings(){
 const AGENTS = {
   outline:  "Planner",
   section:  "Writer",
-  edit:     "Reviser",
+  action:   "Action agent",
   figure:   "Illustrator",
   finder:   "Image finder",
   research: "Researcher",
@@ -4312,6 +4410,8 @@ function callEl(rec, i, t){
   const body = el("div", "call-body");
   body.append(fromNode(rec, t));
   if(rec.error && rec.status !== "ok") body.append(el("p", "why" + (rec.status === "error" ? "" : " soft"), rec.error));
+  /* What an action's answer did to the page, change by change. */
+  if(rec.applied){ const p = el("p", "from"); p.append(el("span", "k", "Applied"), rec.applied.length ? rec.applied.join(" · ") : "nothing"); body.append(p); }
   if(rec.usage){
     const u = rec.usage, p = el("p", "from");
     p.append(el("span", "k", "Usage"), kTok(u.in) + " tokens in · " + kTok(u.out) + " out" + (u.searches ? " · " + u.searches + (u.searches === 1 ? " search" : " searches") : "") + (u.turns > 1 ? " · " + u.turns + " turns" : "") + " · " + usd(u.cost));
@@ -4398,7 +4498,6 @@ function docMarkdown(d){
   if(d.instruction) asked.push("Asked to: " + d.instruction.replace(/\s*\n+\s*/g, " "));
   if(d.note) asked.push("Note from the planner: " + d.note);
   if(d.rewrite) asked.push("Rewrite of “" + d.rewrite.ofTitle + "”: " + d.rewrite.instruction);
-  if(d.define && d.define.from) asked.push("Defines “" + d.define.term + "” in “" + d.define.from.title + "”");
   if(asked.length) parts.push(asked.map(l => "> " + l).join("\n>\n"));
 
   for(const b of d.blocks){

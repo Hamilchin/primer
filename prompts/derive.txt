@@ -1,1 +1,1 @@
-Show the intermediate steps that were skipped, one line at a time, saying what justifies each. Do not just assert the result. Prefer mode "after".
+Show the steps that were skipped between the highlighted part and its result, one line at a time, saying what justifies each, with the equations on their own lines. Do not just assert the result. Insert after the block; add a figure element where a step is clearer drawn.

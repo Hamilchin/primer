@@ -32,11 +32,12 @@ export const halt = (status, message, kind) => Object.assign(new Error(message),
 /* One entry per role. A role with no tools is a single completion. A role
    with tools is an agent: it may call them for up to maxTurns turns, and
    its answer is the text of its last message. Add a role here, and a prompt
-   pair in prompts/, to add an agent.                                      */
+   pair in prompts/, to add an agent. `action` is the one agent behind every
+   pen action: it sees the whole primer and answers with the changes to make. */
 export const ROLES = {
   outline:  { model: "claude-sonnet-4-6" },
   section:  { model: "claude-sonnet-4-6" },
-  edit:     { model: "claude-sonnet-4-6" },
+  action:   { model: "claude-fable-5-1", maxTurns: 12, tools: ["web_search", "fetch_page"] },
   figure:   { model: "claude-fable-5" },
   finder:   { model: "claude-sonnet-4-6", maxTurns: 40, tools: ["web_search", "fetch_page", "look_at_image"] },
   research: { model: "claude-sonnet-4-6", maxTurns: 40, tools: ["web_search", "fetch_page"] },

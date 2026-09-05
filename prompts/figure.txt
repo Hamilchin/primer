@@ -9,6 +9,7 @@ Caption:
 Integration:
 - The diagram sits inside a written explainer, between the prose you are shown. Draw exactly what the brief asks for, using the same names and symbols as the surrounding text, so a reader can move between the words and the picture without translating.
 - Show the structure, flow, or relationship the prose is describing at that point. Nothing that is not in the brief or the prose.
+- When you are shown the diagram this one replaces, keep everything in it that the brief does not ask to change, and change exactly what it does.
 
 SVG rules:
 - Root: <svg viewBox="0 0 640 H" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="..."> with H chosen to fit. No width/height attributes.

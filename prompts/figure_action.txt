@@ -1,1 +1,1 @@
-Draw what the highlighted text describes. If it describes no structure, draw the structure of the surrounding block instead.
+Draw the highlighted passage: insert a figure element after the block, with a brief that says exactly what to show and which labels to use. If the passage describes no structure, draw the structure of the block around it. If the selection is itself a diagram, replace it with a figure element whose brief says what to draw differently.

@@ -23,45 +23,46 @@
 ~~There should be a setting that allows you to change the location/existence of the table of contents.~~
 ~~There should be a default "edit" function in the revise selector that edits the selected portion (diagrams, prose, sections, and all) to the user's direction.~~
 ~~Add a "Bug reporting and feedback" tab to the top that is very apparent. This product will be sent to my beta testers. One sentence in a hover-over text box is enough! Also add a "complain" option to the selction/revision menu, saying "this feedback will be sent to alexander"~~
-~~Button for create an account is misformatted and smaller than it should be.~~ 
-~~Setup guide has irrelevant information. It should be ULTRA CONCISE. WTF Is "Every primer is written by Claude, and Claude has to be paid for. A key is what pays"??? Why do you need this? Just explain how primer works, and how to get a key (personal subscription, API key, using someone else's key, sharing key with someone else.) Also, the setup guide should not be in "sign in" since no one is putting a key there.~~ 
-~~Why the heck is "A small numeral after each cited claim. Hover it for the source." in the settings? Can you strip out all of this slop? Don't add random explanations like this.~~ 
-~~Make the homescreen "new primer" UI better. Use your incredible UI design abilities. It should be simple, obvious, minimal, uncluttered. Perhaps making the input windows more apparent instead of just a line floating in space? Not sure. But please do your best to design something that is a work of art, a joy to use. You can rehaul anything.~~ 
-~~Remove "Something broken, confusing or missing? Say so in a sentence and it goes straight to Alexander, with the page you are on."~~ 
-~~Change the toml to have a min of more than 0 cpus, it should always have 1 so things are much quicker.~~ 
-~~Make "add a key" and "linked to a shared key" cleaner than just one after the other. You should be able to click one and a drop down with the fields should appear. One will replace the other.~~ 
-~~Make settings slightly more to the left, ever so slightly, so it looks good and spaced well. The primer logo should be slightly, ever so slightly bigger.~~ 
-~~The outline preview should be subsection-aware.~~ 
-~~Reverse the homescreen "new primer" UI, the earlier one was better. Also do you think it would be good to put the primer logo above the user request field instead? If not, keep it how it is.~~ 
-~~Show "link not found" message when a link (a share link for instance) doesn't exist.~~ 
-~~When you close a primer it should continue generating, even when you are on the homescreen or something.~~ 
-~~A wrong password on sign-in answers "A password is at least 8 characters." This should only exist for when you create a new account. Say the name or password is wrong.~~ 
-~~The delete button should pop up at the side; right now it is WITHIN each library element, meaning when it is not hovered there is an awkward space.~~ 
-~~Remove "found" as a margin label on every image.~~ 
-~~The key hint "subscription …oken · personal" shows the last four characters of the token; "subscription · personal" is enough.~~ 
-~~When you hover over a question, the highlight section is faint and unnoticeable. The highlight selection should always be quite visible.~~ 
-~~The share menu is a confusing nightmare. No need to have copy or open button, just clicking on the link should be enough! Also the switch element seems to be rectangular. Do not write "Anyone with it reads this primer as it stands, and as it changes." - just say "live updating."~~ 
-~~About and Inspector disagree about cost on the same primer once revisions have run; both should sum the same calls.~~ 
-~~A "new primer" button should be in the top menu bar when not on the homescreen. It should link back to the homescreen with the focus in the element.~~ 
-~~You should be able to treat the primer library as links, so right clickig should allow you to open in new tab and such.~~ 
-~~BUG: going to any selection with an input bar like ask or complain persists the input bar even if you deselect. Don't do that.~~ 
-~~System and user prompts should be collapsed by default, side by side, in the inspector.~~ 
-~~"interrupted after §10 of 11, section 10 didn't come backResume" is all on a different line from the "AboutShareRewriteInspector" line, making it look unclean and cluttered.~~ 
-~~If the organizer/planner of the primer has any objections or notes (like an assumption made about the question, or if the question itself has a mistake in it, or if it was malformed, etc) it should be able to put them in a "note from the planner" displayed at the top. Add this functionality.~~ 
-~~The state of the input fields should be persisted even if, say, they add an API key.~~ 
-~~Replace "name" with "Username"~~ 
-~~Do a rehaul of the settings UI, especially the ENTIRE "keys" section - right now it's SO cluttered, not compact, not orderly, no clear visual hierarchy, etc. It should be minimal, easy to use, a UI WORK OF ART. Don't write "Its name", just write "key name" and "password." Rethink this UI, plan it, and generally make the settings page better, more compact, less all-over-the-place.~~  
-~~The "write" button should be "write new primer."~~ 
-~~The library is visually high compared to the new primer creation menu, that should be fixed~~ 
+~~Button for create an account is misformatted and smaller than it should be.~~
+~~Setup guide has irrelevant information. It should be ULTRA CONCISE. WTF Is "Every primer is written by Claude, and Claude has to be paid for. A key is what pays"??? Why do you need this? Just explain how primer works, and how to get a key (personal subscription, API key, using someone else's key, sharing key with someone else.) Also, the setup guide should not be in "sign in" since no one is putting a key there.~~
+~~Why the heck is "A small numeral after each cited claim. Hover it for the source." in the settings? Can you strip out all of this slop? Don't add random explanations like this.~~
+~~Make the homescreen "new primer" UI better. Use your incredible UI design abilities. It should be simple, obvious, minimal, uncluttered. Perhaps making the input windows more apparent instead of just a line floating in space? Not sure. But please do your best to design something that is a work of art, a joy to use. You can rehaul anything.~~
+~~Remove "Something broken, confusing or missing? Say so in a sentence and it goes straight to Alexander, with the page you are on."~~
+~~Change the toml to have a min of more than 0 cpus, it should always have 1 so things are much quicker.~~
+~~Make "add a key" and "linked to a shared key" cleaner than just one after the other. You should be able to click one and a drop down with the fields should appear. One will replace the other.~~
+~~Make settings slightly more to the left, ever so slightly, so it looks good and spaced well. The primer logo should be slightly, ever so slightly bigger.~~
+~~The outline preview should be subsection-aware.~~
+~~Reverse the homescreen "new primer" UI, the earlier one was better. Also do you think it would be good to put the primer logo above the user request field instead? If not, keep it how it is.~~
+~~Show "link not found" message when a link (a share link for instance) doesn't exist.~~
+~~When you close a primer it should continue generating, even when you are on the homescreen or something.~~
+~~A wrong password on sign-in answers "A password is at least 8 characters." This should only exist for when you create a new account. Say the name or password is wrong.~~
+~~The delete button should pop up at the side; right now it is WITHIN each library element, meaning when it is not hovered there is an awkward space.~~
+~~Remove "found" as a margin label on every image.~~
+~~The key hint "subscription …oken · personal" shows the last four characters of the token; "subscription · personal" is enough.~~
+~~When you hover over a question, the highlight section is faint and unnoticeable. The highlight selection should always be quite visible.~~
+~~The share menu is a confusing nightmare. No need to have copy or open button, just clicking on the link should be enough! Also the switch element seems to be rectangular. Do not write "Anyone with it reads this primer as it stands, and as it changes." - just say "live updating."~~
+~~About and Inspector disagree about cost on the same primer once revisions have run; both should sum the same calls.~~
+~~A "new primer" button should be in the top menu bar when not on the homescreen. It should link back to the homescreen with the focus in the element.~~
+~~You should be able to treat the primer library as links, so right clickig should allow you to open in new tab and such.~~
+~~BUG: going to any selection with an input bar like ask or complain persists the input bar even if you deselect. Don't do that.~~
+~~System and user prompts should be collapsed by default, side by side, in the inspector.~~
+~~"interrupted after §10 of 11, section 10 didn't come backResume" is all on a different line from the "AboutShareRewriteInspector" line, making it look unclean and cluttered.~~
+~~If the organizer/planner of the primer has any objections or notes (like an assumption made about the question, or if the question itself has a mistake in it, or if it was malformed, etc) it should be able to put them in a "note from the planner" displayed at the top. Add this functionality.~~
+~~The state of the input fields should be persisted even if, say, they add an API key.~~
+~~Replace "name" with "Username"~~
+~~Do a rehaul of the settings UI, especially the ENTIRE "keys" section - right now it's SO cluttered, not compact, not orderly, no clear visual hierarchy, etc. It should be minimal, easy to use, a UI WORK OF ART. Don't write "Its name", just write "key name" and "password." Rethink this UI, plan it, and generally make the settings page better, more compact, less all-over-the-place.~~
+~~The "write" button should be "write new primer."~~
+~~The library is visually high compared to the new primer creation menu, that should be fixed~~
 ~~You should be able to set an independent model for each agent. The defaults and selections for each agent should be displayed in settings, and there should be a "reset to default" button.~~
-~~Users should be able to change which edit options appear in the hotbar and create new ones as needed with their own custom prompts. There should be a section of the settings dedicated to exclusively this, and it should be clean, intuitive, easy to use, minimal, structured, and complete. You should be able to select "active actions" - i.e. the ones that appear in the hotbar when selecting. You should be able to turn them off or delete them, rename them, edit the prompt, edit the model doing the actions, as well as restore all default active actions. And anything else I've forgotten. You are a UI/UX expert. I need this to be not confusing and done elegantly.~~ 
-~~Sonnet should be default for researcher.~~ 
-~~Move up and move down don't work for actions. Move up/down/delete should appear as options when hovering over the unexpanded actions, not after expanding.~~ 
-~~Add a guide to actions, what "modes" are, etc. Minimal, simple, like the setup guide (write it in primer format with the table of contents and whatnot)~~ 
-~~Primer should default to "paper" theme, and favicon should be black instead of white~~ 
-You should still be able to share primers/make them public even if they aren't finished creating yet. For some reason right now the only things I see in the bar are "about" and "inspector"
-Asking to explain the diagram deleted the diagram, for some reason. Fix this!
-Make sure you know exactly what kinds of interactions are possible with the set of actions. Try going through all of them exhastively (thinking through them) and doing extensive bugtesting of them. Like what happens if you highlight a diagram and ask for another diagram? What happens if you do an action on the answer to a question? Make sure we have unified code for all of these; that each mode works well together and the agent knows through its prompts what the best thing is to do. What happens when you edit a side answer? Why would it get put in the main thing? 
-Actions should have a little more free reign over what they can do, and they should have a bunch of context on what is being highlighted, where in the primer it is, what the primer content is, what questions were asked before, and what actions (replace, edit, insert, diagram, research, etc etc etc) it has access to. And it should have access to all of them, including image search and research and diagram and whatnot, so it can adapt based on the user's ask. Derive should be able to draw diagrams, write equations, insert, edit, etc. 
-Make sure the "actions" have a unified interface that is easily debuggable. All the a
-Do NOT mention the original primer that the definition is sourced from in the definition primer. Do not use callbacks to the concepts in the original things. Have it be made entirely independenlty, using the same code a user would use to make a new primer, except with a "definition prompt" in the userprompt. This should essentially be like the user asking for a definition of whatever was highlighted. What should happen is an agent figures out what term definition the user was asking for (if the selection covers half a sentence, for example), then a new primer is just made in the same way all primers are made. The new primer should not know about the old one. 
+~~Users should be able to change which edit options appear in the hotbar and create new ones as needed with their own custom prompts. There should be a section of the settings dedicated to exclusively this, and it should be clean, intuitive, easy to use, minimal, structured, and complete. You should be able to select "active actions" - i.e. the ones that appear in the hotbar when selecting. You should be able to turn them off or delete them, rename them, edit the prompt, edit the model doing the actions, as well as restore all default active actions. And anything else I've forgotten. You are a UI/UX expert. I need this to be not confusing and done elegantly.~~
+~~Sonnet should be default for researcher.~~
+~~Move up and move down don't work for actions. Move up/down/delete should appear as options when hovering over the unexpanded actions, not after expanding.~~
+~~Add a guide to actions, what "modes" are, etc. Minimal, simple, like the setup guide (write it in primer format with the table of contents and whatnot)~~
+~~Primer should default to "paper" theme, and favicon should be black instead of white~~
+~~You should still be able to share primers/make them public even if they aren't finished creating yet. For some reason right now the only things I see in the bar are "about" and "inspector"~~
+~~Asking to explain the diagram deleted the diagram, for some reason. Fix this!~~
+~~Make sure you know exactly what kinds of interactions are possible with the set of actions. Try going through all of them exhastively (thinking through them) and doing extensive bugtesting of them. Like what happens if you highlight a diagram and ask for another diagram? What happens if you do an action on the answer to a question? Make sure we have unified code for all of these; that each mode works well together and the agent knows through its prompts what the best thing is to do. What happens when you edit a side answer? Why would it get put in the main thing?~~
+~~Actions should have a little more free reign over what they can do, and they should have a bunch of context on what is being highlighted, where in the primer it is, what the primer content is, what questions were asked before, and what actions (replace, edit, insert, diagram, research, etc etc etc) it has access to. And it should have access to all of them, including image search and research and diagram and whatnot, so it can adapt based on the user's ask. Derive should be able to draw diagrams, write equations, insert, edit, etc. It should _KNOW_ what it is replacing if it is replacing, and it should be able to CHOOSE where the edit text goes or whatever. Design this system keeping in mind that we want the agent to have full control and information over the changes it makes and how things will change.~~
+~~Change the actions to use fable by default.~~
+~~Make sure the "actions" have a unified interface that is easily debuggable. All the action agents should have a similar set of tools available to them. Make sure this is coded in an elegant, modular, and ideally universal way. Use simple, extensible, non-hacky solutions.~~
+~~Do NOT mention the original primer that the definition is sourced from in the definition primer. Do not use callbacks to the concepts in the original things. Have it be made entirely independenlty, using the same code a user would use to make a new primer, except with a "definition prompt" in the userprompt. This should essentially be like the user asking for a definition of whatever was highlighted. What should happen is an agent figures out what term definition the user was asking for (if the selection covers half a sentence, for example), then a new primer is just made in the same way all primers are made. The new primer should not know about the old one.~~

@@ -1,1 +1,1 @@
-Say the same thing more simply. Break it into smaller steps if that helps. Replace jargon with plain words, or define it on the spot. Prefer mode "replace".
+Say the same thing more simply: smaller steps, plain words, jargon defined on the spot. Replace the block. On a diagram, keep it and insert prose after it that walks the reader through what it shows.
