@@ -1206,13 +1206,11 @@ function normalizeActions(stored){
     if(base && base.src) a.src = base.src;
     if(s.prompt != null) a.prompt = String(s.prompt);
     if(s.model) a.model = String(s.model);
-    {
-      if(s.input || (base && base.input)) a.input = true;
-      const ph = s.placeholder != null ? s.placeholder : (base && base.placeholder);
-      if(a.input && ph) a.placeholder = String(ph).slice(0,120);
-      const vb = s.verb != null ? s.verb : (base && base.verb);
-      if(vb) a.verb = String(vb).slice(0,20);
-    }
+    if(s.input || (base && base.input)) a.input = true;
+    const ph = s.placeholder != null ? s.placeholder : (base && base.placeholder);
+    if(a.input && ph) a.placeholder = String(ph).slice(0,120);
+    const vb = s.verb != null ? s.verb : (base && base.verb);
+    if(vb) a.verb = String(vb).slice(0,20);
     seen.add(a.id); out.push(a);
   }
   return out.length ? out : defaultActions();
@@ -1489,13 +1487,132 @@ function runOf(d){
   return r;
 }
 const running = d => { const r = d && runs.get(d.id); return !!(r && (r.jobs.size || r.active)); };
-function stopRun(d){
+/* byYou: a person pressed Stop. That is the one stop that lasts (d.halt,
+   below); a run that dies on its own is taken up again. */
+function stopRun(d, byYou){
+  if(byYou){ d.halt = { by:"you" }; unschedule(d); unqueue(d.id); save(d); livePaint(); }
   const r = runs.get(d.id);
   if(!r || !(r.jobs.size || r.active)) return;
   r.cancelled = true;
   r.jobs.forEach(j => j.ctrl.abort());
 }
 function tidyRun(d){ const r = runs.get(d.id); if(r && !r.jobs.size && !r.active) runs.delete(d.id); }
+
+/* ══ carrying on ══════════════════════════════════════════════
+   The page writes a primer, so a closed tab, a lost connection or a call
+   that never came back leaves one unfinished. Nothing a person did not
+   stop stays that way: a run that fails in this tab is tried again after
+   a pause, longer each time, and whichever tab next has the library takes
+   up whatever closed tabs left behind, two at a time. Only Stop lasts: a
+   primer stopped by hand (d.halt.by) waits for Resume. One that died for
+   want of a working key (d.halt.kind) waits for a different key, and one
+   that has failed on its own AUTO_MAX times running waits for a person.
+
+   Two tabs never write one primer: a tab renews a lease on each primer it
+   is writing every few seconds, and a lease renewed lately is someone
+   else's. A reload keeps the tab's id, so the lease is its own again.  */
+const TAB = (() => { try{ const t = sessionStorage.getItem("primer:tab") || uid(); sessionStorage.setItem("primer:tab", t); return t; }catch(e){ return uid(); } })();
+const LEASE_BEAT = 5000, LEASE_STALE = 15000, AUTO_MAX = 5, AUTO_AT_ONCE = 2;
+const leaseKey = id => "primer:lease:" + id;
+const leases = new Map();   // docId → interval renewing it
+function takeLease(d){
+  if(leases.has(d.id)) return;
+  const beat = () => store.set(leaseKey(d.id), { tab:TAB, at:Date.now() });
+  beat(); leases.set(d.id, setInterval(beat, LEASE_BEAT));
+}
+function dropLease(d){
+  if(!leases.has(d.id)) return;
+  clearInterval(leases.get(d.id)); leases.delete(d.id);
+  store.del(leaseKey(d.id));
+}
+/* Another tab is writing it now. */
+async function heldElsewhere(id){
+  const l = await store.get(leaseKey(id));
+  return !!(l && l.tab !== TAB && Date.now() - l.at < LEASE_STALE);
+}
+/* A closing tab lets its leases go, so the next tab need not wait them out. */
+addEventListener("pagehide", () => {
+  for(const [id, t] of leases){
+    clearInterval(t);
+    if(isGuest()) local.del(leaseKey(id));
+    else fetch("/api/store/" + encodeURIComponent(leaseKey(id)), { method:"DELETE", keepalive:true }).catch(() => {});
+  }
+  leases.clear();
+});
+const keySig = () => me && me.key ? String(me.key.id || me.key.kind + "/" + me.key.name) : "";
+const HARD = new Set(["no_key", "billing_error", "authentication_failed"]);   // kinds no retry can mend
+
+/* Whether a primer may be taken up unasked: unfinished, not stopped by
+   hand, not waiting on a key that has not changed, not failed too often. */
+function eligible(d){
+  if(!d || !d.status || d.status === "done" || running(d)) return false;
+  if(d.halt && d.halt.by) return false;
+  if(d.halt && HARD.has(d.halt.kind) && (!me || !me.key || keySig() === d.halt.key)) return false;
+  return (d.tries || 0) < AUTO_MAX;
+}
+const elsewhere = new Set();   // ids another tab holds a lease on, as last seen
+const retryT = new Map();      // docId → the timer of a retry due in this tab
+const pendingRetry = d => retryT.has(d.id);
+function unschedule(d){ clearTimeout(retryT.get(d.id)); retryT.delete(d.id); }
+/* A run that ended on its own is tried again in a while: 20 seconds the
+   first time, doubling to five minutes; a rate limit waits a quarter hour. */
+function tryLater(d){
+  unschedule(d);
+  if(!eligible(d)) return;
+  const wait = d.halt && d.halt.kind === "rate_limit" ? 900e3 : Math.min(20e3 * 2 ** Math.max(0, (d.tries || 0) - 1), 300e3);
+  retryT.set(d.id, setTimeout(() => { retryT.delete(d.id); takeUp(d); }, wait));
+  livePaint();
+}
+/* Take a primer up unasked, unless another tab has it. */
+async function takeUp(d){
+  if(!eligible(d)) return false;
+  if(await heldElsewhere(d.id)){ elsewhere.add(d.id); livePaint(); return false; }
+  elsewhere.delete(d.id);
+  if(!eligible(d)) return false;
+  resume(d, true);
+  return true;
+}
+/* Everything the library holds unfinished, queued and started two at a time. */
+const queue = [];
+const unqueue = id => { const i = queue.indexOf(id); if(i > -1) queue.splice(i, 1); };
+const autoRuns = () => [...runs.values()].filter(r => r.auto && (r.active || r.jobs.size)).length;
+function carryOn(){
+  if(!me || route === "login") return;
+  for(const it of index){
+    if(!it.status || it.status === "done" || it.halt === "you" || (it.tries || 0) >= AUTO_MAX) continue;
+    const d = docs.get(it.id);
+    if(d && (running(d) || pendingRetry(d) || !eligible(d))) continue;
+    if(!queue.includes(it.id)) queue.push(it.id);
+  }
+  pump();
+}
+let pumping = false;
+async function pump(){
+  if(pumping) return;
+  pumping = true;
+  try{
+    while(queue.length && autoRuns() < AUTO_AT_ONCE){
+      const id = queue.shift();
+      const cur = docs.get(id);
+      if(cur && (running(cur) || pendingRetry(cur))) continue;
+      let d;
+      try{ d = await refetch(id); }catch(e){ break; }   // no server: the next sweep tries again
+      if(d) await takeUp(d);
+    }
+  }finally{ pumping = false; livePaint(); }
+}
+/* The stored copy, read afresh: another tab may have written it since this
+   one read it, and a resume must start from what is there now. */
+async function refetch(id){
+  const old = docs.get(id);
+  if(old && running(old)) return old;
+  docs.delete(id); traces.delete(id);
+  const d = await loadDoc(id);
+  if(d && old && doc === old){ doc = d; undoStack = []; if(route === "doc"){ const y = scrollY; render(); scrollTo(0, y); } }
+  return d;
+}
+/* The library is looked over now and then while it is on screen. */
+setInterval(() => { if(route === "cover") carryOn(); }, 20000);
 
 /* One model call on a document's behalf. While it runs it is a job the desk
    shows; its text streams into `block`; every prompt, tool call and reply
@@ -2892,8 +3009,9 @@ async function researchAll(d){
 const DEFINE = BRIEFS.find(b => b.define);
 function defineFrom(d, b, words, term){
   const def = startDoc({ topic:term, known:d.known, instruction:DEFINE.text }, true);
-  const linked = !!(b && b.md && words && linkWords(b, words, "primer:" + def.id));
-  if(linked){ b.fresh = true; patch(d, b); }
+  /* A link lives in prose or a note; a heading is a title, and a caption is plain. */
+  const linked = !!(b && (b.kind === "prose" || b.kind === "note") && words && linkWords(b, words, "primer:" + def.id));
+  if(linked) b.fresh = true;
   return { doc:def, linked };
 }
 /* The first plain occurrence of `text` in a block becomes a link. */
@@ -2961,8 +3079,8 @@ function primerView(d, selected){
     const from = !e ? "" : e.by === "research" ? ", corrected by research"
       : ", from " + e.label + (e.note ? " “" + e.note + "”" : e.quote ? " on “" + e.quote + "”" : "");
     const tag = kind => "[" + label + " " + kind + from + (selected.has(b.id) ? " · SELECTED" : "") + "]";
-    if(b.kind === "heading"){ n++; m = 0; lines.push(tag("heading") + " Section " + n + ": " + headingTitle(b)); }
-    else if(b.kind === "subheading"){ m++; lines.push(tag("subheading") + " Subsection " + n + "." + m + ": " + headingTitle(b)); }
+    if(b.kind === "heading"){ n++; m = 0; lines.push(tag("heading of section " + n) + " " + headingTitle(b)); }
+    else if(b.kind === "subheading"){ m++; lines.push(tag("subheading " + n + "." + m) + " " + headingTitle(b)); }
     else if(b.pending || b.error || unfilled(b)) lines.push(tag(b.kind === "figure" ? "diagram" : b.kind === "image" ? "image" : "prose") + " (not made yet" + (b.brief ? ": " + b.brief : "") + ")");
     else if(b.kind === "figure") lines.push(tag("diagram") + (b.caption ? " Caption: " + b.caption : "") + (b.brief ? "\nBrief: " + b.brief : "") + (selected.has(b.id) && b.md ? "\nSVG:\n" + b.md : ""));
     else if(b.kind === "image") lines.push(tag("image") + (b.title ? " " + b.title : "") + (b.caption ? "\nCaption: " + b.caption : ""));
@@ -2970,8 +3088,16 @@ function primerView(d, selected){
   });
   return { text: lines.join("\n\n"), ids, labels };
 }
+const CHANGES_MAX = 8;   // the prompt asks for one to three
 const BLOCK_WORD = { heading:"a section heading", subheading:"a subheading", figure:"a diagram", image:"an image", note:"a note in the margin", prose:"a paragraph" };
 const blockWord = b => BLOCK_WORD[b.kind] || BLOCK_WORD.prose;
+/* Blocks as a phrase: "a paragraph", "3 paragraphs and a diagram". */
+function blockWords(list){
+  const n = new Map();
+  list.forEach(b => { const k = b.kind in BLOCK_WORD ? b.kind : "prose"; n.set(k, (n.get(k) || 0) + 1); });
+  const parts = [...n].map(([k, c]) => c === 1 ? BLOCK_WORD[k] : c + " " + BLOCK_WORD[k].replace(/^an? /, "").replace(/^note in/, "notes in") + (/note/.test(k) ? "" : "s"));
+  return parts.length > 1 ? parts.slice(0, -1).join(", ") + " and " + parts[parts.length - 1] : parts[0] || "nothing";
+}
 /* Which blocks the reader selected, and where they are. */
 function whereText(d, view, blocks){
   const at = b => "[" + view.labels.get(b.id) + "]", first = blocks[0];
@@ -2988,7 +3114,8 @@ async function applyEdit(blockId, act, question){
   const d = doc;
   const target = d.blocks.find(b => b.id === blockId);
   if(!target) return;
-  const a = actionById(act) || { id:act, label:"edit", kind:"prompt" };
+  const a = actionById(act);
+  if(!a) return;
   const own = !!(sel && sel.blockId === blockId);
   const spanned = own && sel.blockIds ? sel.blockIds.map(id => d.blocks.find(b => b.id === id)).filter(Boolean) : [];
   if(!spanned.includes(target)) spanned.unshift(target);
@@ -3011,18 +3138,17 @@ async function applyEdit(blockId, act, question){
   });
   const secLabel = target.sec != null ? " §" + (target.sec + 1) : "";
   const stamp = { label:a.label, note:question || "", quote:highlighted.slice(0, 220), ts:Date.now() };
+  const unbusy = () => { target.busy = false; delete target.hl; inFlight--; clearHighlight(); };
   const undone = () => { if(doc === d) undoStack.pop(); patch(d, target); toolsPaint(); tidyRun(d); livePaint(); };
+  const finished = () => { livePaint(); if(!done.queued) tidyRun(d); };
 
-  let out, callId;
+  let out, callId, done;
   try{
     ({ value:out, callId } = await agent(d, { role:"action", label: word(a) + secLabel, sec:target.sec, system:sys("action"), user, by:"you", model:a.model }));
-  }catch(e){
-    target.busy = false; delete target.hl; inFlight--; clearHighlight();
-    return undone();
-  }
-  target.busy = false; delete target.hl; inFlight--; clearHighlight();
+  }catch(e){ unbusy(); return undone(); }
+  unbusy();
   const changes = Array.isArray(out) ? out : Array.isArray(out && out.changes) ? out.changes : [];
-  const done = applyChanges(d, changes, view, stamp, callId, spanned);
+  done = applyChanges(d, changes, view, stamp, callId, spanned);
   const rec = (traces.get(d.id) || []).find(r => r.id === callId);
   if(rec){ rec.applied = done.log; saveTrace(d.id); }
   const said = out && !Array.isArray(out) && out.note ? String(out.note).trim() : "";
@@ -3037,20 +3163,21 @@ async function applyEdit(blockId, act, question){
   }
   save(d);
   toast(cap(done.did.join(", ")) + (said ? ". " + said : ""), { undo:true });
-  tidyRun(d); livePaint();
+  finished();
 }
 
 /* Apply the agent's changes to the document, in order, each by the label
    it named. A change naming a block no longer there is skipped and said
-   so. Returns {did, landed, log}: a phrase per change made, for the toast;
-   the first block that landed, to scroll to; and a line per change, kept
-   or skipped, for the Inspector. */
+   so. Returns {did, landed, log, queued}: a phrase per change made, for the
+   toast; the first block that landed, to scroll to; a line per change,
+   kept or skipped, for the Inspector; and how many diagrams and images
+   were queued, whose jobs end the run when they are done. */
 function applyChanges(d, changes, view, stamp, callId, selected){
   const did = [], log = [], visuals = [];
   let landed = null;
   const at = label => { const id = view.ids.get(String(label == null ? "" : label).trim()); return id ? d.blocks.findIndex(b => b.id === id) : -1; };
   const land = b => { if(!landed && b) landed = b; };
-  const what = list => list.map(blockWord).join(", ");
+  const what = blockWords;
   /* The agent's elements as blocks, in the section of the block they go
      beside. A figure that takes a diagram's place carries that diagram's
      SVG for the illustrator to work from. */
@@ -3066,12 +3193,13 @@ function applyChanges(d, changes, view, stamp, callId, selected){
       visuals.push(b);
       return [b];
     }
+    /* A heading element retitles the heading it replaces (below); anywhere else it can only open a subsection. */
     if(kind === "subheading" || kind === "heading"){ const t = x.title || x.md; return t ? [subBlock(t, base)] : []; }
     if(kind === "note"){ const md = String(x.md || "").trim(); return md ? [{ id:uid(), kind:"note", md, ...base }] : []; }
     return proseBlocks(String(x.md || ""), base);
   });
 
-  for(const c of changes.slice(0, 8)){
+  for(const c of changes.slice(0, CHANGES_MAX)){
     if(!c || typeof c !== "object") continue;
     const op = String(c.op || "").toLowerCase();
     if(op === "replace"){
@@ -3082,7 +3210,7 @@ function applyChanges(d, changes, view, stamp, callId, selected){
         /* A heading stays the block it is and takes the new title; anything else goes under it. */
         const t = made.find(b => b.kind === "subheading"), rest = made.filter(b => b !== t);
         if(!t && !rest.length){ log.push("replace " + c.block + ": no new title"); continue; }
-        if(t){ old.md = (old.kind === "heading" ? "## " : "### ") + headingTitle(t); old.edit = stamp; old.fresh = true; land(old); did.push("retitled the section"); }
+        if(t){ old.md = (old.kind === "heading" ? "## " : "### ") + headingTitle(t).replace(/^(section|subsection)\s+[\d.]+\s*[:.]?\s*/i, ""); old.edit = stamp; old.fresh = true; land(old); did.push("retitled the section"); }
         if(rest.length){ d.blocks.splice(i + 1, 0, ...rest); land(rest[0]); did.push("added " + what(rest)); }
         log.push((t ? "retitled " : "kept ") + c.block + (rest.length ? ", added " + what(rest) + " under it" : ""));
         continue;
@@ -3094,7 +3222,8 @@ function applyChanges(d, changes, view, stamp, callId, selected){
     }else if(op === "insert"){
       const before = c.before != null && c.after == null, ref = before ? c.before : c.after, i = at(ref);
       if(i < 0){ log.push("insert: no such block " + ref); continue; }
-      const made = blocksOf(c.with, d.blocks[i].sec);
+      /* What goes before a block belongs to the section it lands in: the one before a heading. */
+      const made = blocksOf(c.with, d.blocks[before && i > 0 ? i - 1 : i].sec);
       if(!made.length){ log.push("insert at " + ref + ": nothing to insert"); continue; }
       d.blocks.splice(before ? i : i + 1, 0, ...made);
       land(made[0]); did.push("added " + what(made));
@@ -3110,16 +3239,19 @@ function applyChanges(d, changes, view, stamp, callId, selected){
       const term = String(c.term || "").trim(), words = String(c.words || term).trim();
       if(!term){ log.push("define: no term"); continue; }
       /* The words are linked in whichever selected block holds them. */
-      const r = defineFrom(d, selected.find(b => b.md && b.md.includes(words)) || selected[0], words, term);
+      const r = defineFrom(d, selected.find(b => (b.kind === "prose" || b.kind === "note") && b.md.includes(words)) || selected[0], words, term);
       did.push("defining “" + term + "”");
       log.push("defining “" + term + "”" + (r.linked ? ", linked from “" + words + "”" : " with no link: “" + words + "” is not in the block"));
     }else log.push("unknown change " + JSON.stringify(c).slice(0, 120));
   }
-  /* Diagrams and images are drawn and found once the prose has landed. */
+  /* Diagrams and images are drawn and found once the prose has landed, on
+     the document's side queue, which a stop before now must not still hold. */
+  const queued = visuals.filter(b => d.blocks.includes(b));
+  if(queued.length) runOf(d).cancelled = false;
   const { titles, outline, reader } = docContext(d);
-  visuals.filter(b => d.blocks.includes(b)).forEach(b => sideLater(d, b,
+  queued.forEach(b => sideLater(d, b,
     () => (b.draw ? genFigure(d, b, titles[b.sec] || "", outline, reader) : genImage(d, b, titles[b.sec] || "")).then(() => { livePaint(); tidyRun(d); })));
-  return { did, landed, log };
+  return { did, landed, log, queued: queued.length };
 }
 
 /* ══ the pen ══════════════════════════════════════════════════ */
@@ -3172,7 +3304,6 @@ function readSelection(){
   if(n && n.nodeType===3) n = n.parentElement;
   const block = n && n.closest ? n.closest("[data-block-id]") : null;
   if(!block || block.classList.contains("pending") || block.classList.contains("busy")) return null;
-  if(block.dataset.kind === "image") return null;
   const range = s.getRangeAt(0), blockIds = [];
   for(const e of main.querySelectorAll(".doc > [data-block-id]")){
     if(e.classList.contains("pending") || e.classList.contains("busy")) continue;
