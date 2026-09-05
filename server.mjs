@@ -52,8 +52,8 @@
 //
 // Environment (all optional):
 //   PORT=8787  HOST=127.0.0.1  DATA_DIR=./data  INVITE=...  PRIMER_SECRET=...  ADMIN=name,name
-//   BRAVE_SEARCH_KEY=...   the one web search every agent uses; without it they can only read pages
-// No model credential comes from the environment: keys are added in Settings.
+// No model credential comes from the environment: keys are added in Settings,
+// and each key's provider runs the agents' web searches on it.
 //
 // Setup:
 //   npm install
@@ -199,7 +199,6 @@ createServer(async (req, res) => {
   console.log(`Primer  →  http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}`);
   console.log(`Invite code for new accounts: ${db.invite}`);
   console.log("Calls run on named keys added in Settings; no model credential is read from the environment.");
-  if (!process.env.BRAVE_SEARCH_KEY) console.log("No BRAVE_SEARCH_KEY: the agents can read pages but not search the web.");
   if (!process.env.PRIMER_SECRET) console.log("No PRIMER_SECRET: stored keys are encrypted with a secret kept in the database itself. Set PRIMER_SECRET so a leaked data directory can't be decrypted.");
 });
 

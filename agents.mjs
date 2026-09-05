@@ -5,9 +5,10 @@
 // subscription token may only be spent by Claude Code, so those calls go
 // through the Claude Agent SDK, which runs it; an Anthropic, OpenRouter or
 // OpenAI key is spoken to directly, through the AI SDK, which knows each
-// provider's API. The tools are the same on both paths, defined once here:
-// one web search for everyone (Brave, with BRAVE_SEARCH_KEY), a page reader,
-// and the finder's eyes.
+// provider's API. The tools are the same on both paths: a page reader and
+// the finder's eyes, defined once here, and a web search, which every
+// provider runs for itself on the key's own account, so nobody's searches
+// are paid for by anyone else.
 //
 // MODELS is the catalogue: what a key may run, under the name its provider
 // knows it by. A role runs on its own model, or the one Settings chose for
@@ -45,7 +46,7 @@ export const ROLES = {
 /* ── models and keys ──────────────────────────────────────────────
    The catalogue. `anthropic`, `openai` and `openrouter` are the model's
    name at that provider; a subscription runs what Anthropic does. A model
-   that cannot see is told so by the finder's tool. */
+   the finder's tool cannot show an image to is told so instead. */
 const MODELS = [
   { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", anthropic: "claude-sonnet-4-6", openrouter: "anthropic/claude-sonnet-4.6" },
   { id: "claude-sonnet-5",   name: "Claude Sonnet 5",   anthropic: "claude-sonnet-5",   openrouter: "anthropic/claude-sonnet-5" },
@@ -55,7 +56,7 @@ const MODELS = [
   { id: "gpt-6-astra",       name: "GPT-6 Astra",       openai: "gpt-6-astra",   openrouter: "openai/gpt-6-astra" },
   { id: "gpt-5.6-terra",     name: "GPT-5.6 Terra",     openai: "gpt-5.6-terra", openrouter: "openai/gpt-5.6-terra" },
   { id: "gpt-5.6-luna",      name: "GPT-5.6 Luna",      openai: "gpt-5.6-luna",  openrouter: "openai/gpt-5.6-luna" },
-  { id: "gemini-3.8-flash",  name: "Gemini 3.8 Flash",  openrouter: "google/gemini-3.8-flash" },
+  { id: "gemini-3.8-flash",  name: "Gemini 3.8 Flash",  openrouter: "google/gemini-3.8-flash", vision: false },   // Google refuses an image inside a tool result via OpenRouter (2026-09-05)
   { id: "deepseek-v4-pro",   name: "DeepSeek V4 Pro",   openrouter: "deepseek/deepseek-v4-pro-0813", vision: false },
   { id: "kimi-k3",           name: "Kimi K3",           openrouter: "moonshotai/kimi-k3" },
   { id: "grok-4.6",          name: "Grok 4.6",          openrouter: "x-ai/grok-4.6" }
@@ -91,6 +92,38 @@ export const choices = kind => MODELS.filter(m => m[PROVIDERS[kind].at]).map(({ 
 export function modelFor(role, kind, chosen) {
   const at = PROVIDERS[kind].at, served = id => { const m = model(id); return m && m[at] ? m : null; };
   return served(chosen) || served((ROLES[role] || ROLES.section).model) || served(PROVIDERS[kind].standIn);
+}
+
+/* ── web search ─────────────────────────────────────────────────
+   Each provider searches for itself, on the key in use: Anthropic's and
+   OpenAI's server-side tools, OpenRouter's server tool (the model's own
+   search where it has one, Exa otherwise), and Claude Code's WebSearch for
+   a subscription. The model asks for a search like any other tool; the
+   provider runs it and hands the results straight back. `tool` opens the
+   provider's tool on its client; `price` is a search at list price, for
+   the providers that do not say what they charged. */
+const SEARCH = {
+  subscription: { builtin: "WebSearch" },
+  anthropic:    { tool: c => c.tools.webSearch_20260209({ maxUses: 10 }), price: 0.01 },
+  openrouter:   { tool: c => c.tools.webSearch({}) },
+  openai:       { tool: c => c.tools.webSearch({}), price: 0.01 }
+};
+/* The pages a search found, as one line: for the Inspector, whichever
+   provider ran it. Anthropic answers a list of pages; OpenAI says what it
+   did (a search, or a page it opened) and the sources it drew on; the
+   pages OpenRouter found arrive as sources, gathered by the caller. */
+const hostOf = url => { try { return new URL(url).host.replace(/^www\./, ""); } catch { return String(url); } };
+const pages = list => list.length
+  ? list.length + (list.length === 1 ? " page: " : " pages: ") + list.map(p => p.title || hostOf(p.url)).join(" · ")
+  : "No results.";
+/* What one provider-run search was, read from the stream part that
+   answered it: {query|open|find, text}. */
+function searched(out) {
+  if (Array.isArray(out)) return { text: pages(out) };
+  const a = (out && out.action) || {}, sources = ((out && out.sources) || []).filter(x => x.type === "url");
+  const ask = a.type === "openPage" ? { open: a.url } : a.type === "findInPage" ? { find: a.pattern, in: a.url }
+    : { query: a.query || (a.queries || []).join(" | ") || "" };
+  return { ask, text: a.type === "openPage" ? "read " + hostOf(a.url) : pages(sources) };
 }
 
 /* Which kind a credential is: its prefix says, and the provider confirms.
@@ -275,17 +308,7 @@ export async function fetchImage(url) {
 }
 
 /* ── the web ────────────────────────────────────────────────────
-   One search for everyone. Without a key the agents can still read a
-   page whose address they know. */
-const BRAVE = process.env.BRAVE_SEARCH_KEY;
-async function search(query) {
-  const u = new URL("https://api.search.brave.com/res/v1/web/search");
-  u.search = new URLSearchParams({ q: query, count: "8" });
-  const r = await fetch(u, { headers: { "x-subscription-token": BRAVE, accept: "application/json" }, signal: AbortSignal.timeout(15000) });
-  if (!r.ok) throw new Error("Search failed (HTTP " + r.status + ").");
-  const hits = ((await r.json()).web || {}).results || [];
-  return hits.length ? hits.map((h, i) => (i + 1) + ". " + plain(h.title) + "\n   " + h.url + "\n   " + plain(h.description || "")).join("\n") : "No results.";
-}
+   The page reader. */
 const PAGE_MAX = 40000;
 async function readPage(url) {
   const r = await safeFetch(url, { headers: { "user-agent": UA, accept: "text/html, text/plain;q=0.9, */*;q=0.5" },
@@ -310,15 +333,11 @@ function plain(html) {
 }
 
 /* ── tools ──────────────────────────────────────────────────────
-   Defined once, in the shape both SDKs can be given. Each answers {text},
-   or {text, image, type} with the image as base64; a failure is caught and
-   answered as {error}, so the agent reads why and goes on. */
+   Our own, defined once, in the shape both SDKs can be given. Each answers
+   {text}, or {text, image, type} with the image as base64; a failure is
+   caught and answered as {error}, so the agent reads why and goes on. The
+   web search is not here: it is the provider's, above. */
 const TOOLS = {
-  web_search: {
-    description: "Search the web. Answers up to eight results, each a title, an address and a line from the page. Use fetch_page to read one.",
-    input: { query: z.string().describe("What to search for") },
-    run: async ({ query }) => ({ text: await search(query) })
-  },
   fetch_page: {
     description: "Read a web page as plain text, up to 40,000 characters.",
     input: { url: z.string().describe("The page's URL") },
@@ -366,7 +385,7 @@ const aiTools = (names, sees) => Object.fromEntries(names.map(name => {
 export async function complete({ system, user, role, model: chosen }, cred, emit, signal) {
   const spec = ROLES[role] || ROLES.section;
   const m = modelFor(role, cred.kind, chosen);
-  const names = (spec.tools || []).filter(t => t !== "web_search" || BRAVE);
+  const names = spec.tools || [];
   emit({ start: { model: m.id, tools: names } });
   const call = { system: String(system || ""), user: String(user || ""), model: m, names, maxTurns: spec.maxTurns || 1 };
   return (cred.kind === "subscription" ? viaClaudeCode : viaProvider)(call, cred, emit, signal);
@@ -407,7 +426,17 @@ function refusal(kind, text, cred) {
 }
 
 /* A subscription's calls: Claude Code, run by the Agent SDK, with the
-   token in its environment and the tools as an MCP server. */
+   token in its environment, our tools as an MCP server and the search its
+   own. A search's result is a text with the pages found as a JSON list
+   after "Links:"; the Inspector gets them in the same words as any other
+   provider's. */
+const WEBSEARCH = SEARCH.subscription.builtin;
+function foundByClaudeCode(content) {
+  const text = brief(content), m = /Links:\s*(\[[\s\S]*?\])/.exec(typeof content === "string" ? content
+    : (Array.isArray(content) ? content : []).map(c => c.type === "text" ? c.text : "").join("\n"));
+  try { if (m) return pages(JSON.parse(m[1])); } catch {}
+  return text;
+}
 async function viaClaudeCode({ system, user, model: m, names, maxTurns }, cred, emit, signal) {
   const env = { ...process.env, CLAUDE_CODE_OAUTH_TOKEN: cred.value };
   delete env.ANTHROPIC_API_KEY; delete env.ANTHROPIC_AUTH_TOKEN;
@@ -415,15 +444,17 @@ async function viaClaudeCode({ system, user, model: m, names, maxTurns }, cred, 
   signal.addEventListener("abort", () => abortController.abort(), { once: true });
   const dog = watchdog(() => abortController.abort());
   let stderr = "";
+  const builtin = names.includes("web_search") ? [WEBSEARCH] : [], ours = names.filter(n => TOOLS[n]);
   const options = {
     stderr: s => { stderr = (stderr + s).slice(-2000); },
     systemPrompt: system, model: m.anthropic, abortController, env,
     settingSources: [], includePartialMessages: true, maxTurns,
-    tools: [], allowedTools: names.map(n => "mcp__primer__" + n), permissionMode: "dontAsk"
+    tools: builtin, allowedTools: [...builtin, ...ours.map(n => "mcp__primer__" + n)], permissionMode: "dontAsk"
   };
-  if (names.length) options.mcpServers = { primer: primerTools };
+  if (ours.length) options.mcpServers = { primer: primerTools };
 
   let last = "", partial = "", result = null, failure = null, searches = 0;
+  const uses = new Map();   // tool_use id → name, to read each result by the tool it answers
   try { for await (const msg of query({ prompt: user, options })) {
     dog.arm();
     if (msg.type === "stream_event") {
@@ -438,15 +469,19 @@ async function viaClaudeCode({ system, user, model: m, names, maxTurns }, cred, 
       for (const c of msg.message.content) {
         if (c.type === "text") text += c.text;
         else if (c.type === "tool_use") {
-          const name = c.name.replace(/^mcp__primer__/, "");
+          const name = c.name === WEBSEARCH ? "web_search" : c.name.replace(/^mcp__primer__/, "");
           if (name === "web_search") searches++;
-          emit({ event: { kind: "tool", name, input: c.input } });
+          uses.set(c.id, name);
+          emit({ event: { kind: "tool", name, input: name === "web_search" ? { query: (c.input || {}).query } : c.input } });
         }
       }
       if (text.trim()) last = text;
     } else if (msg.type === "user" && Array.isArray(msg.message && msg.message.content)) {
       for (const c of msg.message.content) {
-        if (c.type === "tool_result") emit({ event: { kind: "result", ok: !c.is_error, text: brief(c.content) } });
+        if (c.type === "tool_result") {
+          const search = uses.get(c.tool_use_id) === "web_search" && !c.is_error;
+          emit({ event: { kind: "result", ok: !c.is_error, text: search ? foundByClaudeCode(c.content) : brief(c.content) } });
+        }
       }
     } else if (msg.type === "result") {
       result = msg;
@@ -455,8 +490,10 @@ async function viaClaudeCode({ system, user, model: m, names, maxTurns }, cred, 
   dog.stop();
   if (result && result.usage) {
     const u = result.usage;
+    /* Claude Code counts the searches it was billed for; the tool uses seen are the fallback. */
+    const billed = Object.values(result.modelUsage || {}).reduce((n, x) => n + (Number(x.webSearchRequests) || 0), 0);
     emit({ usage: { in: (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0),
-                    out: u.output_tokens || 0, cost: result.total_cost_usd || 0, turns: result.num_turns || 0, searches } });
+                    out: u.output_tokens || 0, cost: result.total_cost_usd || 0, turns: result.num_turns || 0, searches: billed || searches } });
   }
   if (dog.quiet) throw new Error(QUIET);
   if (signal.aborted) throw new Error("Stopped.");
@@ -476,34 +513,61 @@ function withStderr(e, stderr) {
 }
 
 /* Every other key's calls: the AI SDK, straight to the provider. A step is
-   one message from the model; the answer is the last one with words in it. */
+   one message from the model; the answer is the last one with words in it.
+   The provider runs the searches itself, so what the stream says of them
+   differs: Anthropic and OpenAI answer each as a tool result, OpenRouter
+   says only how many it ran, with the pages it cited as sources. All of it
+   reaches the Inspector as the same two events, a search and its pages. */
 async function viaProvider({ system, user, model: m, names, maxTurns }, cred, emit, signal) {
-  const p = PROVIDERS[cred.kind], client = p.client(cred.value), id = m[p.at];
+  const p = PROVIDERS[cred.kind], client = p.client(cred.value), id = m[p.at], search = SEARCH[cred.kind];
   const abortController = new AbortController();
   signal.addEventListener("abort", () => abortController.abort(), { once: true });
   const dog = watchdog(() => abortController.abort());
+  const tools = aiTools(names.filter(n => TOOLS[n]), m.vision !== false);
+  if (names.includes("web_search")) tools.web_search = search.tool(client);
   const stream = streamText({
     model: cred.kind === "openrouter" ? client(id, { usage: { include: true } }) : client(id),
-    system, prompt: user, tools: aiTools(names, m.vision !== false), stopWhen: stepCountIs(maxTurns),
+    system, prompt: user, tools, stopWhen: stepCountIs(maxTurns),
     maxOutputTokens: 32000, abortSignal: abortController.signal,
     providerOptions: cred.kind === "anthropic" ? { anthropic: { thinking: { type: "adaptive" } } } : undefined,
     onError() {}   // an error arrives as a part of the stream, below; the SDK would also print it
   });
 
   let last = "", step = "", partial = "", turns = 0, searches = 0, charged = 0, usage = null, error = null;
+  let seen = 0, sources = [];   // this step's searches answered in the stream, and the pages cited
   for await (const part of stream.fullStream) {
     dog.arm();
     if (part.type === "text-delta") { step += part.text; partial += part.text; emit({ delta: part.text }); }
     else if (part.type === "tool-call") {
-      if (part.toolName === "web_search") searches++;
-      emit({ event: { kind: "tool", name: part.toolName, input: part.input } });
+      /* A search names its query when it answers, if the call did not; the filtering a search may run under the hood is not news. */
+      if (part.toolName === "web_search") { if (part.input && part.input.query) emit({ event: { kind: "tool", name: "web_search", input: { query: part.input.query } } }); }
+      else if (!part.providerExecuted) emit({ event: { kind: "tool", name: part.toolName, input: part.input } });
     }
-    else if (part.type === "tool-result") emit({ event: { kind: "result", ok: !part.output.error, text: brief(part.output.error || part.output.text) } });
-    else if (part.type === "tool-error") emit({ event: { kind: "result", ok: false, text: brief(String(part.error && part.error.message || part.error)) } });
+    else if (part.type === "tool-result") {
+      if (part.toolName === "web_search") {
+        seen++;
+        const { ask, text } = searched(part.output);
+        if (ask) emit({ event: { kind: "tool", name: "web_search", input: ask } });
+        emit({ event: { kind: "result", ok: true, text: brief(text) } });
+      } else if (!part.providerExecuted) emit({ event: { kind: "result", ok: !part.output.error, text: brief(part.output.error || part.output.text) } });
+    }
+    else if (part.type === "tool-error") {
+      const e = part.error;
+      emit({ event: { kind: "result", ok: false, text: brief(e && e.errorCode ? "Search failed: " + String(e.errorCode).replace(/_/g, " ") + "." : String(e && e.message || e)) } });
+    }
+    else if (part.type === "source") { if (part.sourceType === "url") sources.push({ url: part.url, title: part.title }); }
     else if (part.type === "finish-step") {
       turns++;
       if (step.trim()) last = step;
       step = "";
+      /* OpenRouter's count is under server_tool_use_details, whatever its docs say; Anthropic's under server_tool_use. */
+      const raw = (part.usage || {}).raw || {}, billed = (raw.server_tool_use_details || raw.server_tool_use || {}).web_search_requests;
+      if (!seen && (billed || sources.length)) {   // searched out of sight: OpenRouter
+        emit({ event: { kind: "tool", name: "web_search", input: { searches: Number(billed) || 1 } } });
+        emit({ event: { kind: "result", ok: true, text: brief(sources.length ? pages(sources) : "Pages not reported.") } });
+      }
+      searches += Math.max(Number(billed) || 0, seen);
+      seen = 0; sources = [];
       charged += Number((((part.providerMetadata || {}).openrouter || {}).usage || {}).cost) || 0;
     }
     else if (part.type === "finish") usage = part.totalUsage;
@@ -511,7 +575,7 @@ async function viaProvider({ system, user, model: m, names, maxTurns }, cred, em
   }
   dog.stop();
   if (usage) emit({ usage: { in: usage.inputTokens || 0, out: usage.outputTokens || 0, turns, searches,
-                             cost: charged || priced(usage, await priceOf(m)) } });
+                             cost: charged || priced(usage, await priceOf(m)) + searches * (search.price || 0) } });
   if (dog.quiet) throw new Error(QUIET);
   if (signal.aborted) throw new Error("Stopped.");
   if (error && !last) throw refusal(...failureOf(error), cred);

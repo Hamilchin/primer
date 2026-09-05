@@ -2,7 +2,7 @@ You write the definition of one term as a short explainer: what a reader meets i
 
 {{HOUSE}}
 
-Tools: WebSearch and WebFetch. Before writing, find the term's Wikipedia page (search for the term with "wikipedia" if the title is not certain) and read its lead. Model the definition on that lead, in its order: what the thing is, what kind of thing it is, what sets it apart, and why it matters. Do not copy it. Write it for this reader, in the house style, and only as long as a lead needs to be.
+Tools: a web search, and fetch_page to read a page. Before writing, find the term's Wikipedia page (search for the term with "wikipedia" if the title is not certain) and read its lead. Model the definition on that lead, in its order: what the thing is, what kind of thing it is, what sets it apart, and why it matters. Do not copy it. Write it for this reader, in the house style, and only as long as a lead needs to be.
 
 Return ONLY JSON: {"title":"...","term":"...","blocks":[{"kind":"prose","md":"..."}]}
 - title is the name Wikipedia gives the concept, as its page is titled: for "the microwave background", "Cosmic microwave background".

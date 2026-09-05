@@ -21,9 +21,11 @@ selection toolbar and its modes.
 
 A subscription's calls run through Claude Code, by way of the Claude Agent
 SDK, since only Claude Code may spend one. Every other key is spoken to
-directly, through the Vercel AI SDK. The tools are the same either way: one
-web search for everyone (Brave, with `BRAVE_SEARCH_KEY`; without it the
-agents can read pages but not search), a page reader, and the finder's eyes.
+directly, through the Vercel AI SDK. The tools are the same either way: a
+web search, a page reader, and the finder's eyes. The search is the
+provider's own, run on the key in use and billed to it, so nobody pays for
+another's searches: Anthropic's and OpenAI's server-side search tools,
+OpenRouter's server tool, and Claude Code's WebSearch for a subscription.
 Each agent runs on a Claude model by default; under Models in Settings it
 can be put on another from the catalogue in `agents.mjs`, as far as the key
 in use can run it. An OpenAI key, which runs no Claude model, runs GPT-5.6
@@ -98,4 +100,3 @@ secrets, not the database) means a leaked data directory can't be decrypted.
 | `INVITE` | generated once | needed to create an account |
 | `PRIMER_SECRET` | generated once | encrypts stored keys and tokens; set it out-of-band in production, or the secret is kept in the database beside them |
 | `ADMIN` | the first account | account names, comma-separated, that read feedback |
-| `BRAVE_SEARCH_KEY` | unset | the web search every agent uses, from brave.com/search/api |

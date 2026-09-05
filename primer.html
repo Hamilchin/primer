@@ -1550,8 +1550,8 @@ async function agent(d, s){
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 function toolNote(ev){
   const i = ev.input || {};
-  if(ev.name === "WebSearch") return "searching “" + (i.query || "") + "”";
-  if(ev.name === "WebFetch") return "reading " + host(i.url);
+  if(ev.name === "web_search") return i.query ? "searching “" + i.query + "”" : i.open || i.in ? "reading " + host(i.open || i.in) : "searching";
+  if(ev.name === "fetch_page") return "reading " + host(i.url);
   if(/look_at_image$/.test(ev.name)) return "looking at " + host(i.url);
   return ev.name;
 }
