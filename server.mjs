@@ -146,6 +146,9 @@ function indexEntry(id, b) {
   const e = { id, title: String(b.title || "").slice(0, 200), updated: Number(b.updated) || Date.now(),
               status: String(b.status || "done").slice(0, 20), short: Number(b.short) || 0 };
   if (b.words != null) e.words = Number(b.words) || 0;
+  /* Why it is not being carried on, and how often carrying on has failed: see the page. */
+  if (b.halt) e.halt = String(b.halt).slice(0, 20);
+  if (b.tries) e.tries = Number(b.tries) || 0;
   return e;
 }
 const NAME = /^[a-z0-9][a-z0-9._-]{1,31}$/;

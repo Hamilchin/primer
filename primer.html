@@ -809,9 +809,9 @@ async function api(path, body, method){
 function signedOut(){ me = null; doc = null; index = []; undoStack = []; route = "login"; render(); }
 
 /* ══ storage ══════════════════════════════════════════════════
-   Keys: primer:index, primer:doc:<id>, primer:raw:<id>, primer:prompts,
-   primer:settings. Kept on the server under the signed-in user; the page
-   sees get/set/del by key and nothing else.                          */
+   Keys: primer:index, primer:doc:<id>, primer:raw:<id>, primer:lease:<id>,
+   primer:prompts, primer:settings, primer:actions. Kept on the server under
+   the signed-in user; the page sees get/set/del by key and nothing else. */
 let saveWarned = false;
 /* A guest has no account: the same keys live in this browser's localStorage. */
 const isGuest = () => !!(me && me.guest);
@@ -863,7 +863,7 @@ const GUEST_CRED = "primer-guest:cred";
 const guestCred = () => local.get(GUEST_CRED);
 function setGuestCred(c){
   if(c) local.set(GUEST_CRED, c); else local.del(GUEST_CRED);
-  if(isGuest()) me.key = guestKeyInfo();
+  if(isGuest()){ me.key = guestKeyInfo(); carryOn(); }
 }
 /* What `me.key` says of it: the same shape a signed-in user's key has. */
 function guestKeyInfo(){
@@ -1512,7 +1512,9 @@ function tidyRun(d){ const r = runs.get(d.id); if(r && !r.jobs.size && !r.active
    is writing every few seconds, and a lease renewed lately is someone
    else's. A reload keeps the tab's id, so the lease is its own again.  */
 const TAB = (() => { try{ const t = sessionStorage.getItem("primer:tab") || uid(); sessionStorage.setItem("primer:tab", t); return t; }catch(e){ return uid(); } })();
-const LEASE_BEAT = 5000, LEASE_STALE = 15000, AUTO_MAX = 5, AUTO_AT_ONCE = 2;
+/* A hidden tab's timers run as seldom as once a minute, so a lease is
+   stale only well after that; a closing tab lets go of its leases at once. */
+const LEASE_BEAT = 5000, LEASE_STALE = 90000, AUTO_MAX = 5, AUTO_AT_ONCE = 2;
 const leaseKey = id => "primer:lease:" + id;
 const leases = new Map();   // docId → interval renewing it
 function takeLease(d){
@@ -1553,16 +1555,17 @@ function eligible(d){
 const elsewhere = new Set();   // ids another tab holds a lease on, as last seen
 const retryT = new Map();      // docId → the timer of a retry due in this tab
 const pendingRetry = d => retryT.has(d.id);
-function unschedule(d){ clearTimeout(retryT.get(d.id)); retryT.delete(d.id); }
+function unschedule(d){ const r = retryT.get(d.id); if(r) clearTimeout(r.t); retryT.delete(d.id); }
 /* A run that ended on its own is tried again in a while: 20 seconds the
    first time, doubling to five minutes; a rate limit waits a quarter hour. */
 function tryLater(d){
   unschedule(d);
   if(!eligible(d)) return;
   const wait = d.halt && d.halt.kind === "rate_limit" ? 900e3 : Math.min(20e3 * 2 ** Math.max(0, (d.tries || 0) - 1), 300e3);
-  retryT.set(d.id, setTimeout(() => { retryT.delete(d.id); takeUp(d); }, wait));
+  retryT.set(d.id, { t: setTimeout(() => { retryT.delete(d.id); takeUp(d); }, wait), at: Date.now() + wait });
   livePaint();
 }
+function inText(ms){ const m = Math.round(ms / 60000); return ms < 45e3 ? "in a moment" : m <= 1 ? "in a minute" : "in " + m + " minutes"; }
 /* Take a primer up unasked, unless another tab has it. */
 async function takeUp(d){
   if(!eligible(d)) return false;
@@ -1595,9 +1598,12 @@ async function pump(){
       const id = queue.shift();
       const cur = docs.get(id);
       if(cur && (running(cur) || pendingRetry(cur))) continue;
-      let d;
-      try{ d = await refetch(id); }catch(e){ break; }   // no server: the next sweep tries again
-      if(d) await takeUp(d);
+      try{
+        /* Another tab's: leave it, but keep the copy on screen current. */
+        if(await heldElsewhere(id)){ elsewhere.add(id); if(doc && doc.id === id) await refetch(id); continue; }
+        const d = await refetch(id);
+        if(d) await takeUp(d);
+      }catch(e){ break; }   // no server: the next sweep tries again
     }
   }finally{ pumping = false; livePaint(); }
 }
@@ -1611,8 +1617,9 @@ async function refetch(id){
   if(d && old && doc === old){ doc = d; undoStack = []; if(route === "doc"){ const y = scrollY; render(); scrollTo(0, y); } }
   return d;
 }
-/* The library is looked over now and then while it is on screen. */
-setInterval(() => { if(route === "cover") carryOn(); }, 20000);
+/* The library is looked over now and then while it is on screen, and so is
+   a primer on screen that another tab is writing. */
+setInterval(() => { if(route === "cover" || (doc && elsewhere.has(doc.id))) carryOn(); }, 20000);
 
 /* One model call on a document's behalf. While it runs it is a job the desk
    shows; its text streams into `block`; every prompt, tool call and reply
@@ -1661,8 +1668,14 @@ async function agent(d, s){
     if(e.kind) rec.kind = e.kind;
     if(!e.stopped) issue(d, cap(s.label || "a call") + " failed: " + e.message, rec, e.kind);
     /* No key, no credit, no login, or a limit reached: nothing else will
-       succeed either, so the run stops here rather than failing piece by piece. */
-    if(e.kind && running(d)){ stopRun(d); d.statusNote = e.kind === "no_key" ? "no key in Settings" : "no credit or login"; }
+       succeed either, so the run stops here rather than failing piece by
+       piece. It is taken up again once the key changes, or, for a limit,
+       once some time has passed. */
+    if(e.kind && running(d)){
+      d.halt = { kind:e.kind, key:keySig() };
+      stopRun(d);
+      d.statusNote = e.kind === "no_key" ? "no key in Settings" : e.kind === "rate_limit" ? "rate limited" : "no credit or login";
+    }
     throw e;
   }finally{
     rec.ended = Date.now(); saveTrace(d.id);
@@ -1882,6 +1895,7 @@ function renderCover(){
   };
   shelfSig = null; libQuery = "";
   renderLibrary();
+  carryOn();
   requestAnimationFrame(() => fields.forEach(grow));
   if(!matchMedia("(pointer:coarse)").matches) topic.focus({ preventScroll:true });
 }
@@ -1891,8 +1905,10 @@ function renderCover(){
 function shelfState(it){
   const d = docs.get(it.id);
   if(d && running(d)) return { live:true, text: docState(d).text };
-  if(d) { const st = docState(d); return st.kind === "done" ? null : { failed: st.kind === "failed", text: st.kind === "short" ? st.text : st.text.split(",")[0] }; }
   const s = it.status || "done";
+  if(s !== "done" && elsewhere.has(it.id)) return { text:"in another tab" };
+  if(s !== "done" && queue.includes(it.id)) return { text:"waiting its turn" };
+  if(d) { const st = docState(d); return st.kind === "done" ? null : { failed: st.kind === "failed", text: st.kind === "short" ? st.text : st.text.split(",")[0] + (st.next || "") }; }
   if(s === "done") return it.short ? { text: it.short === 1 ? "one piece missing" : it.short + " pieces missing" } : null;
   if(s === "failed") return { failed:true, text:"failed" };
   return { text: s === "stopped" ? "stopped" : s === "interrupted" ? "interrupted" : "unfinished" };
@@ -1944,7 +1960,7 @@ function renderLibrary(){
     if(it.words) open.append(el("span", "words", it.words.toLocaleString() + (it.words === 1 ? " word" : " words")));
     open.append(el("time", null, shortDate(it.updated)));
     let x;
-    if(s && s.live) x = btn("x stop", "Stop", () => stopRun(docs.get(it.id)));
+    if(s && s.live) x = btn("x stop", "Stop", () => stopRun(docs.get(it.id), true));
     else{
       x = btn("x", "Delete");
       x.onclick = () => confirmRow(li, it.title, () => deleteDoc(it.id));
@@ -2067,7 +2083,8 @@ function metaNode(d){
 const unfilled = b => !b.md && !b.src && (b.slot || ((b.kind === "figure" || b.kind === "image") && b.brief));
 const gaps = d => d.blocks.filter(unfilled);
 
-/* Where a document stands: {kind:"busy"|"stopped"|"failed"|"short"|"done", text}. */
+/* Where a document stands: {kind:"busy"|"live"|"stopped"|"failed"|"short"|"done", text, next?}:
+   next is the tail of text that says what the page will do about it by itself. */
 function docState(d){
   const secs = d.blocks.filter(b => b.kind === "heading").length;
   if(running(d)){
@@ -2086,11 +2103,17 @@ function docState(d){
     return { kind:"live", text: d.status === "planning" ? "being planned" : d.status === "researching" ? "sources being checked"
                                 : "being written" + (secs ? ", §" + Math.min(done + 1, secs) + " of " + secs : "") };
   }
-  if(d.status === "failed") return { kind:"failed", text:"failed" + (d.statusNote ? ": " + d.statusNote : "") };
+  if(elsewhere.has(d.id) && d.status && d.status !== "done") return { kind:"live", text:"being written in another tab" };
+  /* What happens next, when nobody does anything: it is taken up again in
+     a while, or once the ones ahead of it are done, or not at all. */
+  const next = pendingRetry(d) ? " · again " + inText(retryT.get(d.id).at - Date.now())
+             : queue.includes(d.id) ? " · waiting its turn"
+             : !d.halt && (d.tries || 0) >= AUTO_MAX ? " · " + AUTO_MAX + " tries" : "";
+  if(d.status === "failed") return { kind:"failed", text:"failed" + (d.statusNote ? ": " + d.statusNote : "") + next, next };
   if(d.status && d.status !== "done"){
     const written = new Set(d.blocks.filter(b => b.sec != null && b.kind !== "heading" && (b.md || b.src)).map(b => b.sec)).size;
     const why = d.status === "stopped" ? "stopped" : "interrupted";
-    return { kind:"stopped", text: why + (written ? " after §" + written + " of " + secs : secs ? " before §1" : "") + (d.statusNote ? ", " + d.statusNote : "") };
+    return { kind:"stopped", text: why + (written ? " after §" + written + " of " + secs : secs ? " before §1" : "") + (d.statusNote ? ", " + d.statusNote : "") + next, next };
   }
   /* Finished, but something it asked for never arrived. Say so: the block
      itself carries the error, and this is what makes it findable. */
@@ -2113,12 +2136,18 @@ function statusNode(d){
       line.append((j.role === "section" || j.role === "research") && secs ? j.label + " of " + secs : j.label);
       if(j.note) line.append(el("span", "note", j.note));
     });
-    line.append(btn("lnk", "Stop", () => stopRun(d)));
+    line.append(btn("lnk", "Stop", () => stopRun(d, true)));
   }
   else if(s.kind === "live"){ line.append(el("i", "dot")); line.append(s.text); }
-  else if(s.kind === "stopped"){ line.append(s.text); if(!readonly()) line.append(btn("lnk", "Resume", () => resume(d))); }
-  else if(s.kind === "failed"){ line.append(s.text); if(!readonly()) line.append(btn("lnk", "Retry", () => resume(d))); }
-  else if(s.kind === "short"){ line.append(s.text); if(!readonly()) line.append(btn("lnk", "Fill in", () => resume(d))); }
+  else if(s.kind === "stopped" || s.kind === "failed"){
+    line.append(s.text);
+    if(!readonly()){
+      line.append(btn("lnk", s.kind === "failed" ? "Retry" : "Resume", () => resumeByHand(d)));
+      /* Due to be taken up again by itself: Stop says leave it. */
+      if(pendingRetry(d) || queue.includes(d.id)) line.append(btn("lnk", "Stop", () => stopRun(d, true)));
+    }
+  }
+  else if(s.kind === "short"){ line.append(s.text); if(!readonly()) line.append(btn("lnk", "Fill in", () => resumeByHand(d))); }
   if(line.childNodes.length) box.append(line);
   const mine = readonly() ? [] : issues.filter(x => x.docId === d.id);
   if(mine.length){
@@ -2417,7 +2446,8 @@ async function countWords(){
 }
 async function persist(d){
   await store.set("primer:doc:"+d.id, { ...d, blocks: d.blocks.map(cleanBlock) });
-  index = await store.index(d.id, { id:d.id, title:d.title, updated:Date.now(), status:d.status || "done", short:gaps(d).length, words:wordCount(d) });
+  index = await store.index(d.id, { id:d.id, title:d.title, updated:Date.now(), status:d.status || "done", short:gaps(d).length, words:wordCount(d),
+                                    halt: d.halt ? (d.halt.by || d.halt.kind) : "", tries: d.tries || 0 });
   if(route === "cover") renderLibrary();
 }
 function save(d, now){
@@ -2485,7 +2515,8 @@ function docContext(d){
 }
 async function deleteDoc(id){
   const d = docs.get(id);
-  if(d) stopRun(d);
+  if(d){ stopRun(d); unschedule(d); dropLease(d); }
+  unqueue(id); elsewhere.delete(id);
   index = await store.index(id, null);
   await store.del("primer:doc:"+id);
   await store.del("primer:raw:"+id);
@@ -2616,7 +2647,7 @@ function startDoc(o, background){
 
 /* Plan the outline, lay out the sections, then write them. */
 async function build(d){
-  const run = runOf(d); run.cancelled = false; run.active = true;
+  const run = runOf(d); run.cancelled = false; run.active = true; takeLease(d);
   d.status = "planning"; d.statusNote = "";
   d.blocks = [{ id:uid(), kind:"prose", pending:true, plan:true, md:"" }];
   rerender(d); save(d, true);
@@ -2666,11 +2697,24 @@ async function build(d){
 }
 
 /* Resume after a stop, a failure, or a reload: plan if there is no outline,
-   otherwise write whatever is still unwritten. */
-function resume(d){
+   otherwise write whatever is still unwritten. auto: the page took it up
+   on its own (carrying on, above); a person's Resume also lifts a Stop
+   and forgives the failures so far. */
+function resume(d, auto){
   if(running(d)) return;
+  unschedule(d); unqueue(d.id);
+  delete d.halt;
+  if(!auto) d.tries = 0;
+  runOf(d).auto = !!auto;
   if(!d.blocks.some(b => b.kind === "heading")) return build(d);
   return writeAll(d);
+}
+/* Resume, Retry and Fill in: a person asked, unless another tab is on it. */
+async function resumeByHand(d){
+  if(running(d)) return;
+  if(await heldElsewhere(d.id)){ elsewhere.add(d.id); toast("Another tab is writing this primer."); livePaint(); return; }
+  elsewhere.delete(d.id);
+  if(!running(d)) resume(d);
 }
 
 /* Sections are written in order so each can build on the ones before it.
@@ -2683,7 +2727,7 @@ function resume(d){
    with the rest marked as waiting. Resume, or any section's Retry, comes
    back through here and writes what is missing in order.               */
 async function writeAll(d){
-  const run = runOf(d); run.cancelled = false; run.active = true;
+  const run = runOf(d); run.cancelled = false; run.active = true; takeLease(d);
   const { titles, outline, reader } = docContext(d);
   d.status = "writing"; d.statusNote = "";
   save(d); livePaint();
@@ -2729,9 +2773,16 @@ async function finish(d){
   settle(d);
 }
 /* A run's end, whichever way it ended: shown, and written at once rather
-   than soon, so a page closed the next moment reopens as it was. */
+   than soon, so a page closed the next moment reopens as it was. A run that
+   failed on its own counts against the primer (d.tries), and is tried again
+   after a pause; a finished one clears the count; the next unfinished
+   primer waiting its turn gets the place this one held. */
 function settle(d){
+  if(d.status === "done") d.tries = 0;
+  else if(d.status === "interrupted" || d.status === "failed" || (d.status === "stopped" && d.halt && d.halt.kind)) d.tries = (d.tries || 0) + 1;
+  dropLease(d);
   rerender(d); flushTrace(d.id); save(d, true); tidyRun(d);
+  tryLater(d); pump();
 }
 /* A pending block whose call will never come: shown stopped, with Retry. */
 function markStopped(d, b){
@@ -2805,7 +2856,7 @@ async function genSection(d, i, title, outline, reader, by){
    is never written ahead of one that is still missing. */
 function retrySection(d){
   if(running(d)){ toast("Wait for " + docState(d).text + " first."); return; }
-  resume(d);
+  resumeByHand(d);
 }
 function replaceSlot(d, i, blocks){
   const at = d.blocks.findIndex(b => b.slot && b.sec===i);
@@ -4183,7 +4234,7 @@ function keysControl(){
   const g = el("div", "keys");
   let st;   // {mine, linked, key}: the whole picture, which every change answers with
   const call = async (path, body, method) => {
-    try{ st = await api(path, body, method); me.key = st.key; draw(); return true; }
+    try{ st = await api(path, body, method); me.key = st.key; draw(); carryOn(); return true; }
     catch(e){ toast(e.message, { err:true }); return false; }
   };
   const today = () => new Date().toISOString().slice(0, 10);
@@ -4769,6 +4820,7 @@ document.addEventListener("visibilitychange", async () => {
   if(document.visibilityState !== "visible" || !me || route === "login") return;
   try{ index = mergedIndex(await store.get("primer:index")); }catch(e){ return; }
   if(route === "cover") renderLibrary();
+  carryOn();
 });
 async function enter(){
   await loadMine();
@@ -4776,6 +4828,7 @@ async function enter(){
   await openLanding();
   if(!isGuest()) migrateLocal();
   countWords();
+  carryOn();
 }
 /* No account: a guest cookie for the calls, everything else in this browser. */
 async function enterGuest(){

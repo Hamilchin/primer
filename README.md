@@ -74,6 +74,16 @@ when it would run long and fall into distinct parts, the writer follows
 that plan, and a revision can open a subsection when what it adds is too
 large for a paragraph. Most primers have none.
 
+A primer is written by the page that asked for it, one call at a time, so
+a closed tab or a lost connection leaves it unfinished. It does not stay
+so: the tab tries a failed run again after a pause, longer each time, and
+whichever tab next opens the library takes up what closed tabs left, two
+at a time, until every primer is done. Only Stop lasts; a stopped primer
+waits for Resume. One that stopped for want of a working key waits for a
+different key, and one that has failed five times running waits for a
+person. Two tabs never write the same primer: the one writing it holds a
+lease, and the other says so.
+
 Share, there from the moment a primer starts, offers two kinds of link to
 `/s/<id>`, readable by anyone, signed in or not. The public link follows the primer: readers
 see it as it stands and as it changes, and while it is still being written
