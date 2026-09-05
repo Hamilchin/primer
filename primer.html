@@ -7,16 +7,16 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <script>/* theme and look before first paint */
-(function(){try{var d=document.documentElement,t=localStorage.getItem("primer:theme")||"";d.dataset.theme=t==="dark"||t==="paper-dark"||(!t&&matchMedia("(prefers-color-scheme:dark)").matches)?"dark":"light";if(t.indexOf("paper")===0)d.dataset.look="paper";}catch(e){}})();
+(function(){try{var d=document.documentElement,t=localStorage.getItem("primer:theme")||"paper";d.dataset.theme=t==="dark"||t==="paper-dark"||(t==="system"&&matchMedia("(prefers-color-scheme:dark)").matches)?"dark":"light";if(t.indexOf("paper")===0)d.dataset.look="paper";}catch(e){}})();
 </script>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Literata:ital,opsz,wght@0,7..72,400..700;1,7..72,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.14/purify.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js" integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.14/purify.min.js" integrity="sha384-46dPGH1XlTmj7bc50bqLjTdORXs/3EP2QpA/6EWbelYWOY9VGp+87RT61S3Mcslb" crossorigin="anonymous"></script>
 
 <style>
 /* ══ tokens ═══════════════════════════════════════════════════
@@ -141,11 +141,13 @@ main{padding:1.5rem var(--gutter) 8rem}
 .login .guest + .guest{margin-top:.5rem}
 .login .guest .act{color:var(--fg);margin-right:.5rem}
 .login .guest .act:hover{color:var(--accent)}
-/* ══ setup guide ══════════════════════════════════════════════ */
-/* A page of plain prose under a title: the guide, a link that leads nowhere. */
-.page .body{margin-top:1.5rem}
-.page .body h2{margin-top:2.2rem}
-.page .body h2:first-child{margin-top:0}
+/* ══ guides ═══════════════════════════════════════════════════ */
+/* A page of prose laid out like a primer: an opening paragraph, the
+   contents, numbered sections. Also the page a dead link lands on. */
+.page>.body,.page .intro{margin-top:1.5rem}
+.page .ssec>.body{margin-top:.9rem}
+.page .intro p:last-child{margin-bottom:0}
+.page .body td:first-child{white-space:nowrap;padding-right:1.5rem}
 /* Common instructions, one click each; they add up and toggle back off. */
 .chips{display:flex;flex-wrap:wrap;gap:.35rem 1rem;margin-top:.6rem;font-size:13.5px}
 .chip{color:var(--fg-2);text-decoration:underline;text-decoration-thickness:1px;text-decoration-color:var(--rule-2);text-underline-offset:3px}
@@ -515,8 +517,8 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
   border-right:1.5px solid var(--fg-3); border-bottom:1.5px solid var(--fg-3); transform:rotate(-45deg); transition:transform .15s;
 }
 .pick-b.on::after,.krow details[open] summary::after{transform:rotate(45deg);top:-.2em}
-.pick-row .tail{margin-left:auto;font-size:14px;color:var(--fg-3);text-decoration:none}
-.pick-row .tail:hover{color:var(--accent)}
+.pick-row .tail,.aset>.acts .tail{margin-left:auto;font-size:14px;color:var(--fg-3);text-decoration:none}
+.pick-row .tail:hover,.aset>.acts .tail:hover{color:var(--accent)}
 .pick-form .kform{padding:.2rem 0 .5rem}
 /* ── prompts: one folded row each; an edited prompt keeps a rule in the
       margin and its Reset, open or closed ── */
@@ -541,7 +543,7 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
    The forms under Keys are made of the same rows.                     */
 /* A touch left of centre: with its numbers hanging in the margin the page
    reads right-heavy when centred exactly. */
-@media (min-width:1000px){ .settings{translate:-1.25rem 0} }
+@media (min-width:1000px){ .settings,.guide{translate:-1.25rem 0} }
 .ssec{position:relative;margin:2.6rem 0 0;scroll-margin-top:calc(var(--head) + 1.25rem)}
 .doc-head + .ssec{margin-top:0}
 .ssec .sub{margin-top:0}
@@ -561,6 +563,30 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 .sel::after{content:"";position:absolute;right:.8rem;top:50%;width:.38em;height:.38em;margin-top:-.3em;border-right:1.5px solid var(--fg-3);border-bottom:1.5px solid var(--fg-3);transform:rotate(45deg);pointer-events:none}
 .models .srow{padding:.5rem 0}
 .models .acts{display:flex;padding:.65rem 0 .25rem}
+/* Actions: the pen's rows, ruled like the keys. */
+.aset .krow .switch{margin-top:.15rem}
+.aset .kmeta:empty{display:none}
+.aset .kbody{margin-top:.1rem}
+.aset-head{display:flex;justify-content:space-between;align-items:baseline}
+.aset-head .lab{font-size:14px;color:var(--fg-2)}
+.aset-inst{gap:.45rem}
+.aset .p-text{margin:0}
+.aset .reset{font-size:13px;color:var(--accent)}
+.aset .reset:hover{text-decoration:underline;text-underline-offset:3px}
+.aset>.acts{padding-top:1.1rem}
+/* Beside each action, while the pointer is on its row: up, down, delete.
+   Faded rather than hidden, so the keyboard reaches them; they show while
+   one has keyboard focus or Delete is asking. */
+.arow{position:relative}
+.arow summary{padding-right:6.5rem}
+.actl{position:absolute;right:0;top:.6rem;display:flex;gap:.8rem;align-items:baseline;font-size:14px;line-height:calc(16px * 1.55);opacity:0;transition:opacity .12s}
+.arow:hover .actl,.actl:has(:focus-visible),.actl:has(.confirm){opacity:1}
+.actl .mv,.actl .x{padding:0 .15rem;color:var(--fg-3);font-size:14px}
+.actl .x{font-size:13px}
+.actl .mv:hover,.actl .x:hover{color:var(--accent)}
+.actl .mv[disabled]{opacity:.3;pointer-events:none}
+.actl .confirm{display:flex;gap:1rem;align-items:baseline;color:var(--fg-2);font-size:14px;white-space:nowrap}
+@media (hover:none){ .actl{opacity:1} }
 /* A row that runs full width: its label above, its control below. */
 .srow.wide{flex-direction:column;align-items:stretch;gap:.9rem}
 .keys{font-size:14px}
@@ -677,6 +703,7 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
   .meta{grid-template-columns:1fr;gap:.05rem}
   .meta dt{margin-top:.4rem}
   .shelf .x{visibility:visible}
+  .actl{opacity:1}
   .shelf .state:not(.live):not(.failed){display:none}
   .shelf .words{display:none}
   .status-row>span{flex-basis:100%;padding-left:0;border-left:0}
@@ -753,18 +780,7 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 <main id="main"></main>
 
 <div class="pen" id="tools" role="toolbar" aria-label="Revise">
-  <div class="pen-row">
-    <button data-act="explain">Explain<kbd>1</kbd></button>
-    <button data-act="example">Example<kbd>2</kbd></button>
-    <button data-act="derive">Derive<kbd>3</kbd></button>
-    <button data-act="figure">Diagram<kbd>4</kbd></button>
-    <button data-act="tighter">Tighter<kbd>5</kbd></button>
-    <button data-act="define">Define<kbd>6</kbd></button>
-    <span class="sep"></span>
-    <button data-act="revise">Edit&hellip;<kbd>7</kbd></button>
-    <button data-act="ask">Ask&hellip;<kbd>8</kbd></button>
-    <button data-act="complain">Complain&hellip;<kbd>9</kbd></button>
-  </div>
+  <div class="pen-row" id="penRow"></div>
   <form class="pen-ask" id="askForm">
     <input id="askInput" autocomplete="off" placeholder="Ask about this…" aria-label="Question">
     <button type="submit" id="askGo">Ask</button>
@@ -866,18 +882,19 @@ const guestMe = () => ({ guest:true, name:"Guest", key:guestKeyInfo() });
    rest, so showing or hiding a part of the page needs no code beyond one
    rule. Only values that differ from def are stored.                  */
 const SECTIONS = [
-  { id:"keys", title:"Keys" }, { id:"writing", title:"Writing" }, { id:"models", title:"Models" }, { id:"display", title:"Display" },
-  { id:"account", title:"Account" }, { id:"prompts", title:"Prompts" }, { id:"inbox", title:"Feedback", admin:true }
+  { id:"keys", title:"Keys" }, { id:"writing", title:"Writing" }, { id:"actions", title:"Actions" }, { id:"models", title:"Models" },
+  { id:"display", title:"Display" }, { id:"account", title:"Account" }, { id:"prompts", title:"Prompts" }, { id:"inbox", title:"Feedback", admin:true }
 ];
 const SETTINGS = {
   keys: { type:"keys", section:"keys", wide:true },
   research: { type:"bool", section:"writing", def:false, label:"Research after writing" },
+  actions: { type:"actions", section:"actions", wide:true },
   models: { type:"models", section:"models", def:{}, wide:true },   // {role: model id}, only where it differs from the server's
   showSources: { type:"bool", section:"display", def:true, attr:"sources", label:"Show sources" },
   showMarks: { type:"bool", section:"display", def:true, attr:"marks", label:"Show margin annotations" },
   contents: { type:"select", section:"display", def:"margin", attr:"contents", label:"Contents",
     options:[{ value:"margin", label:"Margin" }, { value:"top", label:"Under the title" }, { value:"off", label:"Off" }] },
-  theme: { type:"select", section:"display", def:"system", label:"Theme",
+  theme: { type:"select", section:"display", def:"paper", label:"Theme",
     options:[{ value:"system", label:"System" }, { value:"light", label:"Light" }, { value:"dark", label:"Dark" },
              { value:"paper", label:"Paper" }, { value:"paper-dark", label:"Paper dark" }] },
   account: { type:"account", section:"account" },
@@ -925,7 +942,7 @@ async function claude(system, user, role, o){
     let r;
     try{
       r = await fetch(ENDPOINT, { method:"POST", headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ system, user, role, model: setting("models")[role], cred: isGuest() ? guestCred() : undefined }), signal: o.signal });
+        body: JSON.stringify({ system, user, role, model: o.model || setting("models")[role], cred: isGuest() ? guestCred() : undefined }), signal: o.signal });
     }catch(e){
       if(e.name === "AbortError") throw stopped();
       if(attempt >= RETRIES) throw new Error("Network error. "+e.message);
@@ -1078,13 +1095,15 @@ const PROMPTS = {
   define_user:          { group:"write",   label:"Definition · user", user:true },
   edit:                 { group:"revise",  label:"Reviser" },
   edit_user:            { group:"revise",  label:"Edit · user", user:true },
-  explain:              { group:"revise",  label:"Explain" },
-  example:              { group:"revise",  label:"Example" },
-  derive:               { group:"revise",  label:"Derive" },
-  tighter:              { group:"revise",  label:"Tighter" },
-  revise:               { group:"revise",  label:"Edit" },
-  ask:                  { group:"revise",  label:"Ask" },
-  figure_action:        { group:"revise",  label:"Diagram" },
+  /* The instructions the selection actions send the reviser. Loaded here
+     for their defaults, but edited under Actions, not on this page. */
+  explain:              { group:"revise",  label:"Explain",  act:true },
+  example:              { group:"revise",  label:"Example",  act:true },
+  derive:               { group:"revise",  label:"Derive",   act:true },
+  tighter:              { group:"revise",  label:"Tighter",  act:true },
+  revise:               { group:"revise",  label:"Edit",     act:true },
+  ask:                  { group:"revise",  label:"Ask",      act:true },
+  figure_action:        { group:"revise",  label:"Diagram",  act:true },
   rewrite_outline:      { group:"rewrite", label:"Outline" },
   rewrite_outline_user: { group:"rewrite", label:"Outline · user", user:true },
   rewrite_section_user: { group:"rewrite", label:"Section · user", user:true }
@@ -1129,20 +1148,84 @@ function instrText(d){
   return t ? usr("instruction", { INSTRUCTION: t }) : "";
 }
 
-/* label is stamped on each revised block and shown in the margin in
-   lowercase; key is the pen's keyboard shortcut.                     */
-const ACTIONS = {
-  explain: { label:"Explain",    key:"1" },
-  example: { label:"Example",    key:"2" },
-  derive:  { label:"Derivation", key:"3" },
-  figure:  { label:"Diagram",    key:"4" },
-  tighter: { label:"Tighter",    key:"5" },
-  define:  { label:"Definition", key:"6" },
-  revise:  { label:"Edit",       key:"7" },
-  ask:     { label:"Question",   key:"8" },
-  complain:{ label:"Complaint",  key:"9" }
-};
+/* ══ actions ══════════════════════════════════════════════════
+   The selection toolbar (the pen) is a list of actions, editable under
+   Actions in Settings: which ones show and in what order, their names, the
+   model each runs on, and — for the ones that revise a selection — the
+   instruction sent to the reviser. An `edit` action fills that instruction
+   into the reviser's user prompt; a `figure` one redraws through the
+   illustrator; `define` writes a small primer on the selection, and
+   `complain` sends a word to the host. `src` names the prompts/ file a
+   built-in's default instruction comes from, so Reset can return to it;
+   `input` means the action asks for a line of direction first. A label is
+   also stamped on each revised block and shown lowercased in the margin.  */
+const DEFAULT_ACTIONS = [
+  { id:"explain",  label:"Explain",  kind:"edit",     src:"explain",       builtin:true },
+  { id:"example",  label:"Example",  kind:"edit",     src:"example",       builtin:true },
+  { id:"derive",   label:"Derive",   kind:"edit",     src:"derive",        builtin:true },
+  { id:"figure",   label:"Diagram",  kind:"figure",   src:"figure_action", builtin:true },
+  { id:"tighter",  label:"Tighter",  kind:"edit",     src:"tighter",       builtin:true },
+  { id:"define",   label:"Define",   kind:"define",   builtin:true },
+  { id:"revise",   label:"Edit",     kind:"edit",     src:"revise", input:true, placeholder:"What should change?", verb:"Edit", builtin:true },
+  { id:"ask",      label:"Ask",      kind:"edit",     src:"ask",    input:true, placeholder:"Ask about this…",     verb:"Ask",  builtin:true },
+  { id:"complain", label:"Complain", kind:"complain", input:true, placeholder:"What's wrong here? This goes to Alexander.", verb:"Send", builtin:true }
+];
+let actions = [];   // the pen, as configured; persisted at primer:actions
 const word = edit => String(edit && edit.label || "").toLowerCase();
+const actionById = id => actions.find(a => a.id === id);
+const activeActions = () => actions.filter(a => a.on);
+const editKind = a => a && (a.kind === "edit" || a.kind === "figure");
+/* An edit or figure action's instruction: the reader's own text if they
+   changed it, otherwise the file default named by `src`. */
+const actionPrompt = a => a && a.prompt != null ? a.prompt : (a && a.src && PROMPTS[a.src] ? PROMPTS[a.src].text : "");
+/* A fresh copy of the shipped pen, carrying over any prompt edit a built-in
+   action already had under the earlier Prompts page. */
+function defaultActions(){
+  return DEFAULT_ACTIONS.map(a => {
+    const c = { ...a, on:true };
+    if(a.src && a.src in overrides) c.prompt = overrides[a.src];
+    return c;
+  });
+}
+/* Whatever was stored, made safe: known fields only, unique ids, built-ins
+   kept whole. An empty or missing list becomes the shipped pen. */
+function normalizeActions(stored){
+  if(!Array.isArray(stored) || !stored.length) return defaultActions();
+  const seen = new Set(), out = [];
+  for(const s of stored){
+    if(!s || typeof s !== "object" || !s.id || seen.has(s.id)) continue;
+    const base = DEFAULT_ACTIONS.find(d => d.id === s.id);
+    const kind = base ? base.kind : (s.kind === "figure" ? "figure" : "edit");
+    const a = { id:String(s.id).slice(0,40), kind, on:s.on !== false, builtin:!!base,
+                label:String(s.label || (base && base.label) || "Action").slice(0,40) };
+    if(base && base.src) a.src = base.src;
+    if(s.prompt != null) a.prompt = String(s.prompt);
+    if(s.model) a.model = String(s.model);
+    if(kind === "edit" || kind === "complain"){
+      if(s.input || (base && base.input)) a.input = true;
+      const ph = s.placeholder != null ? s.placeholder : (base && base.placeholder);
+      if(a.input && ph) a.placeholder = String(ph).slice(0,120);
+      const vb = s.verb != null ? s.verb : (base && base.verb);
+      if(vb) a.verb = String(vb).slice(0,20);
+    }
+    seen.add(a.id); out.push(a);
+  }
+  return out.length ? out : defaultActions();
+}
+function saveActions(){ return store.set("primer:actions", actions); }
+/* Draw the pen from the active actions, in order; the first nine take the
+   keyboard shortcuts 1–9. */
+function renderPen(){
+  const row = document.getElementById("penRow");
+  if(!row) return;
+  row.replaceChildren(...activeActions().map((a, i) => {
+    const asks = !!a.input || a.kind === "complain";
+    const b = btn(null, a.label + (asks ? "…" : ""));
+    b.dataset.act = a.id;
+    if(i < 9) b.append(el("kbd", null, String(i + 1)));
+    return b;
+  }));
+}
 
 /* Common ways to ask for a primer. Each becomes a chip under the
    Instructions field on the cover; clicking one writes its text into the
@@ -1431,6 +1514,7 @@ async function agent(d, s){
   livePaint();
   try{
     const out = await askJSON(s.system, s.user, s.role, {
+      model: s.model,
       signal: job.ctrl.signal,
       onDelta: soFar => { rec.output = soFar; if(live) live(soFar); liveCall(rec); saveTrace(d.id, true); },
       onEvent: ev => {
@@ -1977,7 +2061,7 @@ function docToc(d, side){
 
 /* The word in the margin while a block is being made. */
 function statusWord(b){
-  if(b.busy) return word(ACTIONS[b.busy] || { label:"revising" });
+  if(b.busy) return word(actionById(b.busy) || { label:"revising" });
   if(b.status) return b.status;
   if(b.plan) return "planning";
   if(b.kind === "figure") return "drawing";
@@ -2871,7 +2955,7 @@ async function applyEdit(blockId, act, question){
   const idx = d.blocks.findIndex(b => b.id===blockId);
   if(idx<0) return;
   const target = d.blocks[idx];
-  const a = ACTIONS[act];
+  const a = actionById(act) || { id:act, label:"edit", kind:"edit" };
   const highlighted = (sel && sel.blockId===blockId && sel.text) ? sel.text : target.md;
 
   snapshot();
@@ -2882,9 +2966,9 @@ async function applyEdit(blockId, act, question){
 
   /* Edit on a diagram goes to the illustrator and redraws it in place; on a
      heading it renames the section; on prose it is a revision like the rest. */
-  const drawing = act==="figure" || (act==="revise" && target.kind==="figure");
+  const drawing = a.kind==="figure" || (act==="revise" && target.kind==="figure");
   const heading = target.kind === "heading" || target.kind === "subheading";
-  let action = rawPrompt(act==="figure" ? "figure_action" : act);
+  let action = actionPrompt(a);
   if(act==="revise" && drawing) action = "Redraw this diagram as the reader directs, keeping everything they did not ask to change. Return one figure block with its caption.";
   else if(heading) action += "\nThe target is a section heading. Return mode \"replace\" with one prose block whose md is the new heading text alone: a short noun phrase, no markdown marks.";
   const { outline, before, after } = context(d, idx);
@@ -2903,7 +2987,7 @@ async function applyEdit(blockId, act, question){
   const secLabel = target.sec != null ? " §" + (target.sec+1) : "";
 
   try{
-    const { value:out } = await agent(d, { role, label: word(a) + secLabel, sec:target.sec, system:sys(role), user, by:"you" });
+    const { value:out } = await agent(d, { role, label: word(a) + secLabel, sec:target.sec, system:sys(role), user, by:"you", model:a.model });
     const blocks = ((out && out.blocks)||[]).filter(x => x && (x.md || x.title));
     if(!blocks.length) throw new Error("Empty response.");
     const stamp = { label:a.label, note:question||"", quote:highlighted.slice(0,220), ts:Date.now() };
@@ -2923,7 +3007,7 @@ async function applyEdit(blockId, act, question){
     if(!made.length) throw new Error("Empty response.");
     target.busy = false; delete target.hl; inFlight--; clearHighlight();
     const at = d.blocks.indexOf(target);
-    const replaced = act==="figure" ? false : act==="revise" && drawing ? true : out.mode==="replace";
+    const replaced = a.kind==="figure" ? false : act==="revise" && drawing ? true : out.mode==="replace";
     let landed = made[0];
     if(heading && replaced){
       /* A heading stays the block it is; it takes the new title. */
@@ -3042,16 +3126,19 @@ document.addEventListener("mousedown", e => {
 });
 function trigger(act){
   if(!sel) return;
-  if(act==="define"){ const {blockId, text} = sel; hideTools(); defineFrom(doc, blockId, text); return; }
-  /* Ask, Edit and Complain take a line of text first: the same field,
-     worded for each. A complaint goes to Alexander, not to the model. */
-  if(act==="ask" || act==="revise" || act==="complain"){
+  const a = actionById(act);
+  if(!a) return;
+  if(a.kind==="define"){ const {blockId, text} = sel; hideTools(); defineFrom(doc, blockId, text); return; }
+  /* An action that asks for a line of text first (Edit, Ask, a custom one,
+     or Complain) opens the field, worded for it. A complaint goes to
+     Alexander, not to the model. */
+  if(a.input || a.kind==="complain"){
     const s = window.getSelection();
     if(s && s.rangeCount) highlightRange(s.getRangeAt(0).cloneRange());
     pen.dataset.mode = act;
-    askInput.placeholder = act==="ask" ? "Ask about this…" : act==="revise" ? "What should change?" : "What's wrong here? This goes to Alexander.";
-    askInput.setAttribute("aria-label", act==="ask" ? "Question" : act==="revise" ? "Instruction" : "Complaint");
-    $("#askGo").textContent = act==="ask" ? "Ask" : act==="revise" ? "Edit" : "Send";
+    askInput.placeholder = a.placeholder || (a.kind==="complain" ? "What's wrong here? This goes to Alexander." : "What should change?");
+    askInput.setAttribute("aria-label", a.label);
+    $("#askGo").textContent = a.verb || a.label;
     pen.classList.add("asking"); askInput.focus(); return;
   }
   const {blockId} = sel;
@@ -3068,7 +3155,8 @@ $("#askForm").onsubmit = e => {
   if(!q || !sel) return;
   const {blockId, text} = sel, mode = pen.dataset.mode || "ask";
   hideTools();
-  if(mode === "complain"){
+  const am = actionById(mode);
+  if(am && am.kind === "complain"){
     const b = doc && doc.blocks.find(x => x.id === blockId);
     const h = b && b.sec != null && doc.blocks.find(x => x.kind === "heading" && x.sec === b.sec);
     sendFeedback("complaint", q, { block:blockId, quote:text, passage: b && b.md ? String(b.md) : "", section: h ? headingTitle(h) : "" });
@@ -3222,14 +3310,14 @@ function goBack(){
    Forward move between them, and a reload reopens the same page.      */
 function pageUrl(){
   if(route === "shared" || route === "missing") return doc && doc.shared ? "/s/" + doc.shared.id : location.pathname;
-  if(route === "guide") return "/guide";
+  if(route === "guide") return guidePage === "setup" ? "/guide" : "/guide/" + guidePage;
   if(route === "settings") return "/settings";
   if((route === "doc" || route === "inspector") && doc) return "/p/" + doc.id + (route === "inspector" ? "/inspector" : "");
   return "/";
 }
 function pageTitle(){
   if(route === "settings") return "Settings · primer";
-  if(route === "guide") return "Setup guide · primer";
+  if(route === "guide") return (GUIDES[guidePage] || GUIDES.setup).title + " · primer";
   if(route === "missing") return "Link not found · primer";
   if(route === "login") return "Sign in · primer";
   if(route === "inspector" && doc) return "Inspector · " + doc.title + " · primer";
@@ -3241,9 +3329,9 @@ function pageTitle(){
 let popping = false;
 function syncHistory(){
   if(popping) return;
-  const st = { route, doc: doc && !doc.shared ? doc.id : null, share: doc && doc.shared ? doc.shared.id : null };
+  const st = { route, doc: doc && !doc.shared ? doc.id : null, share: doc && doc.shared ? doc.shared.id : null, guide: route === "guide" ? guidePage : null };
   const cur = history.state, url = pageUrl();
-  if(cur && cur.route === st.route && cur.doc === st.doc && cur.share === st.share){
+  if(cur && cur.route === st.route && cur.doc === st.doc && cur.share === st.share && (cur.guide || null) === st.guide){
     if(location.pathname !== url) history.replaceState(cur, "", url);
     return;
   }
@@ -3262,6 +3350,7 @@ addEventListener("popstate", async e => {
     }else{
       if(!st.doc) doc = null;
       else if(!(doc && doc.id === st.doc)){ doc = (await loadDoc(st.doc)) || null; undoStack = []; }
+      if(st.route === "guide") guidePage = GUIDES[st.guide] ? st.guide : "setup";
       route = !me && st.route !== "guide" ? "login" : st.route === "login" && me ? "cover" : st.route;
       if((route === "doc" || route === "inspector") && !doc) route = "cover";
       render();
@@ -3536,7 +3625,7 @@ function promptsNode(sec, n){
     const num = n + "." + (j + 1), head = el("div", "ssub");
     head.append(el("span", "marg num numsub", "§ " + num), el("h3", null, PROMPT_GROUPS[g]));
     sec.append(head);
-    Object.keys(PROMPTS).filter(k => PROMPTS[k].group === g && !PROMPTS[k].user).forEach(k => sec.append(promptRow(k)));
+    Object.keys(PROMPTS).filter(k => PROMPTS[k].group === g && !PROMPTS[k].user && !PROMPTS[k].act).forEach(k => sec.append(promptRow(k)));
     return { num, title:PROMPT_GROUPS[g], sub:true, at:() => head };
   });
 }
@@ -3621,6 +3710,111 @@ const CONTROLS = {
       });
       g.replaceChildren(...rows.map(r => r.row), acts(reset));
     }).catch(e => g.replaceChildren(el("p", "none", e.message)));
+    return g;
+  },
+  /* The selection toolbar (the pen). Each action is a row: the switch puts
+     it in the pen, the fold opens its editor — name, the instruction sent to
+     the reviser, the model it runs on, whether it asks for a note first —
+     and up, down and Delete wait beside the row for the pointer. New
+     actions, Restore and the guide sit at the foot. */
+  actions(){
+    const g = el("div", "keys aset"), list = el("ul", "klist");
+    let models = [], defaults = {};
+    const debounced = (input, fn) => { let t; input.oninput = () => { clearTimeout(t); t = setTimeout(fn, 300); }; };
+    const modelSel = a => {
+      const wrap = el("span", "sel"), sel = el("select", "field"), role = a.kind === "figure" ? "figure" : "edit";
+      const nameOf = id => (models.find(m => m.id === id) || { name:id }).name;
+      const def = el("option", null, "Default" + (defaults[role] ? " · " + nameOf(defaults[role]) : "")); def.value = "";
+      sel.append(def);
+      [...new Set([...models.map(m => m.id), ...(a.model ? [a.model] : [])])].forEach(id => { const o = el("option", null, nameOf(id)); o.value = id; sel.append(o); });
+      sel.value = a.model || "";
+      sel.setAttribute("aria-label", "Model");
+      sel.onchange = () => { if(sel.value) a.model = sel.value; else delete a.model; saveActions(); };
+      wrap.append(sel); return wrap;
+    };
+    const placeholderRow = a => {
+      const f = kfield(); f.value = a.placeholder || ""; f.setAttribute("aria-label", "Prompt shown"); f.placeholder = "What should change?";
+      debounced(f, () => { const v = f.value.trim().slice(0, 120); if(v) a.placeholder = v; else delete a.placeholder; saveActions(); });
+      return { field:f, row:srow("Prompt shown", f) };
+    };
+    /* Move up or down one place. The list is redrawn with the same folds
+       open and the pressed arrow focused again, so a key press repeats. */
+    const move = (a, dir) => {
+      const i = actions.indexOf(a), j = i + dir;
+      if(i < 0 || j < 0 || j >= actions.length) return;
+      actions.splice(i, 1); actions.splice(j, 0, a); saveActions(); renderPen(); paint(null, { id:a.id, ctl:dir < 0 ? "up" : "down" });
+    };
+    const row = a => {
+      const li = el("li", "krow arow"), d = el("details"), sum = el("summary");
+      li.dataset.id = a.id;
+      const nameSpan = el("span", "kname", a.label), meta = el("span", "kmeta", a.on ? (a.builtin ? "" : "custom") : "off");
+      sum.append(nameSpan, meta);
+      const sw = switchBtn(a.label, a.on, v => { a.on = v; meta.textContent = v ? (a.builtin ? "" : "custom") : "off"; saveActions(); renderPen(); });
+      const body = el("div", "kbody"), f = el("form", "kform"); f.onsubmit = e => e.preventDefault();
+      const name = kfield(); name.value = a.label; name.setAttribute("aria-label", "Name");
+      debounced(name, () => { const v = name.value.trim().slice(0, 40); if(v){ a.label = v; nameSpan.textContent = v; sw.setAttribute("aria-label", v); saveActions(); renderPen(); } });
+      f.append(srow("Name", name));
+      if(editKind(a)){
+        const ta = el("textarea", "p-text"); ta.spellcheck = false; ta.value = actionPrompt(a); ta.setAttribute("aria-label", "Instruction");
+        const dflt = () => a.src && PROMPTS[a.src] ? PROMPTS[a.src].text : "";
+        const rst = btn("reset", "Reset");
+        const markReset = () => { rst.style.visibility = (a.builtin && ta.value !== dflt()) ? "visible" : "hidden"; };
+        rst.onclick = () => { ta.value = dflt(); delete a.prompt; grow(ta); markReset(); saveActions(); };
+        debounced(ta, () => { if(a.builtin && ta.value === dflt()) delete a.prompt; else a.prompt = ta.value; markReset(); saveActions(); });
+        const head = el("div", "aset-head"); head.append(el("span", "lab", "Instruction"), rst);
+        const irow = el("div", "srow wide aset-inst"); irow.append(head, ta);
+        d.ontoggle = () => { if(d.open) grow(ta); };
+        markReset();
+        const ph = placeholderRow(a); ph.row.hidden = !a.input;
+        f.append(irow, srow("Model", modelSel(a)),
+          srow("Ask for a note first", switchBtn("Ask for a note first", !!a.input, v => { if(v) a.input = true; else delete a.input; ph.row.hidden = !v; saveActions(); renderPen(); if(v) ph.field.focus(); })),
+          ph.row);
+      } else if(a.kind === "complain"){
+        f.append(placeholderRow(a).row);
+      }
+      body.append(f); d.append(sum, body);
+      /* Beside the row, shown while the pointer is on it: up, down, delete.
+         The row's end arrows are greyed; Delete asks first, in place. */
+      const i = actions.indexOf(a), ctl = el("span", "actl");
+      const arrow = (dir, label) => { const b = btn("mv", dir < 0 ? "\u2191" : "\u2193", () => move(a, dir)); b.setAttribute("aria-label", label); b.title = label; b.dataset.ctl = dir < 0 ? "up" : "down"; return b; };
+      const up = arrow(-1, "Move up"); up.disabled = i === 0;
+      const down = arrow(1, "Move down"); down.disabled = i === actions.length - 1;
+      const del = btn("x", "Delete", () => confirmRow(ctl, a.label, () => { actions = actions.filter(x => x !== a); saveActions(); renderPen(); paint(); }));
+      ctl.append(up, down, del);
+      li.append(sw, d, ctl);
+      return { li, d, name };
+    };
+    /* Redraw every row. Folds that were open stay open; `openId` opens one
+       more with its name focused; `focus` puts focus on a row's control. */
+    function paint(openId, focus){
+      const open = new Set([...list.querySelectorAll("li[data-id]")].filter(li => li.querySelector("details").open).map(li => li.dataset.id));
+      let to = null;
+      list.replaceChildren(...actions.map(a => {
+        const r = row(a);
+        if(open.has(a.id)) r.d.open = true;
+        if(openId && a.id === openId){ r.d.open = true; to = r.name; }
+        if(focus && a.id === focus.id) to = r.li.querySelector(`[data-ctl="${focus.ctl}"]`);
+        return r.li;
+      }));
+      if(to && !to.disabled) to.focus();
+    }
+    const add = btn("go", "New action", () => {
+      const a = { id:"a" + uid(), label:"New action", kind:"edit", on:true, prompt:"", builtin:false };
+      actions.push(a); saveActions(); renderPen(); paint(a.id);
+    });
+    const restore = el("span");
+    const askRestore = () => {
+      const was = [...restore.childNodes], c = el("span", "confirm");
+      c.append(el("span", null, "Restore the default actions?"),
+               btn("danger", "Restore", () => { actions = defaultActions(); saveActions(); renderPen(); paint(); toast("Actions restored"); }),
+               btn(null, "Keep", () => restore.replaceChildren(...was)));
+      restore.replaceChildren(c);
+    };
+    restore.append(btn("quiet", "Restore defaults", askRestore));
+    const guide = guideLink("actions"); guide.className = "tail";
+    g.append(list, acts(add, restore, guide));
+    api("/api/models", { cred: isGuest() ? guestCred() : undefined })
+      .then(r => { models = r.models || []; defaults = r.defaults || {}; }).catch(() => {}).finally(() => paint());
     return g;
   },
   /* What readers sent, newest first, each with where it came from. */
@@ -3712,11 +3906,16 @@ function picker(items, tail){
   w.append(row, slot);
   return w;
 }
-/* A link to the setup guide, a real address that also works in place. */
-function guideLink(){
-  const a = el("a", null, "Setup guide"); a.href = "/guide";
-  a.onclick = inPlace(() => goto("guide"));
+/* A link to a guide, a real address that also works in place. */
+function guideLink(which = "setup"){
+  const a = el("a", null, GUIDES[which].title); a.href = which === "setup" ? "/guide" : "/guide/" + which;
+  a.onclick = inPlace(() => openGuide(which));
   return a;
+}
+/* Open a guide, or, pressed on the guide already open, go back. */
+function openGuide(which){
+  if(route === "guide" && guidePage === which){ goBack(); return; }
+  guidePage = which; route = "guide"; render(); scrollTo(0, 0);
 }
 /* A guest keeps one credential in this browser: a key or token of their
    own, checked once with Anthropic, or someone's shared key by name and
@@ -3863,44 +4062,88 @@ function keysControl(){
   call("/api/keys");
   return g;
 }
-/* ══ setup guide ══════════════════════════════════════════════
-   How to get a key of your own, at /guide, for anyone. */
+/* ══ guides ═══════════════════════════════════════════════════
+   Two short pages about Primer itself, open to anyone and laid out like
+   a primer: an opening paragraph, the contents, numbered sections. The
+   setup guide is at /guide, the actions guide at /guide/actions.       */
+const GUIDES = {
+  setup: {
+    title: "Setup guide",
+    intro: `<p>Give Primer a topic and Claude plans an outline, writes each section, draws the diagrams and finds the images, then checks its claims on the web. Select any passage to revise it, have it explained, or get a primer on it.</p>
+    <p>Each primer runs on a key: your Claude subscription, an Anthropic, OpenRouter or OpenAI key, or a key someone shared with you. Add or link one in Settings, under Keys.</p>`,
+    sections: [
+      { title: "Your Claude subscription", html: `<ol>
+        <li>Install Claude Code: <code>npm install -g @anthropic-ai/claude-code</code></li>
+        <li>Run <code>claude</code> and sign in with your Claude account.</li>
+        <li>Run <code>claude setup-token</code> and copy the token it prints.</li>
+        <li>Paste it under Keys, <em>Add a key</em>.</li>
+      </ol>
+      <p>Primers count against your plan's limits. Anthropic's terms cover Claude Code and claude.ai; using the token here is your own call.</p>` },
+      { title: "An Anthropic API key", html: `<ol>
+        <li>At <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a>, add credit under Billing and create a key under API keys.</li>
+        <li>Paste it under Keys, <em>Add a key</em>.</li>
+      </ol>
+      <p>A short primer costs cents; one with research and images, a dollar or two.</p>` },
+      { title: "An OpenRouter or OpenAI key", html: `<ol>
+        <li>At <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener">openrouter.ai</a> or <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com</a>, add credit and create a key.</li>
+        <li>Paste it under Keys, <em>Add a key</em>.</li>
+      </ol>
+      <p>Under Models, each agent can then run on another model: any in the list with an OpenRouter key, OpenAI's with an OpenAI key.</p>` },
+      { title: "Someone else's key", html: `<p>Ask them for the key's name and password, then link to it under Keys.</p>` },
+      { title: "Sharing yours", html: `<p>Tick <em>Share it with a password</em> on your key and give people its name and password. Change the password and everyone is dropped; delete the key and it is gone for everyone.</p>` }
+    ]
+  },
+  actions: {
+    title: "Actions guide",
+    intro: `<p>Select a passage in any primer and a small toolbar appears above it: the pen. Each button on it is an action, something the selection can have done to it. The first nine answer to the keys 1 to 9.</p>`,
+    sections: [
+      { title: "The built-in actions", html: `<table>
+        <tr><td>Explain</td><td>Says the same thing more simply, in place.</td></tr>
+        <tr><td>Example</td><td>Adds the smallest concrete example, after the passage.</td></tr>
+        <tr><td>Derive</td><td>Shows the steps that were skipped, one at a time, after it.</td></tr>
+        <tr><td>Diagram</td><td>Draws what the passage describes.</td></tr>
+        <tr><td>Tighter</td><td>Same content, fewer words.</td></tr>
+        <tr><td>Define</td><td>Writes a small primer on the selected words and links them to it.</td></tr>
+        <tr><td>Edit</td><td>Asks what should change, then changes only that.</td></tr>
+        <tr><td>Ask</td><td>Asks your question and answers it, in the text or as a note in the margin.</td></tr>
+        <tr><td>Complain</td><td>Sends what is wrong to Alexander, with the passage.</td></tr>
+      </table>` },
+      { title: "How an action runs", html: `<p>An action that rewrites goes to the reviser, the agent that revises one block at a time. It sees the block you selected, the blocks either side, the words you highlighted, your note if the action asked for one, and the action's instruction. It answers with one to a few blocks and a mode.</p>
+      <p>Diagram goes to the illustrator instead, and Define to the definer. Every block an action changed keeps the action's name in the margin; press it to see what was asked.</p>` },
+      { title: "Modes", html: `<p>The mode says where the answer goes.</p>
+      <ul>
+        <li><em>replace</em>: the new blocks take the place of the block you selected. For saying the same thing better, as Explain and Tighter do.</li>
+        <li><em>after</em>: they are inserted directly after it. For adding something, as Example and Derive do.</li>
+      </ul>
+      <p>An instruction can prefer a mode; the reviser decides from what you asked. Each block it returns is prose, a note (a short aside in the margin, for a side question) or, rarely, a subheading, which opens a new subsection in the contents.</p>` },
+      { title: "Your own actions", html: `<p>Under Settings, Actions, <em>New action</em> makes one.</p>
+      <ul>
+        <li><em>Name</em>: what its button says, and the word left in the margin of the blocks it changes.</li>
+        <li><em>Instruction</em>: what to do with the selection, in a sentence or two. Say which mode to prefer.</li>
+        <li><em>Model</em>: what it runs on, or the reviser's default.</li>
+        <li><em>Ask for a note first</em>: the action then waits for a line from you before it runs, as Edit and Ask do. <em>Prompt shown</em> is the hint in that field.</li>
+      </ul>
+      <p>A built-in's instruction can be changed the same way; <em>Reset</em> beside it returns the original. The switch on a row puts the action in the pen or takes it out. Hover a row for its arrows and Delete. <em>Restore defaults</em> brings back the nine as shipped and drops the rest.</p>` }
+    ]
+  }
+};
+let guidePage = "setup";
 function renderGuide(){
-  const page = el("article", "doc page");
-  page.innerHTML = `<header class="doc-head"><h1 class="title">Setup guide</h1></header>
-  <div class="body">
-    <p>Give Primer a topic and Claude plans an outline, writes each section, draws the diagrams and finds the images, then checks its claims on the web. Select any passage to revise it, have it explained, or get a primer on it.</p>
-    <p>Each primer runs on a key: your Claude subscription, an Anthropic, OpenRouter or OpenAI key, or a key someone shared with you. Add or link one in Settings, under Keys.</p>
-
-    <h2>Your Claude subscription</h2>
-    <ol>
-      <li>Install Claude Code: <code>npm install -g @anthropic-ai/claude-code</code></li>
-      <li>Run <code>claude</code> and sign in with your Claude account.</li>
-      <li>Run <code>claude setup-token</code> and copy the token it prints.</li>
-      <li>Paste it under Keys, <em>Add a key</em>.</li>
-    </ol>
-    <p>Primers count against your plan's limits. Anthropic's terms cover Claude Code and claude.ai; using the token here is your own call.</p>
-
-    <h2>An Anthropic API key</h2>
-    <ol>
-      <li>At <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a>, add credit under Billing and create a key under API keys.</li>
-      <li>Paste it under Keys, <em>Add a key</em>.</li>
-    </ol>
-    <p>A short primer costs cents; one with research and images, a dollar or two.</p>
-
-    <h2>An OpenRouter or OpenAI key</h2>
-    <ol>
-      <li>At <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener">openrouter.ai</a> or <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com</a>, add credit and create a key.</li>
-      <li>Paste it under Keys, <em>Add a key</em>.</li>
-    </ol>
-    <p>Under Models, each agent can then run on another model: any in the list with an OpenRouter key, OpenAI's with an OpenAI key.</p>
-
-    <h2>Someone else's key</h2>
-    <p>Ask them for the key's name and password, then link to it under Keys.</p>
-
-    <h2>Sharing yours</h2>
-    <p>Tick <em>Share it with a password</em> on your key and give people its name and password. Change the password and everyone is dropped; delete the key and it is gone for everyone.</p>
-  </div>`;
+  const g = GUIDES[guidePage] || GUIDES.setup;
+  const page = el("article", "doc page guide");
+  page.innerHTML = `<header class="doc-head"><h1 class="title"></h1></header>`;
+  page.querySelector(".title").textContent = g.title;
+  const head = page.querySelector(".doc-head");
+  const intro = el("div", "body intro"); intro.innerHTML = g.intro; head.append(intro);
+  const secs = g.sections.map((sec, i) => {
+    const s = el("section", "ssec"), body = el("div", "body");
+    body.innerHTML = sec.html;
+    s.append(el("span", "marg num", "§ " + (i + 1)), el("h2", "sub", sec.title), body);
+    return s;
+  });
+  const items = g.sections.map((sec, i) => ({ num:String(i + 1), title:sec.title, at:() => secs[i] }));
+  head.append(tocNode(items), tocNode(items, true));
+  page.append(...secs);
   main.replaceChildren(page);
 }
 /* A shared link that leads nowhere: taken back, or never there. */
@@ -4240,16 +4483,17 @@ addEventListener("afterprint", () => {
 });
 
 /* ══ theme ════════════════════════════════════════════════════
-   The theme is a setting: system, light, dark, paper or paper-dark. It
-   sets both the palette (data-theme) and the look, which brings the faces
-   (data-look). primer:theme in localStorage is only a copy the pre-paint
-   script reads, so the page never flashes the other colour. */
+   The theme is a setting: paper unless chosen otherwise, else system,
+   light, dark or paper-dark. It sets both the palette (data-theme) and
+   the look, which brings the faces (data-look). primer:theme in
+   localStorage is only a copy the pre-paint script reads, so the page
+   never flashes the other colour. */
 function applyTheme(){
   const t = setting("theme"), root = document.documentElement;
   const dark = t === "dark" || t === "paper-dark" || (t === "system" && matchMedia("(prefers-color-scheme:dark)").matches);
   root.dataset.theme = dark ? "dark" : "light";
   if(t.startsWith("paper")) root.dataset.look = "paper"; else delete root.dataset.look;
-  try{ if(t === "system") localStorage.removeItem("primer:theme"); else localStorage.setItem("primer:theme", t); }catch(e){}
+  try{ localStorage.setItem("primer:theme", t); }catch(e){}
 }
 try{ matchMedia("(prefers-color-scheme:dark)").addEventListener("change", () => { if(setting("theme") === "system") applyTheme(); }); }catch(e){}
 
@@ -4271,9 +4515,9 @@ document.addEventListener("keydown", e => {
     return;
   }
   if(!inField && !e.metaKey && !e.ctrlKey && !e.altKey &&
-     pen.classList.contains("show") && !pen.classList.contains("asking")){
-    const act = Object.keys(ACTIONS).find(k => ACTIONS[k].key === e.key);
-    if(act){ e.preventDefault(); trigger(act); }
+     pen.classList.contains("show") && !pen.classList.contains("asking") && /^[1-9]$/.test(e.key)){
+    const a = activeActions()[Number(e.key) - 1];
+    if(a){ e.preventDefault(); trigger(a.id); }
   }
 });
 
@@ -4284,8 +4528,11 @@ async function loadMine(){
     index = (await store.get("primer:index")) || [];
     overrides = (await store.get("primer:prompts")) || {};
     settings = (await store.get("primer:settings")) || {};
+    actions = normalizeActions(await store.get("primer:actions"));
   }catch(e){ toast("Couldn't reach the server: " + e.message, { err:true }); }
+  if(!actions.length) actions = defaultActions();
   applySettings();
+  renderPen();
 }
 /* Back to this tab after another wrote a primer: the library catches up. */
 document.addEventListener("visibilitychange", async () => {
@@ -4334,9 +4581,9 @@ async function migrateLocal(){
   if(me && me.guest) me = guestMe();
   /* A link to a shared primer, and the guide, open for anyone; signing in
      is for everything else. */
-  const shared = sharePath();
+  const shared = sharePath(), guideAt = /^\/guide(?:\/(\w+))?$/.exec(location.pathname);
   if(shared){ if(me) await loadMine(); await openShared(shared); }
-  else if(location.pathname === "/guide"){ if(me) await loadMine(); route = "guide"; render(); }
+  else if(guideAt){ guidePage = GUIDES[guideAt[1]] ? guideAt[1] : "setup"; if(me) await loadMine(); route = "guide"; render(); }
   else if(me) await enter(); else { route = "login"; render(); }
   /* A reload keeps the old entry's state; start the count afresh here. */
   popping = false; history.replaceState(null, "", location.pathname); syncHistory();

@@ -87,15 +87,19 @@ const GUEST_OK = /^\/api\/(complete|media|models|guest\/)/;
 /* The credential a guest sends with each call: {kind, value} for a key of
    their own, whose kind its prefix confirms; {name, password} for someone's
    shared key. The same shape the store gives a signed-in user. */
-function guestCred(c) {
+function guestCred(c, ip) {
   if (!c || typeof c !== "object") return null;
   if (c.value) {
     const value = String(c.value), kind = kindOf(value) || (PROVIDERS[c.kind] ? c.kind : null);
     return kind ? { kind, value, own: true, key: { name: "your " + PROVIDERS[kind].word, kind, owner: "you" } } : null;
   }
   if (!c.name) return null;
-  const r = db.keys.sharedCredential(String(c.name), String(c.password || ""));
-  if (!r) throw halt(403, "The shared key “" + c.name + "” no longer accepts that password. Link to it again in Settings.");
+  /* A shared key's password is guessed no faster here than at the link
+     endpoints: the same buckets, so /api/complete is no way around them. */
+  const name = String(c.name).trim();
+  guard("link:" + ip, 40); guard("link:" + name, 8);
+  const r = db.keys.sharedCredential(name, String(c.password || ""));
+  if (!r) { strike("link:" + ip, "link:" + name); throw halt(403, "The shared key “" + name + "” no longer accepts that password. Link to it again in Settings."); }
   return { ...r, own: false };
 }
 
@@ -103,7 +107,7 @@ function guestCred(c) {
 const TYPES = { html: "text/html; charset=utf-8", txt: "text/plain; charset=utf-8", png: "image/png",
                 jpg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml" };
 /* Addresses the page answers for itself: /, /guide, /settings, /p/<id>, /p/<id>/inspector. */
-const PAGE_PATH = /^\/(guide|settings|p\/[\w-]+(\/inspector)?)?$/;
+const PAGE_PATH = /^\/(guide(\/\w+)?|settings|p\/[\w-]+(\/inspector)?)?$/;
 const SHARE_ID = /^[\w-]{8,40}$/;
 const MEDIA_NAME = /^[0-9a-f]{20}\.(png|jpg|gif|webp)$/;
 /* The image files among a primer's blocks, by name. */
@@ -196,6 +200,7 @@ createServer(async (req, res) => {
   console.log(`Invite code for new accounts: ${db.invite}`);
   console.log("Calls run on named keys added in Settings; no model credential is read from the environment.");
   if (!process.env.BRAVE_SEARCH_KEY) console.log("No BRAVE_SEARCH_KEY: the agents can read pages but not search the web.");
+  if (!process.env.PRIMER_SECRET) console.log("No PRIMER_SECRET: stored keys are encrypted with a secret kept in the database itself. Set PRIMER_SECRET so a leaked data directory can't be decrypted.");
 });
 
 async function serve(req, res) {
@@ -415,7 +420,7 @@ async function serve(req, res) {
   /* ── model calls ── */
   if (req.method === "POST" && path === "/api/complete") {
     const body = await readBody(req);
-    const cred = me ? db.users.credential(me.id) : guestCred(body.cred);
+    const cred = me ? db.users.credential(me.id) : guestCred(body.cred, ip);
     if (!cred) throw halt(400, "No key to run on. Add one, or link to a shared key, in Settings.", "no_key");
     /* Who is calling, on which key: the record of shared use. */
     console.log("  " + (me ? me.name : "guest") + "  " + (body.role || "?") + "  on “" + cred.key.name + "”" + (cred.own ? "" : " (" + cred.key.owner + "’s)"));
@@ -454,7 +459,7 @@ async function serve(req, res) {
 
   /* What each role runs on the caller's key when nothing is chosen, and what that key can run. */
   if (req.method === "POST" && path === "/api/models") {
-    const cred = me ? db.users.credential(me.id) : guestCred((await readBody(req)).cred);
+    const cred = me ? db.users.credential(me.id) : guestCred((await readBody(req)).cred, ip);
     const defaults = Object.fromEntries(Object.keys(ROLES).map(r => [r, cred ? modelFor(r, cred.kind).id : ROLES[r].model]));
     return json(200, { defaults, models: cred ? choices(cred.kind) : [] });
   }

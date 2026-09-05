@@ -16,7 +16,8 @@ subscription token (from `claude setup-token`), or an Anthropic, OpenRouter
 or OpenAI key. Which kind it is comes from the value itself, confirmed with
 its provider. Every primer is written on the key its writer has picked. Keys
 are stored encrypted, but the host can use them; that is the trust involved.
-`/guide` walks a newcomer through getting a key.
+`/guide` walks a newcomer through getting a key; `/guide/actions` explains the
+selection toolbar and its modes.
 
 A subscription's calls run through Claude Code, by way of the Claude Agent
 SDK, since only Claude Code may spend one. Every other key is spoken to
@@ -80,10 +81,12 @@ reverse proxy. Or, with the Dockerfile and fly.toml here, on Fly.io:
 
     fly launch --no-deploy                       # keep the fly.toml it finds
     fly volumes create primer_data --size 1
-    fly secrets set INVITE=a-word
+    fly secrets set INVITE=a-word PRIMER_SECRET=$(openssl rand -hex 32)
     fly deploy
 
-Then send friends the URL and the invite word.
+Then send friends the URL and the invite word. Set `PRIMER_SECRET` from the
+start: it encrypts the stored keys, and keeping it out of the volume (in Fly's
+secrets, not the database) means a leaked data directory can't be decrypted.
 
 ## Environment
 
@@ -93,6 +96,6 @@ Then send friends the URL and the invite word.
 | `HOST` | `127.0.0.1` | `0.0.0.0` to accept outside connections |
 | `DATA_DIR` | `./data` | database and media |
 | `INVITE` | generated once | needed to create an account |
-| `PRIMER_SECRET` | generated once | encrypts stored keys and tokens |
+| `PRIMER_SECRET` | generated once | encrypts stored keys and tokens; set it out-of-band in production, or the secret is kept in the database beside them |
 | `ADMIN` | the first account | account names, comma-separated, that read feedback |
 | `BRAVE_SEARCH_KEY` | unset | the web search every agent uses, from brave.com/search/api |

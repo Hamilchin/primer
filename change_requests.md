@@ -54,3 +54,8 @@
 ~~The "write" button should be "write new primer."~~ 
 ~~The library is visually high compared to the new primer creation menu, that should be fixed~~ 
 ~~You should be able to set an independent model for each agent. The defaults and selections for each agent should be displayed in settings, and there should be a "reset to default" button.~~
+~~Users should be able to change which edit options appear in the hotbar and create new ones as needed with their own custom prompts. There should be a section of the settings dedicated to exclusively this, and it should be clean, intuitive, easy to use, minimal, structured, and complete. You should be able to select "active actions" - i.e. the ones that appear in the hotbar when selecting. You should be able to turn them off or delete them, rename them, edit the prompt, edit the model doing the actions, as well as restore all default active actions. And anything else I've forgotten. You are a UI/UX expert. I need this to be not confusing and done elegantly.~~ 
+~~Sonnet should be default for researcher.~~ 
+~~Move up and move down don't work for actions. Move up/down/delete should appear as options when hovering over the unexpanded actions, not after expanding.~~ 
+~~Add a guide to actions, what "modes" are, etc. Minimal, simple, like the setup guide (write it in primer format with the table of contents and whatnot)~~ 
+~~Primer should default to "paper" theme, and favicon should be black instead of white~~ 

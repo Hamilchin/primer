@@ -17,6 +17,8 @@
 
 import { writeFile, mkdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import { query, tool as sdkTool, createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
 import { streamText, stepCountIs, tool } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
@@ -36,7 +38,7 @@ export const ROLES = {
   edit:     { model: "claude-sonnet-4-6" },
   figure:   { model: "claude-fable-5" },
   finder:   { model: "claude-sonnet-4-6", maxTurns: 40, tools: ["web_search", "fetch_page", "look_at_image"] },
-  research: { model: "claude-fable-5", maxTurns: 40, tools: ["web_search", "fetch_page"] },
+  research: { model: "claude-sonnet-4-6", maxTurns: 40, tools: ["web_search", "fetch_page"] },
   define:   { model: "claude-sonnet-4-6", maxTurns: 12, tools: ["web_search", "fetch_page"] }
 };
 
@@ -217,12 +219,44 @@ const webURL = url => {
   if (!/^https?:$/.test(u.protocol)) throw new Error("Only http(s) URLs.");
   return u;
 };
+/* The tools fetch a URL the model chose, so they must not be aimed at the
+   machine itself or its private network. An address in a private, loopback
+   or link-local range is refused; a hostname is refused if it resolves to
+   one. redirect is manual so every hop is checked, not just the first. */
+const isPrivate = ip => {
+  if (isIP(ip) === 6) {
+    const a = ip.toLowerCase();
+    if (a.startsWith("::ffff:") && isIP(a.slice(7)) === 4) return isPrivate(a.slice(7));
+    return a === "::1" || a === "::" || /^f[cd]/.test(a) || /^fe[89ab]/.test(a);
+  }
+  const p = ip.split(".").map(Number);
+  return p[0] === 0 || p[0] === 10 || p[0] === 127 || (p[0] === 169 && p[1] === 254)
+    || (p[0] === 172 && p[1] >= 16 && p[1] <= 31) || (p[0] === 192 && p[1] === 168) || (p[0] === 100 && p[1] >= 64 && p[1] <= 127);
+};
+async function publicOnly(host) {
+  const bare = host.replace(/^\[|\]$/g, "");
+  if (isIP(bare)) { if (isPrivate(bare)) throw new Error("That address isn't allowed."); return; }
+  if (host === "localhost" || /\.(internal|local|localhost)$/i.test(host)) throw new Error("That address isn't allowed.");
+  let addrs;
+  try { addrs = await lookup(host, { all: true }); } catch { throw new Error("Couldn't resolve that host."); }
+  if (!addrs.length || addrs.some(a => isPrivate(a.address))) throw new Error("That address isn't allowed.");
+}
+async function safeFetch(url, opts = {}) {
+  let u = webURL(url);
+  for (let hop = 0; hop < 5; hop++) {
+    await publicOnly(u.hostname);
+    const r = await fetch(u, { ...opts, redirect: "manual" });
+    if (r.status >= 300 && r.status < 400 && r.headers.get("location")) { u = webURL(new URL(r.headers.get("location"), u)); continue; }
+    return r;
+  }
+  throw new Error("Too many redirects.");
+}
 export async function fetchImage(url) {
   const u = webURL(url);
   const wiki = await wikiThumb(u, 1000).catch(() => null);
-  const r = await fetch(wiki || url, {
+  const r = await safeFetch(wiki || url, {
     headers: { "user-agent": UA, accept: "image/*" },
-    signal: AbortSignal.timeout(20000), redirect: "follow"
+    signal: AbortSignal.timeout(20000)
   });
   if (!r.ok) throw new Error("HTTP " + r.status);
   const type = (r.headers.get("content-type") || "").split(";")[0].trim();
@@ -254,8 +288,8 @@ async function search(query) {
 }
 const PAGE_MAX = 40000;
 async function readPage(url) {
-  const r = await fetch(webURL(url), { headers: { "user-agent": UA, accept: "text/html, text/plain;q=0.9, */*;q=0.5" },
-                                       signal: AbortSignal.timeout(20000), redirect: "follow" });
+  const r = await safeFetch(url, { headers: { "user-agent": UA, accept: "text/html, text/plain;q=0.9, */*;q=0.5" },
+                                   signal: AbortSignal.timeout(20000) });
   if (!r.ok) throw new Error("HTTP " + r.status);
   const type = (r.headers.get("content-type") || "").split(";")[0].trim();
   if (!/^text\/|json|xml/.test(type)) throw new Error("Not a text page (" + (type || "unknown type") + ").");
