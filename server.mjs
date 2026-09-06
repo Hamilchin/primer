@@ -43,12 +43,14 @@
 // someone's shared key. POST /api/guest/check {value} says which kind a
 // credential is; POST /api/guest/link {name, password} confirms a shared key.
 //
-// Sharing: POST /api/share {of} freezes a primer as it is stored and answers
-// {id}; with live:true it answers the one link that follows the primer as
-// it changes. GET /s/:id is that primer as a page and GET /api/share/:id as
-// JSON, for anyone, signed in or not. What a link shows is `snapshot`, the
-// one place the server reads inside a stored primer. GET /api/shares?doc=
-// lists a primer's links, DELETE /api/share/:id removes one.
+// Sharing: PUT /api/public/:id {on} makes a primer's own address, /p/:id,
+// open to anyone, or closes it again; GET /api/primer/:id is the primer as
+// its owner has it now, as JSON, for anyone, signed in or not. POST
+// /api/share {of} freezes a copy of a primer as it is stored and answers
+// {id}: GET /s/:id is that copy as a page and GET /api/share/:id as JSON.
+// What either shows is `snapshot`, the one place the server reads inside a
+// stored primer. GET /api/shares?doc= says whether a primer is public and
+// lists its frozen links, DELETE /api/share/:id removes one.
 //
 // Environment (all optional):
 //   PORT=8787  HOST=127.0.0.1  DATA_DIR=./data  INVITE=...  PRIMER_SECRET=...  ADMIN=name,name
@@ -133,10 +135,10 @@ const MEDIA_NAME = /^[0-9a-f]{20}\.(png|jpg|gif|webp)$/;
 /* The image files among a primer's blocks, by name. */
 const mediaOf = blocks => [...new Set(blocks.map(x => x && typeof x.src === "string" && x.src.startsWith("/media/") ? x.src.slice(7) : "")
   .filter(n => MEDIA_NAME.test(n)))];
-/* What a link shows of a stored primer: its finished pieces, with links to
+/* What a reader sees of a stored primer: its finished pieces, with links to
    the owner's other primers made plain, and the display switches that
-   shape them. A frozen link keeps this as it is now; a live link makes it
-   afresh each time. This is the one place the server reads inside the
+   shape them. A frozen link keeps this as it is now; a public primer is
+   made afresh each time. This is the one place the server reads inside the
    page's blobs, and it copies out only what it names: a rewrite's source
    text, the calls behind the pieces and the failures among them stay
    with the owner. Null once the primer is gone. */
@@ -269,17 +271,22 @@ async function serve(req, res) {
   /* A guest: no account, primers kept in their browser, a credential sent with each call. */
   if (req.method === "POST" && path === "/api/guest") { setCookie(guestToken()); return json(200, { guest: true }); }
 
-  /* ── a shared primer: anyone with the link ── */
+  /* ── a public primer, as its owner has it right now: anyone with the address ── */
+  if (req.method === "GET" && path.startsWith("/api/primer/")) {
+    const id = path.slice("/api/primer/".length);
+    const pub = DOC_ID.test(id) && db.public.get(id);
+    const snap = pub && snapshot(pub.user, id);
+    if (!snap) throw halt(404, "That address doesn't lead to a primer.");
+    db.public.media(id, mediaOf(snap.blocks));
+    return json(200, { id, by: pub.by, created: pub.created, live: true, doc: snap });
+  }
+  /* ── a frozen copy: anyone with the link ── */
   if (req.method === "GET" && path.startsWith("/api/share/")) {
     const id = path.slice("/api/share/".length);
     const s = SHARE_ID.test(id) && db.shares.get(id);
-    /* A live link: the primer as its owner has it right now. */
-    const snap = s && s.live && snapshot(s.user, s.doc);
-    if (!s || (s.live && !snap)) throw halt(404, "That link doesn't lead to a primer any more.");
-    if (snap) db.shares.media(s.id, mediaOf(snap.blocks));
+    if (!s) throw halt(404, "That link doesn't lead to a primer any more.");
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-cache" });
-    return res.end('{"id":' + JSON.stringify(s.id) + ',"by":' + JSON.stringify(s.by) + ',"created":' + s.created
-                 + (snap ? ',"live":true,"doc":' + JSON.stringify(snap) : ',"doc":' + s.body) + "}");
+    return res.end('{"id":' + JSON.stringify(s.id) + ',"by":' + JSON.stringify(s.by) + ',"created":' + s.created + ',"doc":' + s.body + "}");
   }
 
   /* ── feedback: from anyone on the page, to whoever hosts ── */
@@ -321,18 +328,21 @@ async function serve(req, res) {
     return json(200, { items: db.feedback.list(300) });
   }
 
-  /* ── sharing: freeze a primer, list a primer's links, take one back ── */
+  /* ── sharing: open a primer's address to anyone, freeze a copy, list, take back ── */
+  if (req.method === "PUT" && path.startsWith("/api/public/")) {
+    const id = path.slice("/api/public/".length), on = !!(await readBody(req)).on;
+    if (!DOC_ID.test(id)) throw halt(400, "Bad primer id.");
+    if (!on) { db.public.remove(me.id, id); return json(200, { on: false }); }
+    if (!snapshot(me.id, id)) throw halt(404, "That primer isn't saved.");
+    if (!db.public.add(me.id, id)) throw halt(409, "Another account's primer has this address.");
+    console.log("  " + me.name + "  public " + id);
+    return json(200, { on: true });
+  }
   if (req.method === "POST" && path === "/api/share") {
     const b = await readBody(req);
     const of = String(b.of || "").slice(0, 40);
     const snap = of && snapshot(me.id, of);
     if (!snap) throw halt(404, "That primer isn't saved.");
-    /* A live link follows the primer; a frozen one is a copy of it now. */
-    if (b.live) {
-      const s = db.shares.live(me.id, of, snap.title);
-      if (!s.reused) console.log("  " + me.name + "  public link " + s.id);
-      return json(200, s);
-    }
     if (!snap.blocks.length) throw halt(400, "Nothing to share yet.");
     /* What the primer cost comes from the page, which keeps the trace. */
     if (b.usage) snap.usage = String(b.usage).slice(0, 200);
@@ -342,7 +352,7 @@ async function serve(req, res) {
   }
   if (req.method === "GET" && path === "/api/shares") {
     const of = String(url.searchParams.get("doc") || "").slice(0, 40);
-    return json(200, { shares: of ? db.shares.list(me.id, of) : [] });
+    return json(200, { public: !!of && db.public.is(me.id, of), shares: of ? db.shares.list(me.id, of) : [] });
   }
   if (req.method === "DELETE" && path.startsWith("/api/share/")) {
     const id = path.slice("/api/share/".length);
@@ -435,7 +445,12 @@ async function serve(req, res) {
       db.kv.set(me.id, k, body);
       return json(200, {});
     }
-    if (req.method === "DELETE") { db.kv.del(me.id, k); return json(200, {}); }
+    if (req.method === "DELETE") {
+      db.kv.del(me.id, k);
+      /* A primer taken out of the library closes its address too. */
+      if (k.startsWith("primer:doc:")) db.public.remove(me.id, k.slice(11));
+      return json(200, {});
+    }
     throw halt(405, "method not allowed");
   }
 
@@ -494,13 +509,16 @@ async function serve(req, res) {
 
   /* ── files: the page and what it needs, and the images that were found ── */
   if (req.method !== "GET" && req.method !== "HEAD") throw halt(405, "method not allowed");
-  /* A shared primer is the same page, titled after the primer so the link
-     unfurls and the tab reads right; the page does the rest from the URL. */
-  if (path.startsWith("/s/")) {
-    const s = SHARE_ID.test(path.slice(3)) && db.shares.get(path.slice(3));
+  /* A public primer or a frozen copy is the same page, titled after the
+     primer so the link unfurls and the tab reads right; the page does the
+     rest from the URL. */
+  const pubAt = /^\/p\/([\w-]+)$/.exec(path), shareAt = /^\/s\/([\w-]+)$/.exec(path);
+  if (pubAt || shareAt) {
+    let title = null;
+    if (pubAt) { const pub = db.public.get(pubAt[1]), snap = pub && snapshot(pub.user, pubAt[1]); if (snap) title = snap.title; }
+    else { const s = SHARE_ID.test(shareAt[1]) && db.shares.get(shareAt[1]); if (s) title = s.title; }
     let html = await readFile(new URL("primer.html", ROOT), "utf8");
-    const live = s && s.live && snapshot(s.user, s.doc);
-    if (s) html = html.replace("<title>primer</title>", "<title>" + escapeHtml(live ? live.title : s.title) + " · primer</title>");
+    if (title) html = html.replace("<title>primer</title>", "<title>" + escapeHtml(title) + " · primer</title>");
     res.writeHead(200, { "content-type": TYPES.html, "cache-control": "no-cache" });
     return res.end(html);
   }

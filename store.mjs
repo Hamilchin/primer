@@ -12,11 +12,11 @@
 //   kv         everything the page keeps, per user, by key: primers, prompt
 //              edits, settings. The client already talks to storage as
 //              get/set/del by key, so the server stores it the same way.
-//   shares     a link to a primer, readable by anyone with the id: a frozen
-//              copy of it as it was, or a live one that the server makes
-//              afresh from the stored primer each time it is opened
-//   share_media  the image files a share refers to, so they can be served
-//              to a reader who is not signed in
+//   public     the primers whose own address, /p/<id>, anyone may read;
+//              the server makes each afresh from the stored primer
+//   shares     a frozen copy of a primer, readable by anyone with the id
+//   share_media  the image files a public primer or a share refers to, so
+//              they can be served to a reader who is not signed in
 //   meta       the server's own few facts: its secret, its invite code
 //
 // Passwords are scrypt hashes. A key's value is encrypted with a secret that
@@ -40,9 +40,11 @@ export function openStore(dir) {
                                          created integer not null);
     create table if not exists kv       (user integer not null references users(id) on delete cascade, k text not null,
                                          v text not null, updated integer not null, primary key (user, k));
+    create table if not exists public   (doc text primary key, user integer not null references users(id) on delete cascade,
+                                         created integer not null);
     create table if not exists shares   (id text primary key, user integer not null references users(id) on delete cascade,
                                          doc text not null, title text not null, hash text not null, body text not null,
-                                         live integer not null default 0, created integer not null);
+                                         created integer not null);
     create table if not exists share_media (share text not null, name text not null, primary key (share, name));
     create table if not exists keys     (id integer primary key, owner integer not null references users(id) on delete cascade,
                                          name text not null, kind text not null, secret text not null,
@@ -56,6 +58,8 @@ export function openStore(dir) {
                                          searches integer not null default 0, cost real not null default 0,
                                          primary key (key, day));
   `);
+  /* Live links, which the public table replaces: gone with their column. */
+  try { db.exec("delete from shares where live = 1; alter table shares drop column live"); } catch {}
 
   const q = {
     metaGet: db.prepare("select v from meta where k = ?"),
@@ -73,11 +77,12 @@ export function openStore(dir) {
     kvSet: db.prepare("insert into kv (user, k, v, updated) values (?, ?, ?, ?) on conflict(user, k) do update set v = excluded.v, updated = excluded.updated"),
     kvDel: db.prepare("delete from kv where user = ? and k = ?"),
     shareAdd: db.prepare("insert into shares (id, user, doc, title, hash, body, created) values (?, ?, ?, ?, ?, ?, ?)"),
-    shareAddLive: db.prepare("insert into shares (id, user, doc, title, hash, body, live, created) values (?, ?, ?, ?, 'live', '', 1, ?)"),
-    shareLive: db.prepare("select id, created from shares where user = ? and doc = ? and live = 1"),
-    shareLast: db.prepare("select id, hash, created from shares where user = ? and doc = ? and live = 0 order by created desc limit 1"),
+    pubAdd: db.prepare("insert or ignore into public (doc, user, created) values (?, ?, ?)"),
+    pubGet: db.prepare("select public.*, users.name as by from public join users on users.id = public.user where public.doc = ?"),
+    pubDel: db.prepare("delete from public where doc = ? and user = ?"),
+    shareLast: db.prepare("select id, hash, created from shares where user = ? and doc = ? order by created desc limit 1"),
     shareGet: db.prepare("select shares.*, users.name as by from shares join users on users.id = shares.user where shares.id = ?"),
-    shareList: db.prepare("select id, created, live from shares where user = ? and doc = ? order by live desc, created desc"),
+    shareList: db.prepare("select id, created from shares where user = ? and doc = ? order by created desc"),
     shareDel: db.prepare("delete from shares where id = ? and user = ?"),
     shareMediaAdd: db.prepare("insert or ignore into share_media (share, name) values (?, ?)"),
     shareMediaDel: db.prepare("delete from share_media where share = ?"),
@@ -300,28 +305,36 @@ export function openStore(dir) {
         for (const name of media) q.shareMediaAdd.run(id, name);
         return { id, created, reused: false };
       },
-      /* One live link per primer: the same one back each time it is asked for. */
-      live(user, doc, title) {
-        const r = q.shareLive.get(user, doc);
-        if (r) return { id: r.id, created: r.created, live: true, reused: true };
-        const id = randomBytes(9).toString("base64url"), created = Date.now();
-        q.shareAddLive.run(id, user, doc, title, created);
-        return { id, created, live: true, reused: false };
-      },
       get(id) {
         const r = q.shareGet.get(id);
-        return r ? { id: r.id, by: r.by, title: r.title, created: r.created, body: r.body, live: !!r.live, user: r.user, doc: r.doc } : null;
+        return r ? { id: r.id, by: r.by, title: r.title, created: r.created, body: r.body } : null;
       },
-      list(user, doc) { return q.shareList.all(user, doc).map(r => ({ id: r.id, created: r.created, live: !!r.live })); },
-      /* The image files a live link shows right now, so its readers can load them. */
-      media(id, names) { for (const name of names) q.shareMediaAdd.run(id, name); },
+      list(user, doc) { return q.shareList.all(user, doc).map(r => ({ id: r.id, created: r.created })); },
       delete(user, id) {
         const r = q.shareDel.run(id, user);
         if (r.changes) q.shareMediaDel.run(id);
         return !!r.changes;
       },
-      /* Whether any share, by anyone, shows this image file. */
+      /* Whether any public primer or share, by anyone, shows this image file. */
       mediaShared(name) { return !!q.shareMediaHas.get(name); }
+    },
+    /* ── public primers: a primer's own address opens for anyone ── */
+    public: {
+      /* False when another account's primer already has this id. */
+      add(user, doc) {
+        q.pubAdd.run(doc, user, Date.now());
+        const r = q.pubGet.get(doc);
+        return !!r && r.user === user;
+      },
+      get(doc) { const r = q.pubGet.get(doc); return r ? { doc: r.doc, user: r.user, by: r.by, created: r.created } : null; },
+      is(user, doc) { const r = q.pubGet.get(doc); return !!r && r.user === user; },
+      /* The image files a public primer shows right now, so its readers can load them. */
+      media(doc, names) { for (const name of names) q.shareMediaAdd.run(doc, name); },
+      remove(user, doc) {
+        const r = q.pubDel.run(doc, user);
+        if (r.changes) q.shareMediaDel.run(doc);
+        return !!r.changes;
+      }
     },
     /* ── feedback: a word from a reader to whoever hosts, with where it came from ── */
     feedback: {

@@ -83,13 +83,15 @@ different key, and one that has failed five times running waits for a
 person. Two tabs never write the same primer: the one writing it holds a
 lease, and the other says so.
 
-Share, there from the moment a primer starts, offers two kinds of link to
-`/s/<id>`, readable by anyone, signed in or not. The public link follows the primer: readers
-see it as it stands and as it changes, and while it is still being written
-their page brings each new piece in. Turning the switch off takes the link
-back. A frozen link is a copy of the primer as it is that moment; later
-changes never reach it, and the Share menu lists those copies and can
-remove them.
+A primer's own address, `/p/<id>`, is its link. Share, there from the
+moment a primer starts, has a Public switch: on, anyone with the address
+reads the primer, signed in or not, as it stands and as it changes, and
+while it is still being written their page brings each new piece in. Off
+takes it back. Whether you can edit depends on whose primer it is, never on
+the address: only the owner edits. A frozen link, `/s/<id>`, is a copy of
+the primer as it is that moment; later changes never reach it, and the
+Share menu lists those copies and can remove them. A guest's primers are in
+their browser alone, so a guest has no Share.
 
 Feedback in the top bar, and Complain in the pen, send a reader's words to
 whoever hosts, along with the page they were on. The account named by

@@ -1267,8 +1267,10 @@ let sel = null;            // {blockId, text, rect}
 let aboutOpen = false;     // the About panel under a primer's title
 const docs = new Map();    // id → the one live object for each document this session
 const uid = () => Math.random().toString(36).slice(2,9);
-/* A shared primer is someone's frozen copy: read it, hover it, print it,
-   but nothing on it can be changed or retried. */
+/* A primer's id is its address, and an address anyone may be given. */
+const docId = () => { const a = crypto.getRandomValues(new Uint8Array(9)); return btoa(String.fromCharCode(...a)).replace(/\+/g, "-").replace(/\//g, "_"); };
+/* Someone else's primer, public or a frozen copy: read it, hover it,
+   print it, but nothing on it can be changed or retried. */
 const readonly = () => route === "shared";
 /* The pages a step away from wherever you were, with Back in the top bar. */
 const aside = () => route === "settings" || route === "inspector" || route === "guide" || route === "missing";
@@ -2115,7 +2117,7 @@ function metaNode(d){
   }
   row("Written", shortDate(d.created));
   if(d.shared){
-    row("Shared by", d.shared.live ? d.shared.by + ", as a public link that follows the primer" : d.shared.by + ", " + shortDate(d.shared.created));
+    row("Shared by", d.shared.live ? d.shared.by : d.shared.by + ", " + shortDate(d.shared.created));
     if(d.usage) row("Usage", d.usage);
   }else{
     const use = usageText(usageOf(d));
@@ -2142,8 +2144,8 @@ function docState(d){
     if(jobs.length > 1) text += ", and " + (jobs.length - 1) + " more";
     return { kind:"busy", text };
   }
-  /* A live link to a primer still being made: say so, and the page will
-     bring the new pieces in as they land. */
+  /* A public primer still being made: say so, and the page will bring
+     the new pieces in as they land. */
   if(d.shared && d.shared.live && /^(planning|writing|researching)$/.test(d.status)){
     const done = new Set(d.blocks.filter(b => b.sec != null && b.kind !== "heading" && b.kind !== "subheading" && (b.md || b.src)).map(b => b.sec)).size;
     return { kind:"live", text: d.status === "planning" ? "being planned" : d.status === "researching" ? "sources being checked"
@@ -2679,7 +2681,7 @@ function trimTitle(s, max, fallback){
    made in the background, then written. A definition (the Definition
    brief, or Define on a selection) is written by the definer. */
 function startDoc(o, background){
-  const d = { id:uid(), title:o.topic, topic:o.topic, known:o.known || "", instruction:o.instruction || "",
+  const d = { id:docId(), title:o.topic, topic:o.topic, known:o.known || "", instruction:o.instruction || "",
               created:Date.now(), status:"planning", blocks:[] };
   if(o.rewrite) d.rewrite = o.rewrite;
   if(o.define) d.define = o.define;
@@ -3644,10 +3646,11 @@ function goBack(){
 /* ══ addresses ════════════════════════════════════════════════
    Every page has an address, a title, and a place in the browser's
    history: a primer at /p/<id>, its Inspector under that, Settings at
-   /settings, the guide at /guide, a shared primer at /s/<id>. Back and
-   Forward move between them, and a reload reopens the same page.      */
+   /settings, the guide at /guide, someone else's public primer at its
+   own /p/<id>, a frozen copy at /s/<id>. Back and Forward move between
+   them, and a reload reopens the same page.                           */
 function pageUrl(){
-  if(route === "shared" || route === "missing") return doc && doc.shared ? "/s/" + doc.shared.id : location.pathname;
+  if(route === "shared" || route === "missing") return doc && doc.shared ? doc.shared.path : location.pathname;
   if(route === "guide") return guidePage === "setup" ? "/guide" : "/guide/" + guidePage;
   if(route === "settings") return "/settings";
   if((route === "doc" || route === "inspector") && doc) return "/p/" + doc.id + (route === "inspector" ? "/inspector" : "");
@@ -3667,7 +3670,7 @@ function pageTitle(){
 let popping = false;
 function syncHistory(){
   if(popping) return;
-  const st = { route, doc: doc && !doc.shared ? doc.id : null, share: doc && doc.shared ? doc.shared.id : null, guide: route === "guide" ? guidePage : null };
+  const st = { route, doc: doc && !doc.shared ? doc.id : null, share: doc && doc.shared ? doc.shared.path : null, guide: route === "guide" ? guidePage : null };
   const cur = history.state, url = pageUrl();
   if(cur && cur.route === st.route && cur.doc === st.doc && cur.share === st.share && (cur.guide || null) === st.guide){
     if(location.pathname !== url) history.replaceState(cur, "", url);
@@ -3683,7 +3686,7 @@ addEventListener("popstate", async e => {
   try{
     closePops(); hideTools();
     if(st.route === "shared" && st.share){
-      if(doc && doc.shared && doc.shared.id === st.share){ route = "shared"; render(); }
+      if(doc && doc.shared && doc.shared.path === st.share){ route = "shared"; render(); }
       else await openShared(st.share);
     }else{
       if(!st.doc) doc = null;
@@ -3704,8 +3707,9 @@ async function openLanding(){
   if(at){
     const d = await openDoc(at[1]);
     if(d && at[2]){ route = "inspector"; render(); }
-    else if(!d) toast("That primer isn't in this library.");
-  }else if(p === "/settings"){ route = "settings"; render(); }
+    else if(!d) await openShared("/p/" + at[1]);   // not in this library: someone else's, if it is public
+  }else if(p && p.startsWith("/s/")) await openShared(p);
+  else if(p === "/settings"){ route = "settings"; render(); }
 }
 settingsBtn.onclick = () => goto("settings");
 backBtn.onclick = goBack;
@@ -3718,11 +3722,12 @@ function goHome(){
 }
 
 /* ══ sharing ══════════════════════════════════════════════════
-   A link is the primer as it is at that moment, frozen on the server:
-   the reader sees exactly this page, and later changes here never reach
-   it. Sharing again with nothing changed gives the same link back.    */
-const SHARE_PATH = /^\/s\/([\w-]+)$/;
-function sharePath(){ const m = SHARE_PATH.exec(location.pathname); return m ? m[1] : null; }
+   A primer's own address is its link: once its owner makes it public,
+   anyone who has the address reads the primer as it is now, and as it
+   changes. A frozen copy is the primer as it was at that moment, at an
+   address of its own; sharing again with nothing changed gives the same
+   copy back. Only the owner ever edits.                               */
+const SHARE_PATH = /^\/[sp]\/[\w-]+$/;
 const shareUrl = id => location.origin + "/s/" + id;
 /* A frozen link: the server copies the primer as it is stored this moment,
    so it is saved first. What a reader gets of it is the server's to say;
@@ -3748,44 +3753,47 @@ function copyLink(url, anchor){
 async function openShare(anchor){
   const d = doc;
   if(readonly()){ openMenu(shareMenu, anchor, [menuItem(shareMenu, "Copy link", () => copyLink(location.href, anchor))]); return; }
-  /* The public link follows the primer: readers see it as it is now and as
-     it changes. A frozen copy stays as it was the day it was made. */
-  const pub = el("div", "pub"), sw = btn("switch"), lab = el("span", null, "Public link");
-  sw.setAttribute("role", "switch"); sw.setAttribute("aria-label", "Public link"); sw.append(el("i"));
+  /* Public: this address opens for anyone, and shows the primer as it is
+     now and as it changes. A frozen copy stays as it was the day it was
+     made. */
+  const pub = el("div", "pub"), sw = btn("switch"), lab = el("span", null, "Public");
+  sw.setAttribute("role", "switch"); sw.setAttribute("aria-label", "Public"); sw.append(el("i"));
   const pubLink = el("div", "links"), links = el("div", "links");
-  const hint = el("span", "hint under", "Live updating");
+  const hint = el("span", "hint under", "Anyone with this address reads it as it changes");
   pub.append(lab, sw);
   const freeze = menuItem(shareMenu, "Copy a frozen link", () => shareDoc(d, anchor));
   freeze.title = "A copy of the primer as it is this moment; later changes never reach it.";
   const rule = el("div", "rule");
   if(!openMenu(shareMenu, anchor, [pub, hint, pubLink, rule, freeze, links])) return;
-  let live = null;
+  let on = false;
+  const addr = location.origin + "/p/" + d.id;
   const paint = () => {
-    sw.setAttribute("aria-checked", String(!!live));
+    sw.setAttribute("aria-checked", String(on));
     pubLink.replaceChildren();
-    if(!live) return;
+    if(!on) return;
     /* The address is the whole control: a click copies it; a middle click
        or a right click opens it as any link. */
-    const u = el("a", "url", shareUrl(live.id)); u.href = shareUrl(live.id); u.title = "Copy";
-    u.onclick = ev => { ev.preventDefault(); copyLink(shareUrl(live.id), anchor); };
+    const u = el("a", "url", addr); u.href = addr; u.title = "Copy";
+    u.onclick = ev => { ev.preventDefault(); copyLink(addr, anchor); };
     pubLink.append(u);
   };
   sw.onclick = async () => {
     sw.disabled = true;
     try{
-      if(live){ await api("/api/share/" + live.id, null, "DELETE"); live = null; paint(); toast("The link no longer opens"); }
+      if(on){ await api("/api/public/" + d.id, { on:false }, "PUT"); on = false; paint(); toast("The address no longer opens for others"); }
       else{
-        live = await api("/api/share", { of:d.id, live:true, title:d.title }); paint();
-        navigator.clipboard.writeText(shareUrl(live.id)).then(() => toast("Public link copied"), () => toast("The link is public"));
+        await save(d, true);
+        await api("/api/public/" + d.id, { on:true }, "PUT"); on = true; paint();
+        navigator.clipboard.writeText(addr).then(() => toast("Public; address copied"), () => toast("Public"));
       }
     }catch(e){ toast("Couldn't change that: " + e.message, { err:true }); }
     sw.disabled = false;
   };
   let list = [];
-  try{ list = (await api("/api/shares?doc=" + encodeURIComponent(d.id))).shares || []; }catch(e){}
+  try{ const r = await api("/api/shares?doc=" + encodeURIComponent(d.id)); list = r.shares || []; on = !!r.public; }catch(e){}
   if(!shareMenu.classList.contains("show") || doc !== d) return;
-  live = list.find(s => s.live) || null; paint();
-  list.filter(s => !s.live).forEach(s => {
+  paint();
+  list.forEach(s => {
     const row = el("div", "linkrow");
     const b = btn(null, "Link from " + timeAgo(s.created), () => copyLink(shareUrl(s.id), anchor));
     b.setAttribute("role", "menuitem"); b.title = shareUrl(s.id);
@@ -3806,11 +3814,14 @@ function openExport(anchor){
     menuItem(shareMenu, "Copy as Markdown", () => copyText(docMarkdown(d)))
   ]);
 }
-/* Reading a shared primer: fetch the frozen copy and show it, signed in
-   or not. The copy carries who shared it and when. */
-async function openShared(id){
+/* Reading someone else's primer, signed in or not: a public one at its
+   own address, /p/<id>, or a frozen copy at /s/<id>. What comes back
+   carries who shared it and when. */
+const sharedApi = path => (path.startsWith("/p/") ? "/api/primer/" : "/api/share/") + path.slice(3);
+const sharedDoc = (path, s) => ({ ...s.doc, id:"share:" + s.id, shared:{ id:s.id, path, by:s.by, created:s.created, live:!!s.live } });
+async function openShared(path){
   let s;
-  try{ s = await api("/api/share/" + id); }
+  try{ s = await api(sharedApi(path)); }
   catch(e){
     doc = null;
     if(e.status === 404){ route = "missing"; render(); return; }
@@ -3818,29 +3829,29 @@ async function openShared(id){
     toast("Couldn't open that link: " + e.message, { err:true });
     return;
   }
-  doc = { ...s.doc, id:"share:" + s.id, shared:{ id:s.id, by:s.by, created:s.created, live:!!s.live } };
+  doc = sharedDoc(path, s);
   undoStack = []; route = "shared";
   render();
   scrollTo(0, 0);
-  if(s.live) watchShared(s.id);
+  if(s.live) watchShared(path);
 }
-/* A live link is read again while it is on screen: often while the primer
-   is still being made, now and then once it is done. Only a change redraws. */
+/* A public primer is read again while it is on screen: often while it is
+   still being made, now and then once it is done. Only a change redraws. */
 let watchT = 0;
-function watchShared(id){
+function watchShared(path){
   clearTimeout(watchT);
   const busy = doc && /^(planning|writing|researching)$/.test(doc.status);
   watchT = setTimeout(async () => {
-    if(route !== "shared" || !doc || !doc.shared || doc.shared.id !== id) return;
+    if(route !== "shared" || !doc || !doc.shared || doc.shared.path !== path) return;
     try{
-      const s = await api("/api/share/" + id);
-      if(route !== "shared" || !doc || doc.shared.id !== id) return;
-      const fresh = { ...s.doc, id:"share:" + s.id, shared:{ id:s.id, by:s.by, created:s.created, live:!!s.live } };
+      const s = await api(sharedApi(path));
+      if(route !== "shared" || !doc || doc.shared.path !== path) return;
+      const fresh = sharedDoc(path, s);
       if(JSON.stringify(fresh.blocks) !== JSON.stringify(doc.blocks) || fresh.title !== doc.title || fresh.status !== doc.status){
         const y = scrollY; doc = fresh; render(); scrollTo(0, y);
       }
-    }catch(e){ if(e.status === 404){ toast("The link no longer opens; the primer was taken back.", { err:true }); return; } }
-    watchShared(id);
+    }catch(e){ if(e.status === 404){ toast("The address no longer opens; the primer was taken back.", { err:true }); return; } }
+    watchShared(path);
   }, busy ? 3000 : 15000);
 }
 
@@ -5035,10 +5046,11 @@ async function migrateLocal(){
   const missing = await loadPrompts();
   try{ me = await api("/api/me"); }catch(e){ me = null; }
   if(me && me.guest) me = guestMe();
-  /* A link to a shared primer, and the guide, open for anyone; signing in
-     is for everything else. */
-  const shared = sharePath(), guideAt = /^\/guide(?:\/(\w+))?$/.exec(location.pathname);
-  if(shared){ if(me) await loadMine(); await openShared(shared); }
+  /* A public primer, a frozen copy and the guide open for anyone; signing
+     in is for everything else. A signed-in reader's own primers come
+     first: /p/<id> is theirs if it is in their library. */
+  const shared = !me && SHARE_PATH.test(location.pathname) ? location.pathname : null, guideAt = /^\/guide(?:\/(\w+))?$/.exec(location.pathname);
+  if(shared) await openShared(shared);
   else if(guideAt){ guidePage = GUIDES[guideAt[1]] ? guideAt[1] : "setup"; if(me) await loadMine(); route = "guide"; render(); }
   else if(me) await enter(); else { route = "login"; render(); }
   /* A reload keeps the old entry's state; start the count afresh here. */
