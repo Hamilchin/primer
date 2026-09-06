@@ -39,7 +39,7 @@ export const ROLES = {
   section:  { model: "claude-sonnet-4-6" },
   action:   { model: "claude-fable-5-1", maxTurns: 12, tools: ["web_search", "fetch_page"] },
   figure:   { model: "claude-fable-5" },
-  finder:   { model: "claude-sonnet-4-6", maxTurns: 40, tools: ["web_search", "fetch_page", "look_at_image"] },
+  finder:   { model: "claude-sonnet-4-6", maxTurns: 24, effort: "low", tools: ["search_images", "web_search", "fetch_page", "look_at_image"] },
   research: { model: "claude-sonnet-4-6", maxTurns: 40, tools: ["web_search", "fetch_page"] },
   define:   { model: "claude-sonnet-4-6", maxTurns: 12, tools: ["web_search", "fetch_page"] }
 };
@@ -227,7 +227,7 @@ export const keepImagesIn = dir => { MEDIA = dir; };
 const WIKI_FILE = /^\/wikipedia\/([a-z-]+)\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^/]+)/;
 async function wikiThumb(u, width) {
   let api, title;
-  const m = u.host === "upload.wikimedia.org" && WIKI_FILE.exec(u.pathname);
+  const m = /^(upload|thumb)\.wikimedia\.org$/.test(u.host) && WIKI_FILE.exec(u.pathname);
   if (m) { api = m[1] === "commons" ? "commons.wikimedia.org" : m[1] + ".wikipedia.org"; title = m[2]; }
   else if (/(^|\.)(wikipedia|wikimedia)\.org$/.test(u.host)) {
     const p = /\/wiki\/(?:File|Image|Fichier|Datei):(.+)$/.exec(decodeURIComponent(u.pathname));
@@ -241,7 +241,13 @@ async function wikiThumb(u, width) {
   const r = await fetch(q, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(15000) });
   if (!r.ok) return null;
   const pages = (((await r.json()) || {}).query || {}).pages || {};
-  const info = (Object.values(pages)[0] || {}).imageinfo;
+  const page = Object.values(pages)[0] || {}, info = page.imageinfo;
+  /* A name the wiki does not know is a guess, and says so, so the next
+     step is a search for the real name rather than another guess. */
+  if (page.missing !== undefined || page.invalid !== undefined) {
+    const e = new Error("No file called “" + decodeURIComponent(title).replace(/_/g, " ") + "” on " + api + ". Do not guess file names: search for the real one first.");
+    e.missing = true; throw e;
+  }
   if (!info || !info[0]) return null;
   /* thumburl is a PNG rendering even when the file itself is an SVG. */
   return info[0].thumburl || (info[0].mime !== "image/svg+xml" ? info[0].url : null) || null;
@@ -287,7 +293,7 @@ async function safeFetch(url, opts = {}) {
 }
 export async function fetchImage(url) {
   const u = webURL(url);
-  const wiki = await wikiThumb(u, 1000).catch(() => null);
+  const wiki = await wikiThumb(u, 1000).catch(e => { if (e.missing) throw e; return null; });
   const r = await safeFetch(wiki || url, {
     headers: { "user-agent": UA, accept: "image/*" },
     signal: AbortSignal.timeout(20000)
@@ -317,30 +323,135 @@ async function readPage(url) {
   if (!r.ok) throw new Error("HTTP " + r.status);
   const type = (r.headers.get("content-type") || "").split(";")[0].trim();
   if (!/^text\/|json|xml/.test(type)) throw new Error("Not a text page (" + (type || "unknown type") + ").");
-  const text = /html/.test(type) ? plain(await r.text()) : await r.text();
+  const text = /html/.test(type) ? plain(await r.text(), r.url || url) : await r.text();
   return text.length > PAGE_MAX ? text.slice(0, PAGE_MAX) + "\n… (cut at " + PAGE_MAX + " characters)" : text;
 }
-/* A page's words, without its furniture. */
+/* A page's words, without its furniture, and its pictures by address.
+   An image is the one thing a page's text cannot carry, and the finder
+   needs it: each <img> stays, where it stood, as "[image: URL] alt text",
+   its address made absolute, so a page's captions and its files meet.
+   Icons and pixels are left out: anything told to be 40px or smaller,
+   an inline data: image, or a bare tracking pixel. */
 const ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
-function plain(html) {
-  return String(html)
+const IMAGES_MAX = 80;
+function plain(html, base) {
+  let kept = 0;
+  const attr = (tag, name) => { const m = new RegExp("\\s" + name + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s\"'>]+))", "i").exec(tag); return m ? (m[1] ?? m[2] ?? m[3]) : null; };
+  const image = tag => {
+    const w = parseInt(attr(tag, "width")), h = parseInt(attr(tag, "height"));
+    if ((w && w <= 40) || (h && h <= 40) || kept >= IMAGES_MAX) return " ";
+    /* A lazily loaded picture names its file in data-src; srcset's first entry is the file at its smallest. */
+    let src = attr(tag, "data-src") || attr(tag, "src") || (attr(tag, "srcset") || "").split(",")[0].trim().split(/\s+/)[0];
+    if (!src || /^data:/i.test(src)) return " ";
+    try { src = new URL(src, base).href; } catch { return " "; }
+    kept++;
+    const alt = decoded(attr(tag, "alt") || "").replace(/\s+/g, " ").trim();
+    return "\n[image: " + src + "]" + (alt ? " " + alt : "") + "\n";
+  };
+  return decoded(String(html)
     .replace(/<(script|style|noscript|svg|nav|header|footer|aside|template)\b[\s\S]*?<\/\1>/gi, " ")
     .replace(/<!--[\s\S]*?-->/g, " ")
-    .replace(/<\/(p|div|li|tr|h[1-6]|section|article|blockquote|pre|dd|dt)>|<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (m, e) => e in ENTITIES ? ENTITIES[e]
-      : e[0] === "#" ? String.fromCodePoint(parseInt(e.slice(e[1] === "x" ? 2 : 1), e[1] === "x" ? 16 : 10) || 32) : m)
+    .replace(/<img\b[^>]*>/gi, image)
+    .replace(/<\/(p|div|li|tr|h[1-6]|section|article|blockquote|pre|dd|dt|figcaption)>|<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, " "))
     .replace(/[ \t\r\f]+/g, " ").replace(/\s*\n\s*/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+const decoded = s => s.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (m, e) => e in ENTITIES ? ENTITIES[e]
+  : e[0] === "#" ? String.fromCodePoint(parseInt(e.slice(e[1] === "x" ? 2 : 1), e[1] === "x" ? 16 : 10) || 32) : m);
+
+/* ── the contact sheet ──────────────────────────────────────────
+   An image search that behaves like an images tab, from two keyless
+   sources asked at once. Wikipedia's article search takes a loose phrase
+   well and ranks the right article first; each of the top articles has a
+   media list, the images its editors chose with the captions they wrote.
+   Commons' own file search, exact-match and name-ranked, adds files no
+   article uses. The first twenty, deduplicated, are rendered as 500px
+   thumbnails, a size Commons keeps ready, in one batched request with the
+   licence, author and description of each. A file is named by its Commons
+   page, which look_at_image and the media store both resolve.        */
+const SHEET_MAX = 20, SHEET_WIDTH = 500, ARTICLES = 3;
+const wikiGet = async (host, params) => {
+  const q = new URL("https://" + host + "/w/api.php");
+  q.search = new URLSearchParams({ ...params, format: "json" });
+  const r = await fetch(q, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(15000) });
+  if (!r.ok) throw new Error(host + " answered HTTP " + r.status + ".");
+  return r.json();
+};
+/* The images of an article, with their captions, oldest source first. */
+async function articleImages(host, title) {
+  const r = await fetch("https://" + host + "/api/rest_v1/page/media-list/" + encodeURIComponent(title.replace(/ /g, "_")),
+                        { headers: { "user-agent": UA }, signal: AbortSignal.timeout(15000) });
+  if (!r.ok) return [];
+  return (((await r.json()) || {}).items || []).filter(i => i.type === "image" && i.title)
+    .map(i => ({ title: i.title.replace(/_/g, " "), caption: plain(String((i.caption || {}).html || (i.caption || {}).text || "")).replace(/\s+/g, " ").trim(), from: title }));
+}
+async function contactSheet(phrase, lang) {
+  const wikis = ["en", ...(lang && /^[a-z]{2,3}$/.test(lang) && lang !== "en" ? [lang] : [])].map(l => l + ".wikipedia.org");
+  const [articles, commons] = await Promise.all([
+    Promise.all(wikis.map(host => wikiGet(host, { action: "query", list: "search", srsearch: phrase, srlimit: String(ARTICLES) })
+      .then(j => Promise.all(((j.query || {}).search || []).map(a => articleImages(host, a.title)))).catch(() => []))),
+    wikiGet("commons.wikimedia.org", { action: "query", list: "search", srsearch: phrase, srnamespace: "6", srlimit: String(SHEET_MAX) })
+      .then(j => ((j.query || {}).search || []).map(f => ({ title: f.title, caption: "", from: "" }))).catch(() => [])
+  ]);
+  /* Articles' pictures interleaved, one from each in turn, so no article's gallery crowds the rest out; then Commons. */
+  const lists = articles.flat().filter(l => l.length), merged = [];
+  for (let i = 0; lists.some(l => i < l.length); i++) lists.forEach(l => { if (i < l.length) merged.push(l[i]); });
+  const seen = new Set(), files = [];
+  for (const f of [...merged, ...commons]) {
+    const key = f.title.toLowerCase();
+    if (seen.has(key) || !/\.(png|jpe?g|gif|webp|svg|tiff?)$/i.test(f.title)) continue;
+    seen.add(key); files.push(f);
+    if (files.length >= SHEET_MAX) break;
+  }
+  if (!files.length) return { text: "Nothing found for “" + phrase + "”. Try other words, or another source." };
+  /* One request renders them all and says what each is. */
+  const j = await wikiGet("commons.wikimedia.org", { action: "query", titles: files.map(f => f.title).join("|"),
+    prop: "imageinfo", iiprop: "url|mime|size|extmetadata", iiurlwidth: String(SHEET_WIDTH),
+    iiextmetadatafilter: "ImageDescription|LicenseShortName|Artist|Credit" });
+  const byTitle = new Map();
+  for (const p of Object.values((j.query || {}).pages || {})) if (p.imageinfo && p.imageinfo[0]) byTitle.set(p.title.toLowerCase(), p.imageinfo[0]);
+  for (const n of (j.query || {}).normalized || []) byTitle.set(n.from.toLowerCase(), byTitle.get(n.to.toLowerCase()));
+  const meta = (info, k) => plain(String(((info.extmetadata || {})[k] || {}).value || "")).replace(/\s+/g, " ").trim();
+  const shown = files.map(f => ({ ...f, info: byTitle.get(f.title.toLowerCase()) })).filter(f => f.info && f.info.thumburl && /^image\//.test(f.info.mime));
+  const thumbs = await Promise.all(shown.map(async f => {
+    try {
+      const t = await fetch(f.info.thumburl, { headers: { "user-agent": UA, accept: "image/*" }, signal: AbortSignal.timeout(15000) });
+      const type = (t.headers.get("content-type") || "").split(";")[0].trim();
+      if (!t.ok || !IMAGE_TYPES[type]) return null;
+      return { data: Buffer.from(await t.arrayBuffer()).toString("base64"), type };
+    } catch { return null; }
+  }));
+  const parts = [];
+  let n = 0;
+  shown.forEach((f, i) => {
+    if (!thumbs[i]) return;
+    n++;
+    const d = f.caption || meta(f.info, "ImageDescription"), licence = meta(f.info, "LicenseShortName"), by = meta(f.info, "Artist") || meta(f.info, "Credit");
+    parts.push({ text: n + ". https://commons.wikimedia.org/wiki/" + encodeURIComponent(f.title.replace(/ /g, "_"))
+      + " (" + f.info.width + "×" + f.info.height + (licence ? ", " + licence : ", licence not stated") + (by ? ", by " + by.slice(0, 80) : "") + ")"
+      + (d ? " " + d.slice(0, 240) : "") + (f.from ? " [in the article “" + f.from + "”]" : "") });
+    parts.push({ image: thumbs[i].data, type: thumbs[i].type });
+  });
+  if (!n) return { text: "Nothing found for “" + phrase + "” that can be shown. Try other words, or another source." };
+  parts.unshift({ text: n + " images for “" + phrase + "”, each shown below its line: the pictures of the Wikipedia articles the phrase finds, with their captions, then files from Commons. To choose one, give its page URL." });
+  return { parts };
 }
 
 /* ── tools ──────────────────────────────────────────────────────
    Our own, defined once, in the shape both SDKs can be given. Each answers
-   {text}, or {text, image, type} with the image as base64; a failure is
-   caught and answered as {error}, so the agent reads why and goes on. The
-   web search is not here: it is the provider's, above. */
+   {text}, or {text, image, type} with the image as base64, or {parts}, a
+   list of {text} and {image, type} in order; a failure is caught and
+   answered as {error}, so the agent reads why and goes on. The web search
+   is not here: it is the provider's, above. */
+const partsOf = r => r.parts || [{ text: r.text }, ...(r.image ? [{ image: r.image, type: r.type }] : [])];
 const TOOLS = {
+  search_images: {
+    description: "Search for images and see the results, like an images tab: up to twenty for a phrase, each shown as a picture with its page URL, size, licence, author and caption. The pictures of the Wikipedia articles the phrase finds come first, with the captions their editors wrote, then files from Wikimedia Commons. Ask in plain words, as a search box would be asked.",
+    input: { phrase: z.string().describe("What to search for, a few words"), lang: z.string().optional().describe("A second Wikipedia to ask, as a language code such as de or fr, when the subject has one") },
+    run: ({ phrase, lang }) => contactSheet(String(phrase || "").trim(), String(lang || "").trim().toLowerCase())
+  },
   fetch_page: {
-    description: "Read a web page as plain text, up to 40,000 characters.",
+    description: "Read a web page as plain text, up to 40,000 characters. Each picture on the page is kept where it stands as [image: URL] with its alt text, so a page's captions lead to its files. A JSON page is returned as it is.",
     input: { url: z.string().describe("The page's URL") },
     run: async ({ url }) => ({ text: await readPage(url) })
   },
@@ -355,25 +466,42 @@ const TOOLS = {
     }
   }
 };
-const attempt = (t, input) => t.run(input).catch(e => ({ error: String(e && e.message || e) }));
-/* The tools as Claude Code sees them: an MCP server of its own. */
-const primerTools = createSdkMcpServer({
+/* What one call may do with its tools: a finder that has seen six
+   candidates, or read twenty pages, is told to decide, since a seventh
+   look has never been the one and every page it reads costs the whole
+   conversation again. `spent` is the call's tally; a tool over budget
+   answers with the instruction in place of the page or picture. */
+const BUDGET = {
+  search_images: { max: 8, then: "You have searched Commons eight times, the most allowed. Choose from what you have seen, look elsewhere, or answer found:false." },
+  look_at_image: { max: 6, then: "You have looked at six candidates, the most allowed. Answer now: the best of those you saw, or found:false." },
+  fetch_page: { max: 20, then: "You have read twenty pages, the most allowed. Answer now with the best candidate you have looked at, or found:false." }
+};
+const attempt = (name, t, input, spent) => {
+  const b = BUDGET[name];
+  if (b && (spent[name] = (spent[name] || 0) + 1) > b.max) return Promise.resolve({ error: b.then });
+  return t.run(input).catch(e => ({ error: String(e && e.message || e) }));
+};
+/* The tools as Claude Code sees them: an MCP server of its own, one per call for its tally. */
+const primerTools = spent => createSdkMcpServer({
   name: "primer", version: "1.0.0",
   tools: Object.entries(TOOLS).map(([name, t]) => sdkTool(name, t.description, t.input, async input => {
-    const r = await attempt(t, input);
+    const r = await attempt(name, t, input, spent);
     if (r.error) return { content: [{ type: "text", text: r.error }], isError: true };
-    return { content: [...(r.image ? [{ type: "image", data: r.image, mimeType: r.type }] : []), { type: "text", text: r.text }] };
+    return { content: partsOf(r).map(x => x.image ? { type: "image", data: x.image, mimeType: x.type } : { type: "text", text: x.text }) };
   }))
 });
 /* The tools as the AI SDK sees them, for a model that can or cannot see. */
-const aiTools = (names, sees) => Object.fromEntries(names.map(name => {
+const aiTools = (names, sees, spent) => Object.fromEntries(names.map(name => {
   const t = TOOLS[name];
   return [name, tool({
     description: t.description, inputSchema: z.object(t.input),
-    execute: input => attempt(t, input),
-    toModelOutput: ({ output: r }) => r.error ? { type: "error-text", value: r.error }
-      : !r.image || !sees ? { type: "text", value: r.text + (r.image ? " This model cannot view images." : "") }
-      : { type: "content", value: [{ type: "file", data: { type: "data", data: r.image }, mediaType: r.type }, { type: "text", text: r.text }] }
+    execute: input => attempt(name, t, input, spent),
+    toModelOutput: ({ output: r }) => {
+      if (r.error) return { type: "error-text", value: r.error };
+      const parts = partsOf(r);
+      if (!sees || !parts.some(x => x.image)) return { type: "text", value: parts.filter(x => !x.image).map(x => x.text).join("\n") + (parts.some(x => x.image) ? "\nThis model cannot view images." : "") };
+      return { type: "content", value: parts.map(x => x.image ? { type: "file", data: { type: "data", data: x.image }, mediaType: x.type } : { type: "text", text: x.text }) };
+    }
   })];
 }));
 
@@ -387,12 +515,45 @@ export async function complete({ system, user, role, model: chosen }, cred, emit
   const spec = ROLES[role] || ROLES.section;
   const m = modelFor(role, cred.kind, chosen);
   const names = spec.tools || [];
-  emit({ start: { model: m.id, tools: names } });
-  const call = { system: String(system || ""), user: String(user || ""), model: m, names, maxTurns: spec.maxTurns || 1 };
-  return (cred.kind === "subscription" ? viaClaudeCode : viaProvider)(call, cred, emit, signal);
+  const call = { system: String(system || ""), user: String(user || ""), model: m, names, maxTurns: spec.maxTurns || 1, effort: spec.effort };
+  if (cred.kind !== "subscription") { emit({ start: { model: m.id, tools: names } }); return viaProvider(call, cred, emit, signal); }
+  await seat(signal, ahead => emit({ event: { kind: "queued", ahead } }));
+  try { emit({ start: { model: m.id, tools: names } }); return await viaClaudeCode(call, cred, emit, signal); }
+  finally { leave(); }
+}
+
+/* ── seats ──────────────────────────────────────────────────────
+   A subscription call is a Claude Code subprocess: a few hundred MB and a
+   busy CPU while it starts. The machine can carry only so many at once,
+   and one too many starves the server itself, which then cannot even hear
+   a stop. So there are AT_ONCE seats, taken in the order asked for; a
+   call without one waits, told how many are ahead of it, and leaves the
+   queue if it is stopped. */
+export const AT_ONCE = Math.max(1, Number(process.env.CALLS_AT_ONCE) || 3);
+let seated = 0;
+const waiting = [];
+export const seats = () => ({ seated, waiting: waiting.length, of: AT_ONCE });
+function seat(signal, told) {
+  if (signal.aborted) return Promise.reject(new Error("Stopped."));
+  if (seated < AT_ONCE) { seated++; return Promise.resolve(); }
+  told(waiting.length + 1);
+  return new Promise((resolve, reject) => {
+    const w = { resolve };
+    waiting.push(w);
+    signal.addEventListener("abort", () => {
+      const i = waiting.indexOf(w);
+      if (i > -1) { waiting.splice(i, 1); reject(new Error("Stopped.")); }
+    }, { once: true });
+  });
+}
+function leave() {
+  seated--;
+  const next = waiting.shift();
+  if (next) { seated++; next.resolve(); }
 }
 
 const IDLE = 150000;
+const EXHAUSTED = n => "The agent used all " + n + " turns without answering.";
 const QUIET = "No answer from the model for " + IDLE / 60000 + " minutes. If this keeps happening, check the key in Settings.";
 /* Aborts a call that has gone quiet for IDLE. */
 function watchdog(abort) {
@@ -438,7 +599,7 @@ function foundByClaudeCode(content) {
   try { if (m) return pages(JSON.parse(m[1])); } catch {}
   return text;
 }
-async function viaClaudeCode({ system, user, model: m, names, maxTurns }, cred, emit, signal) {
+async function viaClaudeCode({ system, user, model: m, names, maxTurns, effort }, cred, emit, signal) {
   const env = { ...process.env, CLAUDE_CODE_OAUTH_TOKEN: cred.value };
   delete env.ANTHROPIC_API_KEY; delete env.ANTHROPIC_AUTH_TOKEN;
   const abortController = new AbortController();
@@ -452,7 +613,8 @@ async function viaClaudeCode({ system, user, model: m, names, maxTurns }, cred, 
     settingSources: [], includePartialMessages: true, maxTurns,
     tools: builtin, allowedTools: [...builtin, ...ours.map(n => "mcp__primer__" + n)], permissionMode: "dontAsk"
   };
-  if (ours.length) options.mcpServers = { primer: primerTools };
+  if (ours.length) options.mcpServers = { primer: primerTools({}) };
+  if (effort) options.effort = effort;   // a role that chooses rather than reasons thinks less, and answers sooner
 
   let last = "", partial = "", result = null, failure = null, searches = 0;
   const uses = new Map();   // tool_use id → name, to read each result by the tool it answers
@@ -499,10 +661,12 @@ async function viaClaudeCode({ system, user, model: m, names, maxTurns }, cred, 
   if (dog.quiet) throw new Error(QUIET);
   if (signal.aborted) throw new Error("Stopped.");
   if (failure && (!last || (result && result.is_error))) throw refusal(failure.kind, failure.text, cred);
+  /* Out of turns, the agent was still working, and what it last said is a
+     plan, not an answer: handing that back would only have it parsed, fail
+     and be asked for all over again at the same cost. */
+  if (result && result.subtype === "error_max_turns") throw new Error(EXHAUSTED(maxTurns));
   if (!last && result && result.subtype !== "success") {
-    throw new Error(result.subtype === "error_max_turns"
-      ? "The agent used all " + maxTurns + " turns without answering."
-      : "The call ended with " + result.subtype + (result.errors && result.errors.length ? ": " + result.errors.join("; ") : "."));
+    throw new Error("The call ended with " + result.subtype + (result.errors && result.errors.length ? ": " + result.errors.join("; ") : "."));
   }
   return last || partial;
 }
@@ -519,22 +683,22 @@ function withStderr(e, stderr) {
    differs: Anthropic and OpenAI answer each as a tool result, OpenRouter
    says only how many it ran, with the pages it cited as sources. All of it
    reaches the Inspector as the same two events, a search and its pages. */
-async function viaProvider({ system, user, model: m, names, maxTurns }, cred, emit, signal) {
+async function viaProvider({ system, user, model: m, names, maxTurns, effort }, cred, emit, signal) {
   const p = PROVIDERS[cred.kind], client = p.client(cred.value), id = m[p.at], search = SEARCH[cred.kind];
   const abortController = new AbortController();
   signal.addEventListener("abort", () => abortController.abort(), { once: true });
   const dog = watchdog(() => abortController.abort());
-  const tools = aiTools(names.filter(n => TOOLS[n]), m.vision !== false);
+  const tools = aiTools(names.filter(n => TOOLS[n]), m.vision !== false, {});
   if (names.includes("web_search")) tools.web_search = search.tool(client);
   const stream = streamText({
     model: cred.kind === "openrouter" ? client(id, { usage: { include: true } }) : client(id),
     system, prompt: user, tools, stopWhen: stepCountIs(maxTurns),
     maxOutputTokens: 32000, abortSignal: abortController.signal,
-    providerOptions: cred.kind === "anthropic" ? { anthropic: { thinking: { type: "adaptive" } } } : undefined,
+    providerOptions: cred.kind === "anthropic" ? { anthropic: { thinking: { type: "adaptive" }, ...(effort ? { effort } : {}) } } : undefined,
     onError() {}   // an error arrives as a part of the stream, below; the SDK would also print it
   });
 
-  let last = "", step = "", partial = "", turns = 0, searches = 0, charged = 0, usage = null, error = null;
+  let last = "", step = "", partial = "", turns = 0, searches = 0, charged = 0, usage = null, error = null, stillWorking = false;
   let seen = 0, sources = [];   // this step's searches answered in the stream, and the pages cited
   for await (const part of stream.fullStream) {
     dog.arm();
@@ -561,6 +725,7 @@ async function viaProvider({ system, user, model: m, names, maxTurns }, cred, em
       turns++;
       if (step.trim()) last = step;
       step = "";
+      stillWorking = part.finishReason === "tool-calls";
       /* OpenRouter's count is under server_tool_use_details, whatever its docs say; Anthropic's under server_tool_use. */
       const raw = (part.usage || {}).raw || {}, billed = (raw.server_tool_use_details || raw.server_tool_use || {}).web_search_requests;
       if (!seen && (billed || sources.length)) {   // searched out of sight: OpenRouter
@@ -580,7 +745,8 @@ async function viaProvider({ system, user, model: m, names, maxTurns }, cred, em
   if (dog.quiet) throw new Error(QUIET);
   if (signal.aborted) throw new Error("Stopped.");
   if (error && !last) throw refusal(...failureOf(error), cred);
-  if (!last && turns >= maxTurns && names.length) throw new Error("The agent used all " + maxTurns + " turns without answering.");
+  /* The last step ended in tool calls: the turns ran out mid-work, and the text so far is not the answer. */
+  if (turns >= maxTurns && names.length && (stillWorking || !last)) throw new Error(EXHAUSTED(maxTurns));
   return last || partial;
 }
 /* What went wrong, in Claude Code's words, and what the provider said. */

@@ -65,8 +65,9 @@ import { readFile } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
+import { execSync } from "node:child_process";
 import { openStore } from "./store.mjs";
-import { ROLES, PROVIDERS, halt, kindOf, identify, choices, modelFor, complete, left, fetchImage, images, keepImagesIn } from "./agents.mjs";
+import { ROLES, PROVIDERS, halt, kindOf, identify, choices, modelFor, complete, left, fetchImage, images, keepImagesIn, seats } from "./agents.mjs";
 
 const PORT = Number(process.env.PORT) || 8787;
 const HOST = process.env.HOST || "127.0.0.1";
@@ -75,6 +76,28 @@ const ROOT = new URL("./", import.meta.url);
 const MEDIA = pathToFileURL(DATA + "/media/");
 const db = openStore(DATA);
 keepImagesIn(MEDIA);
+/* Which build this is, for the report the Inspector copies: on Fly the
+   deployment's tag from the image reference; at home the commit. */
+/* If the machine is so starved that this loop cannot run, nothing it
+   serves works and no stop can reach it: better to exit and let the
+   platform start it afresh (Fly restarts a process that fails). A timer
+   late by STARVED twice running is that signal; a busy second is not. */
+const STARVED = 30000;
+(function watch(late = 0) {
+  const at = Date.now();
+  setTimeout(() => {
+    const lag = Date.now() - at - 5000;
+    if (lag < STARVED) return watch(0);
+    console.error("Starved: the event loop ran " + Math.round(lag / 1000) + "s late" + (late ? "; exiting so the platform restarts it" : ""));
+    if (late) process.exit(1);
+    watch(1);
+  }, 5000).unref();
+})();
+const BUILD = (() => {
+  const ref = process.env.FLY_IMAGE_REF;
+  if (ref) return ref.slice(ref.lastIndexOf(":") + 1);
+  try { return execSync("git describe --always --dirty", { cwd: new URL(ROOT).pathname, stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); } catch { return ""; }
+})();
 
 /* A guest has a cookie but no account: a random value signed with the
    server's secret, so it costs no row and survives a restart. */
@@ -236,9 +259,11 @@ async function serve(req, res) {
     return json(200, { name: user.name, key: user.key, admin: user.admin });
   }
   if (req.method === "POST" && path === "/api/logout") { db.sessions.delete(token); setCookie(null); return json(200, {}); }
+  /* Alive, and how many calls are seated: for Fly's check and a curious eye. */
+  if (path === "/api/health") return json(200, { ok: true, build: BUILD, calls: seats() });
   if (path === "/api/me") {
-    if (me) return json(200, { name: me.name, key: me.key, admin: me.admin });
-    if (guest) return json(200, { guest: true });
+    if (me) return json(200, { name: me.name, key: me.key, admin: me.admin, build: BUILD });
+    if (guest) return json(200, { guest: true, build: BUILD });
     throw halt(401, "Not signed in.");
   }
   /* A guest: no account, primers kept in their browser, a credential sent with each call. */

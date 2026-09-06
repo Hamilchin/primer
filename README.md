@@ -44,9 +44,8 @@ password, or unsharing, takes the key away from everyone linked to it; they
 have to link again. Nothing is read from the environment: to share your own
 Claude, add its token as a shared key like anyone else.
 
-Select a passage and the pen appears: Explain, Example, Derive, Diagram,
-Tighter, Define, Edit, Ask, Complain, and any action you add under Actions
-in Settings. All but Complain go to one agent, the action agent, which is
+Select a passage and the pen appears: Example, Diagram, Define, Ask,
+Complain, and any action you add under Actions in Settings. All but Complain go to one agent, the action agent, which is
 shown the whole primer block by block, the blocks you selected, the words
 you highlighted, your note if the action took one, and, on every block an
 earlier action made, what was asked. It answers with changes it chose:

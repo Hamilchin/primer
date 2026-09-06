@@ -66,3 +66,5 @@
 ~~Change the actions to use fable by default.~~
 ~~Make sure the "actions" have a unified interface that is easily debuggable. All the action agents should have a similar set of tools available to them. Make sure this is coded in an elegant, modular, and ideally universal way. Use simple, extensible, non-hacky solutions.~~
 ~~Do NOT mention the original primer that the definition is sourced from in the definition primer. Do not use callbacks to the concepts in the original things. Have it be made entirely independenlty, using the same code a user would use to make a new primer, except with a "definition prompt" in the userprompt. This should essentially be like the user asking for a definition of whatever was highlighted. What should happen is an agent figures out what term definition the user was asking for (if the selection covers half a sentence, for example), then a new primer is just made in the same way all primers are made. The new primer should not know about the old one.~~
+~~Make fewer default actions. Consolidate some if necessary. 8-9 is too much.~~
+~~Add a "with diagrams" option to the quickselect.~~ 

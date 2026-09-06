@@ -620,6 +620,7 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 .account{flex:1;display:flex;justify-content:space-between;align-items:baseline;gap:1rem;font-size:16px}
 
 /* ══ inspector: the calls ═════════════════════════════════════ */
+.inspector .report{margin-top:2rem;font-size:12px;white-space:pre-wrap;word-break:break-word}
 .call{border-top:1px solid var(--rule)}
 .call:last-of-type{border-bottom:1px solid var(--rule)}
 .call summary{display:flex;gap:1rem;align-items:baseline;padding:.65rem 0;cursor:pointer;list-style:none;font-size:15px}
@@ -1097,13 +1098,9 @@ const PROMPTS = {
   action_user:          { group:"revise",  label:"Action · user", user:true },
   /* The instructions the pen's actions send the action agent. Loaded here
      for their defaults, but edited under Actions, not on this page. */
-  explain:              { group:"revise",  label:"Explain",  act:true },
   example:              { group:"revise",  label:"Example",  act:true },
-  derive:               { group:"revise",  label:"Derive",   act:true },
   figure_action:        { group:"revise",  label:"Diagram",  act:true },
-  tighter:              { group:"revise",  label:"Tighter",  act:true },
   define_action:        { group:"revise",  label:"Define",   act:true },
-  revise:               { group:"revise",  label:"Edit",     act:true },
   ask:                  { group:"revise",  label:"Ask",      act:true },
   rewrite_outline:      { group:"rewrite", label:"Outline" },
   rewrite_outline_user: { group:"rewrite", label:"Outline · user", user:true },
@@ -1163,16 +1160,15 @@ function instrText(d){
    action asks for a line of direction first. A label is also stamped on
    each block an action made and shown lowercased in the margin.          */
 const DEFAULT_ACTIONS = [
-  { id:"explain",  label:"Explain",  kind:"prompt",   src:"explain",       builtin:true },
   { id:"example",  label:"Example",  kind:"prompt",   src:"example",       builtin:true },
-  { id:"derive",   label:"Derive",   kind:"prompt",   src:"derive",        builtin:true },
   { id:"figure",   label:"Diagram",  kind:"prompt",   src:"figure_action", builtin:true },
-  { id:"tighter",  label:"Tighter",  kind:"prompt",   src:"tighter",       builtin:true },
   { id:"define",   label:"Define",   kind:"prompt",   src:"define_action", builtin:true },
-  { id:"revise",   label:"Edit",     kind:"prompt",   src:"revise", input:true, placeholder:"What should change?", verb:"Edit", builtin:true },
   { id:"ask",      label:"Ask",      kind:"prompt",   src:"ask",    input:true, placeholder:"Ask about this…",     verb:"Ask",  builtin:true },
   { id:"complain", label:"Complain", kind:"complain", input:true, placeholder:"What's wrong here? This goes to Alexander.", verb:"Send", builtin:true }
 ];
+/* Built-ins the pen once shipped and no longer does. A stored list that
+   still carries one drops it: Ask does what each did when asked. */
+const RETIRED_ACTIONS = new Set(["explain", "derive", "tighter", "revise"]);
 let actions = [];   // the pen, as configured; persisted at primer:actions
 const word = edit => String(edit && edit.label || "").toLowerCase();
 const actionById = id => actions.find(a => a.id === id);
@@ -1198,7 +1194,7 @@ function normalizeActions(stored){
   if(!Array.isArray(stored) || !stored.length) return defaultActions();
   const seen = new Set(), out = [];
   for(const s of stored){
-    if(!s || typeof s !== "object" || !s.id || seen.has(s.id)) continue;
+    if(!s || typeof s !== "object" || !s.id || seen.has(s.id) || RETIRED_ACTIONS.has(s.id)) continue;
     const base = DEFAULT_ACTIONS.find(d => d.id === s.id);
     const kind = base ? base.kind : "prompt";
     const a = { id:String(s.id).slice(0,40), kind, on:s.on !== false, builtin:!!base,
@@ -1242,6 +1238,7 @@ const BRIEFS = [
   { label:"With derivations",text:"Derive every result step by step instead of stating it, saying what justifies each step." },
   { label:"Worked examples", text:"Give every idea a concrete worked example with real numbers." },
   { label:"Rigorous",        text:"Be precise: exact definitions, stated assumptions, and proofs or proof sketches for the central results." },
+  { label:"With diagrams",   text:"Make it highly visual: a diagram, plot or figure in every section, wherever a structure, a relationship or a quantity is clearer seen than said, and real images where a real artifact beats a drawing." },
   { label:"No pictures",     text:"Text only. Do not request any diagrams or images." }
 ];
 
@@ -1480,10 +1477,10 @@ function callFor(t, b){
    `doc`; it works on the document it was given, and the page redraws only
    when that document is the one on screen. So a second primer can be
    started, or the library opened, while the first is still being written. */
-const runs = new Map();   // docId → {doc, jobs:Set<job>, cancelled, active, side}
+const runs = new Map();   // docId → {doc, jobs:Set<job>, cancelled, active, side:Set<promise>}
 function runOf(d){
   let r = runs.get(d.id);
-  if(!r){ r = { doc:d, jobs:new Set(), cancelled:false, active:false, side:Promise.resolve() }; runs.set(d.id, r); }
+  if(!r){ r = { doc:d, jobs:new Set(), cancelled:false, active:false, side:new Set() }; runs.set(d.id, r); }
   return r;
 }
 const running = d => { const r = d && runs.get(d.id); return !!(r && (r.jobs.size || r.active)); };
@@ -1621,6 +1618,24 @@ async function refetch(id){
    a primer on screen that another tab is writing. */
 setInterval(() => { if(route === "cover" || (doc && elsewhere.has(doc.id))) carryOn(); }, 20000);
 
+/* No more than CALLS_AT_ONCE model calls in flight from this page, over
+   every primer and action in it; the rest wait, and go in the order they
+   were asked for. A call stopped while waiting leaves the line. */
+const CALLS_AT_ONCE = 8;
+const gate = { busy:0, line:[] };
+function takeTurn(signal){
+  if(gate.busy < CALLS_AT_ONCE && !gate.line.length){ gate.busy++; return Promise.resolve(); }
+  return new Promise((res, rej) => {
+    const w = { res, rej };
+    gate.line.push(w);
+    signal.addEventListener("abort", () => { const i = gate.line.indexOf(w); if(i > -1){ gate.line.splice(i, 1); rej(stopped()); } }, { once:true });
+  });
+}
+function giveTurn(){
+  gate.busy--;
+  while(gate.busy < CALLS_AT_ONCE && gate.line.length){ gate.busy++; gate.line.shift().res(); }
+}
+
 /* One model call on a document's behalf. While it runs it is a job the desk
    shows; its text streams into `block`; every prompt, tool call and reply
    lands in the document's trace. Throws with e.stopped when the run was
@@ -1641,14 +1656,19 @@ async function agent(d, s){
   if(s.block) s.block.liveRole = s.role;
   const live = s.block ? liveInto(d, s.block) : null;
   livePaint();
+  let turn = false;
   try{
+    job.note = "waiting its turn";
+    await takeTurn(job.ctrl.signal);
+    turn = true; job.note = ""; livePaint();
     const out = await askJSON(s.system, s.user, s.role, {
       model: s.model,
       signal: job.ctrl.signal,
       onDelta: soFar => { rec.output = soFar; if(live) live(soFar); liveCall(rec); saveTrace(d.id, true); },
       onEvent: ev => {
         rec.events.push({ t:Date.now(), ...ev });
-        if(ev.kind === "start") rec.model = ev.model;
+        if(ev.kind === "queued") job.note = "waiting for a free seat on the server" + (ev.ahead > 1 ? ", " + (ev.ahead - 1) + " ahead" : "");
+        if(ev.kind === "start"){ rec.model = ev.model; if(/free seat/.test(job.note)) job.note = ""; }
         if(ev.kind === "usage"){ rec.usage = { in:ev.in, out:ev.out, cost:ev.cost, searches:ev.searches, turns:ev.turns }; usagePaint(d); return; }
         if(ev.kind === "tool") job.note = toolNote(ev);
         if(ev.kind === "result") job.note = ev.ok ? job.note : "tool failed, trying another way";
@@ -1678,6 +1698,7 @@ async function agent(d, s){
     }
     throw e;
   }finally{
+    if(turn) giveTurn();
     rec.ended = Date.now(); saveTrace(d.id);
     run.jobs.delete(job); livePaint(); liveCall(rec);
   }
@@ -1696,6 +1717,11 @@ function toolNote(ev){
    status line of the document it belongs to.
    Each one also lives on in its block's error and in the trace.      */
 const issues = [];
+/* Errors the page itself threw, kept for the Inspector's report. */
+const faults = [];
+const fault = (what, e) => { faults.push({ ts:Date.now(), what, text:String(e && e.stack || e && e.message || e) }); if(faults.length > 30) faults.shift(); };
+addEventListener("error", e => fault("error", e.error || e.message));
+addEventListener("unhandledrejection", e => fault("unhandled rejection", e.reason));
 function issue(d, msg, rec, kind){
   const last = issues[0];
   if(last && last.docId === d.id && last.msg === msg) return;
@@ -1739,7 +1765,7 @@ const written = d => !!(d && d.blocks.some(b => b.md && b.kind !== "heading"));
 const settled = d => written(d) && !running(d);
 /* The top bar holds what is not about any one primer. */
 function paintHeader(){
-  backBtn.classList.toggle("hide", !aside());
+  backBtn.classList.toggle("hide", !(aside() || (route === "doc" && me)));
   newBtn.classList.toggle("hide", !me || route === "cover" || route === "login");
   settingsBtn.classList.toggle("hide", !me || route === "login");
   settingsBtn.classList.toggle("on", route === "settings");
@@ -1761,6 +1787,7 @@ function toolsNode(d){
   if(!readonly()){
     if(settled(d)){ const r = add("Rewrite", () => openRewrite(r)); r.setAttribute("aria-haspopup", "true"); }
     add("Inspector", () => goto("inspector"), route === "inspector");
+    if(route === "inspector") add("Copy report", () => copyReport(d));
   }
   if(route === "doc" && undoStack.length){ const u = add("Undo", doUndo); u.classList.add("undo"); }
   return nav;
@@ -2032,6 +2059,24 @@ function askedOnHover(h, e, b){
   h.onmouseenter = () => {
     const q = b.edit && b.edit.quote ? plainMd(b.edit.quote).trim() : "";
     if(!q || inFlight) return;
+    if(b.edit.blocks){
+      /* The blocks the reader selected, those still in the primer: the words
+         within them, or all of them when the whole block was selected or
+         the words are no longer there. */
+      const bodies = b.edit.blocks.map(id => main.querySelector(`[data-block-id="${id}"] .body`)).filter(Boolean)
+        .sort((x, y) => x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1);
+      if(!bodies.length) return;
+      const r = !b.edit.whole && locate(bodies, q);
+      /* One range per block, so nothing that has since landed between them is painted. */
+      return highlightRange(bodies.map(body => {
+        const x = document.createRange(); x.selectNodeContents(body);
+        if(r){
+          if(r.compareBoundaryPoints(Range.START_TO_START, x) > 0) x.setStart(r.startContainer, r.startOffset);
+          if(r.compareBoundaryPoints(Range.END_TO_END, x) < 0) x.setEnd(r.endContainer, r.endOffset);
+        }
+        return x.collapsed ? null : x;
+      }).filter(Boolean));
+    }
     for(let x = e.previousElementSibling; x; x = x.previousElementSibling){
       if(!x.dataset.blockId) continue;
       const o = doc && doc.blocks.find(y => y.id === x.dataset.blockId);
@@ -2043,6 +2088,7 @@ function askedOnHover(h, e, b){
   };
   h.onmouseleave = () => { if(inFlight) rehighlight(); else clearHighlight(); };
 }
+function shortQuote(q){ q = String(q || ""); return q.length > 220 ? q.slice(0, 220).trimEnd() + "…" : q; }
 function plainMd(s){
   return String(s).replace(/!\[[^\]]*\]\([^)]*\)/g, "").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, "").replace(/(\*\*|__|[*_`~])/g, "");
@@ -2245,7 +2291,7 @@ function blockEl(b, n){
   }
   if(b.kind === "note"){
     const q = btn("side-q");
-    const asked = b.edit && (b.edit.note || b.edit.quote);
+    const asked = b.edit && (b.edit.note || shortQuote(b.edit.quote));
     q.textContent = asked ? "“" + asked + "”" : "";
     q.onclick = ev => { ev.stopPropagation(); if(b.edit) showPop(q, provNodes(b)); };
     askedOnHover(q, e, b);
@@ -2718,8 +2764,9 @@ async function resumeByHand(d){
 }
 
 /* Sections are written in order so each can build on the ones before it.
-   Diagrams and images are made on a side queue and overlap with the next
-   section. Then the research agent checks the text, if it is turned on.
+   Diagrams, images and, when it is turned on, the research agent's check
+   of a section all start the moment that section lands, together, and
+   overlap with the sections after it.
 
    A section that does not come back is never skipped: the ones after it
    would be written without it in view, and nothing could put that right
@@ -2749,7 +2796,7 @@ async function writeAll(d){
   }
   if(halted){
     d.blocks.filter(b => b.slot && !b.md && b.sec >= halted).forEach(b => markWaiting(d, b, halted));
-    await run.side;
+    await sideDone(run);
     d.status = "interrupted"; d.statusNote = "section " + halted + " didn't come back";
     run.active = false;
     settle(d);
@@ -2763,8 +2810,10 @@ async function writeAll(d){
 }
 async function finish(d){
   const run = runOf(d);
+  /* Sections checked as they landed are done or under way; any left over
+     (checking turned on midway, or a run resumed) are checked now. */
   if(!run.cancelled && setting("research") && !d.researched) await research(d, "");
-  await run.side;
+  await sideDone(run);
   if(run.cancelled){
     d.blocks.filter(b => b.pending).forEach(b => markStopped(d, b));
     d.status = "stopped";
@@ -2846,6 +2895,7 @@ async function genSection(d, i, title, outline, reader, by){
     save(d);
     made.filter(b => b.draw || b.find).forEach(b =>
       sideLater(d, b, () => b.draw ? genFigure(d, b, title, outline, reader) : genImage(d, b, title)));
+    if(setting("research")) sideLater(d, null, () => researchSection(d, i, ""));
   }catch(e){
     replaceSlot(d, i, [{ id:uid(), kind:"prose", md:"", sec:i, slot:true, stopped:!!e.stopped,
       error: e.stopped ? "Stopped." : "Section "+(i+1)+" didn't come back. "+e.message }]);
@@ -2871,14 +2921,18 @@ function swapBlock(d, id, blocks){
   rerender(d);
 }
 
-/* Diagrams and images are made one at a time, alongside the section being
-   written. A stopped run marks what it never got to. */
+/* Diagrams, images and source checks are side work: each starts at once
+   and runs alongside everything else, and the run is not done until all
+   of it is. A stopped run marks the block it never got to. */
 function sideLater(d, b, fn){
   const run = runOf(d);
-  run.side = run.side.then(async () => {
-    if(run.cancelled){ markStopped(d, b); return; }
-    await fn();
-  }).catch(e => console.error(e));
+  if(run.cancelled){ if(b) markStopped(d, b); return; }
+  const p = Promise.resolve().then(fn).catch(e => console.error(e)).finally(() => run.side.delete(p));
+  run.side.add(p);
+}
+/* Every side task under way, and any started while waiting. */
+async function sideDone(run){
+  while(run.side.size) await Promise.all([...run.side]);
 }
 /* A visual keeps its first id as `origin` through every retry, and `by`,
    the section call that asked for it, so its calls stay filed together;
@@ -2983,21 +3037,21 @@ async function saveMedia(url){
 async function research(d, by){
   const run = runOf(d);
   const { titles } = docContext(d);
-  d.status = "researching"; save(d); livePaint();
-  for(let i = 0; i < titles.length; i++){
-    if(run.cancelled) return;
-    /* A section checked on an earlier, interrupted pass stays checked. */
-    const h = d.blocks.find(b => b.kind==="heading" && b.sec===i);
-    if(h && h.checked) continue;
-    await researchSection(d, i, by);
+  /* A section checked on an earlier, interrupted pass stays checked, and
+     one being checked now is left to it; the rest are checked together. */
+  const due = titles.map((_, i) => i).filter(i => { const h = d.blocks.find(b => b.kind==="heading" && b.sec===i); return h && !h.checked && h.status !== "checking"; });
+  if(due.length && !run.cancelled){
+    d.status = "researching"; save(d); livePaint();
+    await Promise.all(due.map(i => researchSection(d, i, by)));
   }
+  await sideDone(run);
   if(!run.cancelled) d.researched = Date.now();
 }
 /* Filed under the call that wrote the section, when that is still known. */
 async function researchSection(d, i, by){
   const heading = d.blocks.find(b => b.kind==="heading" && b.sec===i);
   const blocks = d.blocks.filter(b => b.sec===i && b.kind==="prose" && b.md && !b.slot);
-  if(!heading || !blocks.length) return;
+  if(!heading || !blocks.length || heading.status === "checking") return;
   heading.status = "checking"; heading.fail = ""; patch(d, heading);
   try{
     const { value } = await agent(d, { role:"research", label:"checking §"+(i+1), sec:i, system:sys("research"),
@@ -3139,7 +3193,7 @@ function primerView(d, selected){
   });
   return { text: lines.join("\n\n"), ids, labels };
 }
-const CHANGES_MAX = 8;   // the prompt asks for one to three
+const CHANGES_MAX = 12;  // one to three for the ask, the rest keeping other blocks consistent with it
 const BLOCK_WORD = { heading:"a section heading", subheading:"a subheading", figure:"a diagram", image:"an image", note:"a note in the margin", prose:"a paragraph" };
 const blockWord = b => BLOCK_WORD[b.kind] || BLOCK_WORD.prose;
 /* Blocks as a phrase: "a paragraph", "3 paragraphs and a diagram". */
@@ -3188,7 +3242,8 @@ async function applyEdit(blockId, act, question){
     LABEL: a.label, ACTION: actionPrompt(a) || "Do as the reader's note says."
   });
   const secLabel = target.sec != null ? " §" + (target.sec + 1) : "";
-  const stamp = { label:a.label, note:question || "", quote:highlighted.slice(0, 220), ts:Date.now() };
+  const words = !!(own && sel.text);
+  const stamp = { label:a.label, note:question || "", quote: words ? highlighted : highlighted.slice(0, 220), whole: !words, blocks: spanned.map(b => b.id), ts:Date.now() };
   const unbusy = () => { target.busy = false; delete target.hl; inFlight--; clearHighlight(); };
   const undone = () => { if(doc === d) undoStack.pop(); patch(d, target); toolsPaint(); tidyRun(d); livePaint(); };
   const finished = () => { livePaint(); if(!done.queued) tidyRun(d); };
@@ -3312,13 +3367,16 @@ function applyChanges(d, changes, view, stamp, callId, selected){
    by text inside the fresh element.                                   */
 const canHighlight = typeof CSS !== "undefined" && CSS.highlights && typeof Highlight === "function";
 function clearHighlight(){ if(canHighlight) CSS.highlights.delete("pen"); }
-function highlightRange(range){ if(canHighlight && range) CSS.highlights.set("pen", new Highlight(range)); }
+function highlightRange(range){ if(canHighlight && range) CSS.highlights.set("pen", new Highlight(...[].concat(range))); }
 /* Find `text` in root's text nodes, tolerant of whitespace; a Range or null. */
 function locate(root, text){
   if(!root || !text) return null;
-  const nodes = [], walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  let n, all = "";
-  while((n = walker.nextNode())){ nodes.push({ n, start: all.length }); all += n.textContent; }
+  const nodes = []; let all = "";
+  for(const r of Array.isArray(root) ? root : [root]){
+    if(all) all += "\n";
+    const walker = document.createTreeWalker(r, NodeFilter.SHOW_TEXT); let n;
+    while((n = walker.nextNode())){ nodes.push({ n, start: all.length }); all += n.textContent; }
+  }
   let i = all.indexOf(text);
   if(i < 0){
     const squash = s => s.replace(/\s+/g, " ");
@@ -3504,7 +3562,7 @@ function provNodes(b){
     nodes.push(el("div", "s", e.note || "The research agent corrected this block."));
     nodes.push(linkRow([ e.url && { label:"Source", href:e.url } ]));
   }else{
-    if(e.note || e.quote) nodes.push(el("div", "q", e.note ? e.note : "“" + e.quote + "”"));
+    if(e.note || e.quote) nodes.push(el("div", "q", e.note ? e.note : "“" + shortQuote(e.quote) + "”"));
     if(!readonly()) nodes.push(linkRow([{ label:"Remove", onclick:() => {
       snapshot();
       doc.blocks = doc.blocks.filter(x => x.id!==b.id);
@@ -3575,8 +3633,10 @@ function goto(r){
   route = r; render(); scrollTo(0, 0);
 }
 /* Back goes to the page before this one in the browser's history when
-   Primer put it there, so the browser's own Back agrees with it. */
+   Primer put it there, so the browser's own Back agrees with it. From a
+   primer it goes to the library, whatever came before. */
 function goBack(){
+  if(route === "doc"){ goHome(); return; }
   if(history.state && history.state.i > 0){ history.back(); return; }
   route = backRoute(); render(); scrollTo(0, 0);
 }
@@ -4376,22 +4436,18 @@ const GUIDES = {
     intro: `<p>Select a passage in any primer and a small toolbar appears above it: the pen. Each button on it is an action, something to be done with the selection. The first nine answer to the keys 1 to 9.</p>`,
     sections: [
       { title: "The built-in actions", html: `<table>
-        <tr><td>Explain</td><td>Says the same thing more simply, in place. On a diagram, adds an explanation under it.</td></tr>
         <tr><td>Example</td><td>Adds the smallest concrete example after the passage.</td></tr>
-        <tr><td>Derive</td><td>Shows the steps that were skipped, one at a time, after it.</td></tr>
         <tr><td>Diagram</td><td>Draws what the passage describes. On a diagram, redraws it.</td></tr>
-        <tr><td>Tighter</td><td>Same content, fewer words.</td></tr>
         <tr><td>Define</td><td>Writes a separate primer defining the term you selected, and links the words to it.</td></tr>
-        <tr><td>Edit</td><td>Asks what should change, then changes only that.</td></tr>
-        <tr><td>Ask</td><td>Asks your question and answers it, as a note in the margin or in the text.</td></tr>
+        <tr><td>Ask</td><td>Asks your question and answers it, as a note in the margin or in the text; asked for a change, it makes it.</td></tr>
         <tr><td>Complain</td><td>Sends what is wrong to Alexander, with the passage.</td></tr>
       </table>` },
       { title: "How an action runs", html: `<p>Every action but Complain goes to one agent. It is shown the whole primer, block by block, with the blocks you selected marked, the words you highlighted, your note if the action asked for one, and the action's instruction. On each block that an earlier action made it sees which action and what was asked, and it can search the web when the ask turns on a fact. It answers with a list of changes, which the page applies in order.</p>
-      <p>Every block an action made keeps the action's name in the margin; press it to see what was asked, or to remove the block. Undo takes the whole action back. The Inspector lists each action's call: what the agent was shown, what it answered, and what was applied.</p>` },
+      <p>Every block an action made keeps the action's name in the margin; press it to see what was asked, or to remove the block. Undo takes the whole action back. The Inspector lists each action's call: what the agent was shown, what it answered, and what was applied. Copy report there puts the whole Inspector on the clipboard as text, to paste to whoever is asked what went wrong.</p>` },
       { title: "Changes", html: `<p>The agent chooses what changes and where; an instruction says what is wanted.</p>
       <ul>
-        <li><em>replace</em>: new content takes the place of a block, as Explain and Tighter do. A heading replaced is retitled.</li>
-        <li><em>insert</em>: new content goes before or after a block, as Example and Derive do.</li>
+        <li><em>replace</em>: new content takes the place of a block, as Ask does when a passage is wrong. A heading replaced is retitled.</li>
+        <li><em>insert</em>: new content goes before or after a block, as Example and Diagram do.</li>
         <li><em>remove</em>: a block is taken out.</li>
         <li><em>define</em>: a primer on a term is written and the words are linked to it, as Define does.</li>
       </ul>
@@ -4401,9 +4457,9 @@ const GUIDES = {
         <li><em>Name</em>: what its button says, and the word left in the margin of the blocks it changes.</li>
         <li><em>Instruction</em>: what to do with the selection, in a sentence or two. Say where the result should go if it matters.</li>
         <li><em>Model</em>: what it runs on, or the action agent's default.</li>
-        <li><em>Ask for a note first</em>: the action then waits for a line from you before it runs, as Edit and Ask do. <em>Prompt shown</em> is the hint in that field.</li>
+        <li><em>Ask for a note first</em>: the action then waits for a line from you before it runs, as Ask does. <em>Prompt shown</em> is the hint in that field.</li>
       </ul>
-      <p>A built-in's instruction can be changed the same way; <em>Reset</em> beside it returns the original. The switch on a row puts the action in the pen or takes it out. Hover a row for its arrows and Delete. <em>Restore defaults</em> brings back the nine as shipped and drops the rest.</p>` }
+      <p>A built-in's instruction can be changed the same way; <em>Reset</em> beside it returns the original. The switch on a row puts the action in the pen or takes it out. Hover a row for its arrows and Delete. <em>Restore defaults</em> brings back the five as shipped and drops the rest.</p>` }
     ]
   }
 };
@@ -4577,6 +4633,7 @@ function evNode(ev){
   else if(ev.kind === "tool"){ li.append(el("span", "k", "→ " + ev.name), JSON.stringify(ev.input)); }
   else if(ev.kind === "result"){ li.className = ev.ok ? "" : "bad"; li.append(el("span", "k", ev.ok ? "←" : "← error"), ev.text || ""); }
   else if(ev.kind === "retry"){ li.append(el("span", "k", "↻ asking again"), ev.reason + "\n" + (ev.output || "")); }
+  else if(ev.kind === "queued"){ li.append(el("span", "k", "⏸ queued"), "waiting for a free seat on the server, " + (ev.ahead - 1 ? (ev.ahead - 1) + " ahead" : "next in line")); }
   else li.append(JSON.stringify(ev));
   return li;
 }
@@ -4660,6 +4717,122 @@ async function openInspector(docId, callId){
   const c = callId && main.querySelector(`.node[data-call-id="${callId}"] > .call`);
   if(c){ c.open = true; c.scrollIntoView({ block:"start", behavior:"smooth" }); }
   else scrollTo(0, 0);
+}
+
+/* ══ report ═══════════════════════════════════════════════════
+   The whole Inspector as one piece of text, to paste to whoever is asked
+   what went wrong: the build and the account, the primer and its state,
+   every block, the issues raised, the usage table, then every call in
+   order with its prompts, events and output. A system prompt that
+   repeats an earlier call's is named rather than printed again.       */
+async function reportOf(d){
+  const t = await traceOf(d.id), L = [], line = (...a) => L.push(a.join(""));
+  const when = ts => ts ? new Date(ts).toISOString() : "";
+  const secs = (a, b) => ((b || Date.now()) - a) / 1000;
+  const field = (k, v) => { if(v !== undefined && v !== null && v !== "" && v !== false) line(k, ": ", typeof v === "string" ? v : JSON.stringify(v)); };
+  line("PRIMER REPORT");
+  field("Copied", when(Date.now()));
+  field("Site", location.host + (me && me.build ? " · build " + me.build : ""));
+  field("Browser", navigator.userAgent);
+  field("Account", !me ? "not signed in" : me.guest ? "guest" : me.name + (me.admin ? " (admin)" : ""));
+  if(me && me.key) field("Key", me.key.kind + " · " + me.key.name + (me.key.owner ? " · " + me.key.owner + "'s" : ""));
+  else if(me) field("Key", "none");
+  const own = Object.fromEntries(Object.keys(settings).filter(k => k !== "models").map(k => [k, settings[k]]));
+  field("Models chosen", Object.keys(setting("models")).length ? setting("models") : "server defaults");
+  field("Settings changed", Object.keys(own).length ? own : "none");
+  line();
+  line("PRIMER");
+  field("Title", d.title); field("Id", d.id);
+  field("Asked for", d.topic); field("Already knew", d.known); field("Asked to", d.instruction);
+  if(d.rewrite) field("Rewrite of", "\u201c" + d.rewrite.ofTitle + "\u201d · \u201c" + d.rewrite.instruction + "\u201d");
+  if(d.define) field("Definition of", d.define.term);
+  field("Written", when(d.created));
+  const shown = docState(d);
+  field("Status", d.status + (d.statusNote ? " · " + d.statusNote : "") + (shown.text ? " · shown as: " + shown.text : ""));
+  field("Halted", d.halt && (d.halt.by === "you" ? "by a Stop pressed by hand, which lasts until Resume" : d.halt.kind + " on key " + d.halt.key));
+  field("Tries", d.tries);
+  field("Running here", running(d) ? [...runOf(d).jobs].map(j => j.role + " " + j.label + (j.note ? " (" + j.note + ")" : "")).join(", ") : undefined);
+  field("Held by another tab", elsewhere.has(d.id) || undefined);
+  field("Retry due", pendingRetry(d) ? inText(retryT.get(d.id).at - Date.now()) : undefined);
+  field("Queued", queue.includes(d.id) || undefined);
+  line();
+  line("BLOCKS (" + d.blocks.length + ", each with the time the call that made it ended)");
+  d.blocks.forEach((b, i) => {
+    const made = b.by && t.find(r => r.id === b.by);
+    const bits = [String(i + 1).padStart(3), made && made.ended ? when(made.ended) : " ".repeat(24), b.kind + (b.sec != null ? " §" + (b.sec + 1) : ""), b.id];
+    if(b.slot) bits.push("slot");
+    if(b.pending) bits.push("pending");
+    if(b.liveRole) bits.push("live:" + b.liveRole);
+    if(b.md) bits.push(b.md.length + " chars" + (b.kind === "heading" || b.kind === "subheading" ? ": " + b.md.replace(/^#+\s*/, "") : ""));
+    if(b.src) bits.push("src " + b.src);
+    if(b.brief) bits.push("brief: " + b.brief);
+    if(b.by) bits.push("by call " + b.by);
+    if(b.edit) bits.push("by action: " + (b.edit.label || JSON.stringify(b.edit)));
+    if(b.busy) bits.push("busy");
+    if(b.error) bits.push("ERROR: " + b.error);
+    line(bits.join("  "));
+  });
+  const mine = issues.filter(x => x.docId === d.id);
+  if(mine.length){
+    line(); line("ISSUES THIS SESSION (" + mine.length + ", newest first)");
+    mine.forEach(x => line(when(x.ts), "  ", x.msg, x.kind ? "  [" + x.kind + "]" : "", x.rec ? "  call " + (t.indexOf(x.rec) + 1) : ""));
+  }
+  if(faults.length){
+    line(); line("PAGE ERRORS THIS SESSION (" + faults.length + ")");
+    faults.forEach(f => line(when(f.ts), "  ", f.what, ": ", f.text));
+  }
+  line(); line("USAGE");
+  if(!t.length) line("No calls.");
+  else{
+    const table = usageNode(t).querySelector("table");
+    [...table.rows].forEach(r => line([...r.cells].map(c => c.textContent).join(" | ")));
+  }
+  const n = st => t.filter(c => c.status === st).length;
+  line(); line("CALLS (" + t.length + (n("error") ? " · " + n("error") + " failed" : "") + (n("lost") ? " · " + n("lost") + " cut off" : "") + (n("running") ? " · " + n("running") + " running" : "") + ")");
+  const systems = new Map();   // system prompt → the number of the call that printed it
+  t.forEach((rec, i) => {
+    line();
+    line("=".repeat(72));
+    line("#", i + 1, "  ", rec.label || rec.role, "  ·  ", rec.role, rec.model ? " \u2192 " + rec.model : "", "  ·  ", stText(rec).replace(/ · [^·]*$/, m => rec.status === "error" ? "" : m));
+    const parent = rec.parent && t.find(r => r.id === rec.parent);
+    field("Called by", (rec.by === "you" ? "you" + (parent ? ", for " : "") : "") + (parent ? "#" + (t.indexOf(parent) + 1) + " " + (parent.label || parent.role) : rec.by === "you" ? "" : rec.parent ? "a call no longer in the trace" : "the run"));
+    field("Id", rec.id + (rec.key ? " · filed under " + rec.key : ""));
+    field("Started", when(rec.started) + (rec.ended ? " · ended " + when(rec.ended) + " · " + secs(rec.started, rec.ended).toFixed(1) + "s" : ""));
+    field("Status", rec.status + (rec.kind ? " (" + rec.kind + ")" : ""));
+    field("Error", rec.error);
+    if(rec.applied) field("Applied", rec.applied.length ? rec.applied.join(" · ") : "nothing");
+    if(rec.usage){ const u = rec.usage; field("Usage", u.in + " in · " + u.out + " out" + (u.searches ? " · " + u.searches + " searches" : "") + (u.turns ? " · " + u.turns + " turns" : "") + " · " + usd(u.cost)); }
+    line();
+    const seen = systems.get(rec.system);
+    if(seen) line("--- System: same as #" + seen);
+    else{ systems.set(rec.system, i + 1); line("--- System"); line(rec.system || "(none)"); }
+    line("--- User"); line(rec.user || "(none)");
+    line("--- Events (" + rec.events.length + ")");
+    rec.events.forEach(ev => {
+      const at = when(ev.t) + " +" + secs(rec.started, ev.t).toFixed(1) + "s  ";
+      if(ev.kind === "start") line(at, "model ", ev.model, ev.tools && ev.tools.length ? "  tools: " + ev.tools.join(", ") : "  no tools");
+      else if(ev.kind === "tool") line(at, "\u2192 ", ev.name, " ", JSON.stringify(ev.input));
+      else if(ev.kind === "result") line(at, ev.ok ? "\u2190 " : "\u2190 ERROR ", ev.text || "");
+      else if(ev.kind === "retry") line(at, "\u21bb asking again: ", ev.reason, ev.output ? "\n" + ev.output : "");
+      else if(ev.kind === "queued") line(at, "queued: waiting for a free seat on the server, ", ev.ahead - 1 ? (ev.ahead - 1) + " ahead" : "next in line");
+      else if(ev.kind === "usage") line(at, "usage ", ev.in, " in · ", ev.out, " out", ev.searches ? " · " + ev.searches + " searches" : "", ev.turns ? " · " + ev.turns + " turns" : "");
+      else line(at, JSON.stringify(ev));
+    });
+    line("--- Output"); line(rec.output || "(none)");
+  });
+  return L.join("\n");
+}
+async function copyReport(d){
+  const text = await reportOf(d);
+  /* When the clipboard is refused, the report goes on the page, selected, to be copied by hand. */
+  copyText(text, () => {
+    const page = main.querySelector(".inspector"); if(!page) return null;
+    let pre = page.querySelector(".report");
+    if(!pre){ pre = el("pre", "report"); page.append(pre); }
+    pre.textContent = text;
+    pre.scrollIntoView({ block:"start" });
+    return pre;
+  }, "Report copied · " + Math.round(text.length / 1000) + "k characters");
 }
 
 /* ══ export ═══════════════════════════════════════════════════

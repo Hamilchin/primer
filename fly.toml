@@ -11,6 +11,9 @@ primary_region = 'lax'
   DATA_DIR = '/data'
   HOST = '0.0.0.0'
   PORT = '8787'
+  # Subscription calls seated at once: each is a Claude Code subprocess of
+  # roughly 300 MB, so this follows the machine's memory below.
+  CALLS_AT_ONCE = '8'
 
 [[mounts]]
   source = 'primer_data'
@@ -23,8 +26,19 @@ primary_region = 'lax'
   auto_start_machines = true
   min_machines_running = 1
 
+  [[http_service.checks]]
+    grace_period = '10s'
+    interval = '30s'
+    timeout = '10s'
+    method = 'GET'
+    path = '/api/health'
+
 [[vm]]
-  size = 'shared-cpu-1x'
-  memory = '1gb'
-  cpus = 1
-  memory_mb = 1024
+  size = 'shared-cpu-2x'
+  memory = '4gb'
+  cpus = 2
+  memory_mb = 4096
+
+# Room to spill into when the seated calls all peak at once: slow, but
+# not a killed process.
+swap_size_mb = 512

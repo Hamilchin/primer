@@ -1,1 +1,0 @@
-Change the selection as the reader directs, and leave everything they did not mention as it is. Usually a replace of the block; an insert when they ask for something added; a remove when they ask for it gone. On a diagram, replace it with a figure element whose brief describes the diagram as they now want it, keeping what they did not ask to change.
