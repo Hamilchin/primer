@@ -33,10 +33,12 @@ export const halt = (status, message, kind) => Object.assign(new Error(message),
    with tools is an agent: it may call them for up to maxTurns turns, and
    its answer is the text of its last message. Add a role here, and a prompt
    pair in prompts/, to add an agent. `action` is the one agent behind every
-   pen action: it sees the whole primer and answers with the changes to make. */
+   pen action: it sees the whole primer and answers with the changes to make.
+   A role with thinking: false writes straight away: a writer left to think
+   first sits silent for ten seconds or more before its first word. */
 export const ROLES = {
-  outline:  { model: "claude-sonnet-4-6" },
-  section:  { model: "claude-sonnet-4-6" },
+  outline:  { model: "claude-sonnet-4-6", thinking: false },
+  section:  { model: "claude-sonnet-4-6", thinking: false },
   action:   { model: "claude-fable-5-1", maxTurns: 12, tools: ["web_search", "fetch_page"] },
   figure:   { model: "claude-fable-5" },
   finder:   { model: "claude-sonnet-4-6", maxTurns: 24, effort: "low", tools: ["search_images", "web_search", "fetch_page", "look_at_image"] },
@@ -515,7 +517,7 @@ export async function complete({ system, user, role, model: chosen }, cred, emit
   const spec = ROLES[role] || ROLES.section;
   const m = modelFor(role, cred.kind, chosen);
   const names = spec.tools || [];
-  const call = { system: String(system || ""), user: String(user || ""), model: m, names, maxTurns: spec.maxTurns || 1, effort: spec.effort };
+  const call = { system: String(system || ""), user: String(user || ""), model: m, names, maxTurns: spec.maxTurns || 1, effort: spec.effort, thinking: spec.thinking };
   if (cred.kind !== "subscription") { emit({ start: { model: m.id, tools: names } }); return viaProvider(call, cred, emit, signal); }
   await seat(signal, ahead => emit({ event: { kind: "queued", ahead } }));
   try { emit({ start: { model: m.id, tools: names } }); return await viaClaudeCode(call, cred, emit, signal); }
@@ -599,7 +601,7 @@ function foundByClaudeCode(content) {
   try { if (m) return pages(JSON.parse(m[1])); } catch {}
   return text;
 }
-async function viaClaudeCode({ system, user, model: m, names, maxTurns, effort }, cred, emit, signal) {
+async function viaClaudeCode({ system, user, model: m, names, maxTurns, effort, thinking }, cred, emit, signal) {
   const env = { ...process.env, CLAUDE_CODE_OAUTH_TOKEN: cred.value };
   delete env.ANTHROPIC_API_KEY; delete env.ANTHROPIC_AUTH_TOKEN;
   const abortController = new AbortController();
@@ -615,6 +617,7 @@ async function viaClaudeCode({ system, user, model: m, names, maxTurns, effort }
   };
   if (ours.length) options.mcpServers = { primer: primerTools({}) };
   if (effort) options.effort = effort;   // a role that chooses rather than reasons thinks less, and answers sooner
+  if (thinking === false) options.thinking = { type: "disabled" };
 
   let last = "", partial = "", result = null, failure = null, searches = 0;
   const uses = new Map();   // tool_use id → name, to read each result by the tool it answers
@@ -683,7 +686,7 @@ function withStderr(e, stderr) {
    differs: Anthropic and OpenAI answer each as a tool result, OpenRouter
    says only how many it ran, with the pages it cited as sources. All of it
    reaches the Inspector as the same two events, a search and its pages. */
-async function viaProvider({ system, user, model: m, names, maxTurns, effort }, cred, emit, signal) {
+async function viaProvider({ system, user, model: m, names, maxTurns, effort, thinking }, cred, emit, signal) {
   const p = PROVIDERS[cred.kind], client = p.client(cred.value), id = m[p.at], search = SEARCH[cred.kind];
   const abortController = new AbortController();
   signal.addEventListener("abort", () => abortController.abort(), { once: true });
@@ -694,7 +697,7 @@ async function viaProvider({ system, user, model: m, names, maxTurns, effort }, 
     model: cred.kind === "openrouter" ? client(id, { usage: { include: true } }) : client(id),
     system, prompt: user, tools, stopWhen: stepCountIs(maxTurns),
     maxOutputTokens: 32000, abortSignal: abortController.signal,
-    providerOptions: cred.kind === "anthropic" ? { anthropic: { thinking: { type: "adaptive" }, ...(effort ? { effort } : {}) } } : undefined,
+    providerOptions: cred.kind === "anthropic" ? { anthropic: { thinking: { type: thinking === false ? "disabled" : "adaptive" }, ...(effort ? { effort } : {}) } } : undefined,
     onError() {}   // an error arrives as a part of the stream, below; the SDK would also print it
   });
 
