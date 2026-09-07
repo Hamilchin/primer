@@ -1,127 +1,50 @@
 # Primer
 
-Name a subject; Primer writes an explainer on it, one section at a time, and
-finds figures. Research, off unless turned on in Settings or run from the foot
-of a primer, then checks the claims against the web. Each person signs in and keeps their own
-primers, prompt edits and settings.
+Name a subject and Primer writes an explainer on it: a plan, then sections
+one at a time, with diagrams and images where they help. Research, when
+turned on, checks the claims against the web and cites or corrects them.
+
+Select a passage and a pen appears: ask for an example, a diagram, a
+definition, or anything in your own words, and the primer is revised in
+place. Undo takes a revision back whole.
+
+Each primer has its own address. Make it public and anyone with the link can
+read it, as it is written and as it changes. A frozen link keeps a copy as
+it stands.
+
+Primer runs on your own key: a Claude subscription, or an Anthropic,
+OpenRouter or OpenAI key, added in Settings. A key can be shared with a
+password, and its owner sees what it has been used for. There are no keys
+in the environment.
+
+Accounts need an invite code. Guests can use it without one, with a key
+they paste; their primers stay in their browser.
 
 ## Run it
 
     npm install
     npm start            # http://localhost:8787, prints the invite code
 
-The first time someone opens it they create an account with that invite code,
-then add a key in Settings, under a name of their choosing: a Claude
-subscription token (from `claude setup-token`), or an Anthropic, OpenRouter
-or OpenAI key. Which kind it is comes from the value itself, confirmed with
-its provider. Every primer is written on the key its writer has picked. Keys
-are stored encrypted, but the host can use them; that is the trust involved.
-`/guide` walks a newcomer through getting a key; `/guide/actions` explains the
-selection toolbar and what its actions can do.
-
-A subscription's calls run through Claude Code, by way of the Claude Agent
-SDK, since only Claude Code may spend one. Every other key is spoken to
-directly, through the Vercel AI SDK. The tools are the same either way: a
-web search, a page reader, and the finder's eyes. The search is the
-provider's own, run on the key in use and billed to it, so nobody pays for
-another's searches: Anthropic's and OpenAI's server-side search tools,
-OpenRouter's server tool, and Claude Code's WebSearch for a subscription.
-Each agent runs on a Claude model by default; under Models in Settings it
-can be put on another from the catalogue in `agents.mjs`, as far as the key
-in use can run it. An OpenAI key, which runs no Claude model, runs GPT-5.6
-Terra where nothing is chosen. The owner of a key sees what it has been
-used for by day, and what is left on it where the provider will say:
-OpenRouter's credit, a subscription's usage windows.
-
-Anyone can also continue as a guest, without an account: a guest pastes a
-key or links to a shared one, and it is sent with each call rather than
-stored; their primers and prompt edits stay in their own browser.
-
-A key can be shared: give it a password, and anyone with an account can link
-to it by typing its name and that password, then run on it. The owner sees
-what the key has been used for, summed per day at API rates. Changing the
-password, or unsharing, takes the key away from everyone linked to it; they
-have to link again. Nothing is read from the environment: to share your own
-Claude, add its token as a shared key like anyone else.
-
-Select a passage and the pen appears: Example, Diagram, Define, Ask,
-Complain, and any action you add under Actions in Settings. All but Complain go to one agent, the action agent, which is
-shown the whole primer block by block, the blocks you selected, the words
-you highlighted, your note if the action took one, and, on every block an
-earlier action made, what was asked. It answers with changes it chose:
-replace a block, insert before or after one, remove one, or define a term.
-What it adds is prose, a note in the margin, a subheading, or a brief for
-a diagram or an image, which the illustrator or the finder then makes,
-exactly as for a section being written; a diagram redrawn is shown to the
-illustrator alongside the brief. It can search the web when an ask turns
-on a fact. Every block it made carries the action's name in the margin,
-Undo takes an action back whole, and the Inspector shows each action's
-call with what was applied. `/guide/actions` explains the rest.
-
-Define asks the agent which term the selection means and which of the
-selected words name it, then writes a primer on that term exactly as the
-cover's Definition chip does, modelled on the first paragraph of its
-Wikipedia page, from the term alone: nothing of the primer it was asked
-from goes with it. The words become a link to it; hover the link for a
-preview that updates as the definition is written. The research agent can
-also link terms to Wikipedia at their first mention, when its prompt asks
-for it (change the last line of the Research prompt in Settings to yes).
-
-A section can have subsections, numbered 3.1, 3.2 in the margin and listed
-under their section in the contents. The planner divides a section only
-when it would run long and fall into distinct parts, the writer follows
-that plan, and a revision can open a subsection when what it adds is too
-large for a paragraph. Most primers have none.
-
-A primer is written by the page that asked for it, one call at a time, so
-a closed tab or a lost connection leaves it unfinished. It does not stay
-so: the tab tries a failed run again after a pause, longer each time, and
-whichever tab next opens the library takes up what closed tabs left, two
-at a time, until every primer is done. Only Stop lasts; a stopped primer
-waits for Resume. One that stopped for want of a working key waits for a
-different key, and one that has failed five times running waits for a
-person. Two tabs never write the same primer: the one writing it holds a
-lease, and the other says so.
-
-A primer's own address, `/p/<id>`, is its link. Share, there from the
-moment a primer starts, has a Public switch: on, anyone with the address
-reads the primer, signed in or not, as it stands and as it changes, and
-while it is still being written their page brings each new piece in. Off
-takes it back. Whether you can edit depends on whose primer it is, never on
-the address: only the owner edits. A frozen link, `/s/<id>`, is a copy of
-the primer as it is that moment; later changes never reach it, and the
-Share menu lists those copies and can remove them. A guest's primers are in
-their browser alone, so a guest has no Share.
-
-Feedback in the top bar, and Complain in the pen, send a reader's words to
-whoever hosts, along with the page they were on. The account named by
-`ADMIN` reads them on the Feedback page of Settings; with `ADMIN` unset,
-the first account made is the host.
-
-Everything lives in `data/` (a SQLite file and the images that were found).
-Back that directory up and you have backed up Primer.
+Needs Node 22.13+. Everything is kept in `data/`; back that up and you have
+backed up Primer.
 
 ## Host it
 
-Any machine with Node 22.13+ works: `HOST=0.0.0.0 npm start` behind your usual
-reverse proxy. Or, with the Dockerfile and fly.toml here, on Fly.io:
+`HOST=0.0.0.0 npm start` behind a reverse proxy, or on Fly.io with the
+Dockerfile and fly.toml here:
 
-    fly launch --no-deploy                       # keep the fly.toml it finds
+    fly launch --no-deploy
     fly volumes create primer_data --size 1
     fly secrets set INVITE=a-word PRIMER_SECRET=$(openssl rand -hex 32)
     fly deploy
 
-Then send friends the URL and the invite word. Set `PRIMER_SECRET` from the
-start: it encrypts the stored keys, and keeping it out of the volume (in Fly's
-secrets, not the database) means a leaked data directory can't be decrypted.
-
-## Environment
+Set `PRIMER_SECRET` from the start: it encrypts the stored keys.
 
 | variable | default | |
 |---|---|---|
 | `PORT` | `8787` | |
 | `HOST` | `127.0.0.1` | `0.0.0.0` to accept outside connections |
-| `DATA_DIR` | `./data` | database and media |
+| `DATA_DIR` | `./data` | database and images |
 | `INVITE` | generated once | needed to create an account |
-| `PRIMER_SECRET` | generated once | encrypts stored keys and tokens; set it out-of-band in production, or the secret is kept in the database beside them |
-| `ADMIN` | the first account | account names, comma-separated, that read feedback |
+| `PRIMER_SECRET` | generated once | encrypts stored keys; set it in production |
+| `ADMIN` | the first account | accounts that read feedback, comma-separated |
