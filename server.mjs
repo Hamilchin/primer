@@ -236,6 +236,8 @@ async function serve(req, res) {
   const token = cookies(req).primer;
   const me = db.sessions.user(token);
   const guest = !me && isGuest(token);
+  /* Who to log: an account by name, a guest by the first bit of their cookie, so two guests can be told apart. */
+  const who = me ? me.name : guest ? "guest-" + token.slice(2, 8) : "reader";
   const setCookie = t => res.setHeader("set-cookie",
     "primer=" + (t || "") + "; Path=/; HttpOnly; SameSite=Lax" + (secure(req) ? "; Secure" : "") + (t ? "; Max-Age=31536000" : "; Max-Age=0"));
   /* Fly's proxy names the caller; anything the caller sent itself is not trusted. */
@@ -300,7 +302,7 @@ async function serve(req, res) {
     const where = { url: cut(w.url, 500), route: cut(w.route, 40), doc: cut(w.doc, 40), title: cut(w.title, 200), section: cut(w.section, 200),
                     block: cut(w.block, 40), quote: cut(w.quote, 500), passage: cut(w.passage, 2000), width: Number(w.width) || undefined };
     db.feedback.add(me ? me.id : null, me ? me.name : guest ? "a guest" : "a reader", kind, text, where);
-    console.log("  " + (me ? me.name : "guest") + "  " + kind + ": " + text.slice(0, 80).replace(/\s+/g, " "));
+    console.log("  " + who + "  " + kind + ": " + text.slice(0, 80).replace(/\s+/g, " "));
     return json(200, {});
   }
 
@@ -319,7 +321,7 @@ async function serve(req, res) {
     guard("link:" + ip, 40); guard("link:" + name, 8);
     const r = db.keys.sharedCredential(name, String(b.password || ""));
     if (!r) { strike("link:" + ip, "link:" + name); throw halt(403, "No shared key with that name and password."); }
-    console.log("  guest  linked to “" + r.key.name + "”");
+    console.log("  " + who + "  linked to “" + r.key.name + "”");
     return json(200, { name: r.key.name, owner: r.key.owner, kind: r.key.kind });
   }
 
@@ -460,7 +462,7 @@ async function serve(req, res) {
     const cred = me ? db.users.credential(me.id) : guestCred(body.cred, ip);
     if (!cred) throw halt(400, "No key to run on. Add one, or link to a shared key, in Settings.", "no_key");
     /* Who is calling, on which key: the record of shared use. */
-    console.log("  " + (me ? me.name : "guest") + "  " + (body.role || "?") + "  on “" + cred.key.name + "”" + (cred.own ? "" : " (" + cred.key.owner + "’s)"));
+    console.log("  " + who + "  " + (body.role || "?") + "  on “" + cred.key.name + "”" + (cred.own ? "" : " (" + cred.key.owner + "’s)"));
     /* Headers go out with the first frame, so a failure before any text can
        still be a plain 500 that the client retries. After that, errors travel
        as a frame. Closing the connection aborts the model call. */
