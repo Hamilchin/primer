@@ -215,6 +215,8 @@ createServer(async (req, res) => {
   try { await serve(req, res); }
   catch (e) {
     if (res.headersSent) return res.end();
+    /* A request whose sender went away mid-body is nobody's fault: a tab closed. */
+    if (e && e.code === "ECONNRESET") { console.log("  (a request was dropped by its sender)"); return res.end(); }
     if (!e.status) console.error(e);
     res.writeHead(e.status || 500, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: { message: e.status ? e.message : "Something went wrong on the server.", kind: e.kind } }));
