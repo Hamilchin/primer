@@ -391,6 +391,10 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 .doc-foot .doc-bar{margin-bottom:0}
 .doc-foot .meta{border-bottom:0;margin:.6rem 0 0;padding-bottom:.2rem}
 .doc-foot + .colophon{margin-top:1.4rem}
+.more-form{margin-top:2.4rem;display:grid;grid-template-columns:1fr auto;gap:.6rem .8rem;align-items:start}
+.more-form .lab{grid-column:1 / -1;margin:0}
+.more-form .field{margin:0}
+.more-form + .colophon{margin-top:1.4rem}
 .colophon .fill{flex:1}
 .colophon button{color:var(--fg-2)}
 .colophon button:hover{color:var(--accent)}
@@ -1370,6 +1374,10 @@ const MATH_RE = /\$\$[\s\S]*?\$\$|\$(?!\s)(?:\\.|[^$\\\n])+?(?<!\s)\$(?!\d)/g;
    text, so a < in a formula is never the start of a tag. */
 const escHtml = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const texForm = m => escHtml(m.startsWith("$$") ? "\\[" + m.slice(2, -2) + "\\]" : "\\(" + m.slice(1, -1) + "\\)");
+/* A lone ~ is "about": "~450 nm" is not the start of a strikethrough, which
+   takes two. Marked would pair two of them across a sentence. */
+const LONE_TILDE = /(^|[^~\\])~(?!~)/g;
+const keepTilde = s => s.split(/(`+[^`]*`+)/g).map((x, i) => i % 2 ? x : x.replace(LONE_TILDE, "$1\\~")).join("");
 /* Nothing the model wrote reaches the page as HTML until DOMPurify has
    been over it. Prose keeps what marked makes of it and its links to
    other primers; a diagram keeps its SVG and nothing that could run,
@@ -1383,14 +1391,14 @@ function mdToHtml(md){
   const parts = String(md).split(/(```[\s\S]*?```)/g);
   const stash = [];
   const masked = parts.map(p => p.startsWith("```") ? p :
-    p.replace(MATH_RE, m => { stash.push(texForm(m)); return "@@PM"+(stash.length-1)+"@@"; })
+    keepTilde(p.replace(MATH_RE, m => { stash.push(texForm(m)); return "@@PM"+(stash.length-1)+"@@"; }))
   ).join("");
   const html = marked.parse(masked);
   return safeHtml(html.replace(/@@PM(\d+)@@/g, (_,i) => stash[+i]));
 }
 function mdInline(md){
   const stash = [];
-  const masked = String(md).replace(MATH_RE, m => { stash.push(texForm(m)); return "@@PM"+(stash.length-1)+"@@"; });
+  const masked = keepTilde(String(md).replace(MATH_RE, m => { stash.push(texForm(m)); return "@@PM"+(stash.length-1)+"@@"; }));
   return safeHtml(marked.parseInline(masked).replace(/@@PM(\d+)@@/g, (_,i) => stash[+i]));
 }
 function typeset(el){
@@ -2039,7 +2047,10 @@ function renderDoc(){
   if(doc.blocks.some(b => b.kind === "heading")){
     const foot = el("div", "doc-foot"); foot.append(barNode(doc), metaNode(doc)); a.appendChild(foot);
   }
-  if(!doc.blocks.some(b => b.pending) && doc.blocks.some(b => b.kind==="heading")) a.appendChild(colophon());
+  if(!doc.blocks.some(b => b.pending) && doc.blocks.some(b => b.kind==="heading")){
+    if(route === "doc") a.appendChild(moreNode(doc));
+    a.appendChild(colophon());
+  }
   main.replaceChildren(a);
   typeset(a);
   layoutSidenotes();
@@ -2408,6 +2419,31 @@ function addCites(body, cites){
   });
 }
 
+/* At the foot of a finished primer, the next one: a related topic, written
+   for a reader who has just read this one. What they already knew, and what
+   this primer covered, go with it. */
+function moreNode(d){
+  const f = el("form", "more-form");
+  const lab = el("label", "lab", "Write more"); lab.htmlFor = "moreTopic";
+  const t = el("textarea", "field"); t.id = "moreTopic"; t.rows = 1; t.placeholder = "A related topic you want to understand";
+  t.oninput = () => grow(t);
+  t.onkeydown = e => { if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); f.requestSubmit(); } };
+  const go = btn("go", "Write"); go.type = "submit";
+  f.append(lab, t, go);
+  f.onsubmit = e => {
+    e.preventDefault();
+    const topic = t.value.trim(); if(!topic){ t.focus(); return; }
+    if(me && !me.key){ goto("settings"); toast("Add a key, or link to a shared one, first"); return; }
+    startDoc({ topic, known: readAfter(d) });
+  };
+  return f;
+}
+/* What the reader knows once they have read primer d. */
+function readAfter(d){
+  const secs = d.blocks.filter(b => b.kind === "heading").map(headingTitle).filter(Boolean);
+  const read = "Has just read a primer titled “" + d.title + "”" + (secs.length ? ", covering: " + secs.join("; ") : "") + ".";
+  return (d.known && d.known.trim() ? d.known.trim() + "\n" : "") + read;
+}
 function colophon(){
   const c = el("footer", "colophon");
   const secs = doc.blocks.filter(b => b.kind==="heading").length;
@@ -4689,7 +4725,12 @@ function callEl(rec, i, t){
   return d;
 }
 /* Keep a running call's row current while the Inspector is open; once it
-   ends, redraw the row so its reason and final state are there. */
+   ends, redraw the row so its reason and final state are there. The clock
+   on a running row ticks on its own, since nothing may arrive for a while. */
+setInterval(() => {
+  if(route !== "inspector" || !doc) return;
+  (traces.get(doc.id) || []).filter(r => r.status === "running").forEach(liveCall);
+}, 1000);
 let liveCallT = 0;
 function liveCall(rec){
   if(route !== "inspector" || !doc || rec.docId !== doc.id || liveCallT) return;
