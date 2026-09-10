@@ -26,6 +26,9 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
+import { parseHTML } from "linkedom";
+import { Readability } from "@mozilla/readability";
+import TurndownService from "turndown";
 
 export const halt = (status, message, kind) => Object.assign(new Error(message), { status, kind });
 
@@ -328,6 +331,82 @@ async function readPage(url) {
   const text = /html/.test(type) ? plain(await r.text(), r.url || url) : await r.text();
   return text.length > PAGE_MAX ? text.slice(0, PAGE_MAX) + "\n… (cut at " + PAGE_MAX + " characters)" : text;
 }
+/* ── a source for a primer ──────────────────────────────────────
+   A page or a PDF, read whole, as markdown with its pictures where they
+   stand: what a primer made from existing content is written from. A
+   page is reduced to its article first, so a site's furniture does not
+   come along; the article keeps its headings, lists, code, links and
+   pictures. There is no cap on the words, only on the download. */
+const SOURCE_MAX = 20 * 1024 * 1024;
+export async function readSource(url) {
+  const r = await safeFetch(url, { headers: { "user-agent": UA, accept: "text/html, application/pdf;q=0.9, text/plain;q=0.8, */*;q=0.5" },
+                                   signal: AbortSignal.timeout(30000) });
+  if (!r.ok) throw new Error("HTTP " + r.status + " from " + new URL(url).host);
+  const type = (r.headers.get("content-type") || "").split(";")[0].trim();
+  const len = Number(r.headers.get("content-length") || 0);
+  if (len > SOURCE_MAX) throw new Error("Too large to read (" + (len / 1048576).toFixed(0) + " MB).");
+  const at = r.url || url;
+  if (type === "application/pdf" || /\.pdf(\?|$)/i.test(at)) {
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > SOURCE_MAX) throw new Error("Too large to read.");
+    return { ...(await pdfText(buf)), url: at, kind: "pdf" };
+  }
+  if (!/html|xml|^text\//.test(type)) throw new Error("Not a page or a PDF (" + (type || "unknown type") + ").");
+  const text = await r.text();
+  if (!/html|xml/.test(type)) return { title: "", md: text.trim(), url: at, kind: "text" };
+  return { ...articleOf(text, at), url: at, kind: "page" };
+}
+/* The article in a page, as markdown. Readability finds the article; when
+   it finds nothing, the body stands in. Pictures told to be 40px or under,
+   and inline data: pictures, are left out, as in the page reader. */
+const turndown = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced", bulletListMarker: "-", emDelimiter: "*" });
+turndown.remove(["script", "style", "noscript", "template", "iframe", "form", "button", "nav"]);
+turndown.addRule("figure", { filter: "figure", replacement: (content) => "\n\n" + content.trim() + "\n\n" });
+turndown.addRule("figcaption", { filter: "figcaption", replacement: (content) => "\n\n*" + content.trim().replace(/\s+/g, " ") + "*\n\n" });
+function articleOf(html, base) {
+  const { document } = parseHTML(html);
+  for (const img of [...document.querySelectorAll("img")]) {
+    const w = parseInt(img.getAttribute("width")), h = parseInt(img.getAttribute("height"));
+    let src = img.getAttribute("data-src") || img.getAttribute("src") || (img.getAttribute("srcset") || "").split(",")[0].trim().split(/\s+/)[0];
+    if ((w && w <= 40) || (h && h <= 40) || !src || /^data:/i.test(src)) { img.remove(); continue; }
+    try { src = new URL(src, base).href; } catch { img.remove(); continue; }
+    img.setAttribute("src", src);
+    if (!img.getAttribute("alt")) img.setAttribute("alt", "");
+  }
+  for (const a of document.querySelectorAll("a[href]")) { try { a.setAttribute("href", new URL(a.getAttribute("href"), base).href); } catch {} }
+  let title = (document.querySelector("title") || {}).textContent || "", body;
+  try {
+    const art = new Readability(document.cloneNode(true), { keepClasses: false }).parse();
+    if (art && art.content && (art.textContent || "").trim().length > 200) { body = art.content; title = art.title || title; }
+  } catch {}
+  if (!body) body = (document.body || document.documentElement).innerHTML;
+  const md = turndown.turndown(body).replace(/\n{3,}/g, "\n\n").trim();
+  return { title: String(title).replace(/\s+/g, " ").trim(), md };
+}
+/* A PDF's words, page by page; a line break where the PDF has one, a
+   paragraph where a line ends short. Its pictures are not carried. */
+async function pdfText(buf) {
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const pdf = await getDocument({ data: new Uint8Array(buf), useSystemFonts: true, isEvalSupported: false }).promise;
+  let title = "";
+  try { title = String(((await pdf.getMetadata()).info || {}).Title || "").trim(); } catch {}
+  const pages = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i), c = await page.getTextContent();
+    let text = "", lastY = null;
+    for (const it of c.items) {
+      if (!("str" in it)) continue;
+      const y = it.transform ? it.transform[5] : null;
+      if (lastY !== null && y !== null && Math.abs(y - lastY) > 2) text += it.hasEOL || Math.abs(y - lastY) > 14 ? "\n" : " ";
+      text += it.str;
+      lastY = y;
+    }
+    pages.push(text.replace(/[ \t]+/g, " ").replace(/ ?\n ?/g, "\n").trim());
+  }
+  const md = pages.join("\n\n").replace(/([^\n.!?:;])\n(?=[a-z(])/g, "$1 ").replace(/\n{3,}/g, "\n\n").trim();
+  return { title, md };
+}
+
 /* A page's words, without its furniture, and its pictures by address.
    An image is the one thing a page's text cannot carry, and the finder
    needs it: each <img> stays, where it stood, as "[image: URL] alt text",

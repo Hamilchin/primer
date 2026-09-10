@@ -150,6 +150,12 @@ main{padding:1.5rem var(--gutter) 8rem}
 .page .body td:first-child{white-space:nowrap;padding-right:1.5rem}
 /* Common instructions, one click each; they add up and toggle back off. */
 .chips{display:flex;flex-wrap:wrap;gap:.35rem 1rem;margin-top:.6rem;font-size:13.5px}
+.from-link{display:block;margin-top:1.2rem;font-size:13px;color:var(--fg-2);text-decoration:underline;text-decoration-thickness:1px;text-decoration-color:var(--rule-2);text-underline-offset:3px}
+.from-link:hover,.from-link.on{color:var(--accent)}
+.from{margin-top:1rem}
+.from .modes{display:flex;flex-wrap:wrap;gap:.3rem 1.4rem;margin-top:.6rem;font-size:13.5px;color:var(--fg-2)}
+.from .modes label{display:flex;gap:.4rem;align-items:baseline;cursor:pointer}
+.from .modes input{accent-color:var(--accent)}
 .chip{color:var(--fg-2);text-decoration:underline;text-decoration-thickness:1px;text-decoration-color:var(--rule-2);text-underline-offset:3px}
 .chip:hover{color:var(--fg);text-decoration-color:currentColor}
 .chip.on{color:var(--accent);text-decoration-color:currentColor}
@@ -1081,7 +1087,7 @@ function repairJSON(s){
    are filled in at call time. `group` sorts them on the page. The
    templates marked `user` only arrange the fields into a message; they
    are loaded but not shown, there being nothing in them to change.   */
-const PROMPT_GROUPS = { base:"Base", write:"Writing a primer", revise:"Actions on a selection", rewrite:"Rewriting a primer" };
+const PROMPT_GROUPS = { base:"Base", write:"Writing a primer", revise:"Actions on a selection", rewrite:"Rewriting a primer", source:"From existing content" };
 const PROMPTS = {
   house:                { group:"base",    label:"House style" },
   reader:               { group:"base",    label:"Reader" },
@@ -1108,7 +1114,15 @@ const PROMPTS = {
   ask:                  { group:"revise",  label:"Ask",      act:true },
   rewrite_outline:      { group:"rewrite", label:"Outline" },
   rewrite_outline_user: { group:"rewrite", label:"Outline · user", user:true },
-  rewrite_section_user: { group:"rewrite", label:"Section · user", user:true }
+  rewrite_section_user: { group:"rewrite", label:"Section · user", user:true },
+  source_outline:       { group:"source",  label:"Outline" },
+  source_outline_user:  { group:"source",  label:"Outline · user", user:true },
+  source_section_user:  { group:"source",  label:"Section · user", user:true }
+};
+/* What the writers are told about a primer made from existing content. */
+const SOURCE_MODES = {
+  rewritten: "Rewrite the text so it is clearer and more digestible, with exactly the same content: every fact, number, claim, example, caveat and picture the text has, none added and none dropped. Its pictures go where they belong, by their addresses.",
+  verbatim:  "Keep the text VERBATIM: every sentence exactly as written, in its order, nothing paraphrased, added or dropped. Your only work is to divide it into the planned sections and place the text's pictures where they stand, by their addresses. A subheading only where the text itself has a heading inside this section's part; where it has none, none. Each prose element is one of the text's own paragraphs, lists, code blocks or equations. Request no diagrams and no found images."
 };
 
 /* Fetch prompts/<key>.txt for every entry. Returns the keys that failed.
@@ -1879,6 +1893,15 @@ function renderCover(){
         <label class="lab" for="cInstr">Instructions (optional)</label>
         <textarea id="cInstr" class="field" rows="1"></textarea>
         <div class="chips" id="cChips"></div>
+        <button class="from-link" type="button" id="cFromLink">From existing content</button>
+        <div class="from" id="cFrom" hidden>
+          <label class="lab" for="cSource">A link, or the text itself</label>
+          <textarea id="cSource" class="field" rows="2" autocomplete="off" spellcheck="false"></textarea>
+          <div class="modes">
+            <label><input type="radio" name="cMode" value="rewritten" checked> Rewritten to be clearer, same content</label>
+            <label><input type="radio" name="cMode" value="verbatim"> Verbatim, only divided into sections</label>
+          </div>
+        </div>
         <div class="composer-foot"><button class="go" type="submit">Write new primer<kbd>↵</kbd></button></div>
       </div>
     </form>
@@ -1923,12 +1946,21 @@ function renderCover(){
     try{ sessionStorage.setItem(DRAFT, JSON.stringify({ topic:topic.value, known:known.value, instr:instr.value })); }catch(e){}
   });
 
+  /* From existing content: a link or a text, and whether it is kept word
+     for word. The topic is optional then; the text names the primer. */
+  const fromLink = $("#cFromLink"), from = $("#cFrom"), source = $("#cSource");
+  source.oninput = () => grow(source);
+  fromLink.onclick = () => { from.hidden = !from.hidden; fromLink.classList.toggle("on", !from.hidden); if(!from.hidden){ grow(source); source.focus(); } };
+  source.onkeydown = e => { if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){ e.preventDefault(); form.requestSubmit(); } };
   form.onsubmit = e => {
     e.preventDefault();
-    const t = topic.value.trim(); if(!t){ topic.focus(); return; }
+    const t = topic.value.trim(), src = from.hidden ? "" : source.value.trim();
+    if(!t && !src){ topic.focus(); return; }
     if(me && !me.key){ goto("settings"); toast("Add a key, or link to a shared one, first"); return; }
     try{ sessionStorage.removeItem(DRAFT); }catch(e){}
-    startDoc({ topic:t, known:known.value.trim(), instruction:instr.value.trim() });
+    const o = { topic:t, known:known.value.trim(), instruction:instr.value.trim() };
+    if(src) o.source = { input:src, mode:(form.querySelector("input[name=cMode]:checked") || {}).value || "rewritten" };
+    startDoc(o);
   };
   shelfSig = null; libQuery = "";
   renderLibrary();
@@ -2116,7 +2148,13 @@ function metaNode(d){
     if(typeof v === "string") dd.textContent = v; else dd.append(v);
     meta.append(dt, dd);
   };
-  row("Asked for", d.topic || d.title);
+  if(d.source){
+    const v = el("span");
+    if(d.source.url) v.append(webLink(host(d.source.url), d.source.url)); else v.append("pasted text");
+    v.append(d.source.mode === "verbatim" ? " · verbatim" : " · rewritten");
+    row("Made from", v);
+    if(d.topic && d.topic !== "From existing content") row("Asked for", d.topic);
+  }else row("Asked for", d.topic || d.title);
   if(d.known) row("Already knew", d.known);
   if(d.instruction) row("Asked to", d.instruction);
   if(d.rewrite){
@@ -2139,7 +2177,7 @@ function metaNode(d){
 /* A piece that was asked for and never arrived: a section that was not
    written, a diagram never drawn, an image never found. Each one keeps its
    brief, so each can be filled in on its own. */
-const unfilled = b => !b.md && !b.src && (b.slot || ((b.kind === "figure" || b.kind === "image") && b.brief));
+const unfilled = b => !b.md && !b.src && (b.slot || ((b.kind === "figure" || b.kind === "image") && (b.brief || b.url)));
 const gaps = d => d.blocks.filter(unfilled);
 
 /* Where a document stands: {kind:"busy"|"live"|"stopped"|"failed"|"short"|"done", text, next?}:
@@ -2270,9 +2308,10 @@ function docToc(d, side){
 function statusWord(b){
   if(b.busy) return word(actionById(b.busy) || { label:"revising" });
   if(b.status) return b.status;
+  if(b.reading) return "reading";
   if(b.plan) return "planning";
   if(b.kind === "figure") return "drawing";
-  if(b.kind === "image") return "finding";
+  if(b.kind === "image") return b.place ? "fetching" : "finding";
   return "writing";
 }
 
@@ -2357,7 +2396,7 @@ function errNode(b){
   const d = doc;
   if(b.slot) x.appendChild(btn(null, "Retry", () => retrySection(d)));
   else if(b.kind === "figure" || b.kind === "image"){
-    if(b.brief) x.appendChild(btn(null, "Retry", () => retryVisual(d, b, true)));
+    if(b.brief || b.url) x.appendChild(btn(null, "Retry", () => retryVisual(d, b, true)));
     x.appendChild(btn(null, "Remove", () => { swapBlock(d, b.id, []); save(d); }));
   }
   else x.appendChild(btn(null, "Retry", () => build(d)));
@@ -2720,6 +2759,7 @@ function startDoc(o, background){
   const d = { id:docId(), title:o.topic, topic:o.topic, known:o.known || "", instruction:o.instruction || "",
               created:Date.now(), status:"planning", blocks:[] };
   if(o.rewrite) d.rewrite = o.rewrite;
+  if(o.source){ d.source = o.source; if(!d.topic){ d.topic = "From existing content"; d.title = isLink(o.source.input) ? o.source.input : firstLine(o.source.input); } }
   if(o.define) d.define = o.define;
   else if(BRIEFS.some(b => b.define && d.instruction.includes(b.text))) d.define = { term:o.topic };
   docs.set(d.id, d);
@@ -2736,7 +2776,31 @@ async function build(d){
   d.blocks = [{ id:uid(), kind:"prose", pending:true, plan:true, md:"" }];
   rerender(d); save(d, true);
 
-  const reader = readerText(d.known), rw = d.rewrite;
+  const reader = readerText(d.known), rw = d.rewrite, src = d.source;
+  /* Existing content is read first: a link is fetched whole, a text is
+     taken as it is. What was read stays with the primer, so a resumed
+     run does not fetch it again. */
+  if(src && !src.text){
+    d.blocks[0].reading = true; patch(d, d.blocks[0]);
+    try{
+      if(isLink(src.input)){
+        const got = await api("/api/source", { url:src.input });
+        src.text = got.md || ""; src.title = got.title || ""; src.url = got.url || src.input; src.kind = got.kind || "";
+      }else{ src.text = src.input; src.title = ""; src.kind = "text"; }
+      if(!src.text.trim()) throw new Error("Nothing readable was found there.");
+      if(src.title && (!d.topic || d.topic === "From existing content")) d.title = trimTitle(src.title, 110, d.title);
+      save(d);
+    }catch(e){
+      if(run.cancelled || e.stopped){ d.status = "stopped"; }
+      else { d.status = "failed"; d.statusNote = e.message; }
+      d.blocks = [{ id:uid(), kind:"prose", md:"", stopped: d.status === "stopped",
+        error: d.status === "stopped" ? "Stopped before the content was read." : "Couldn't read the content. " + e.message }];
+      run.active = false;
+      settle(d);
+      return;
+    }
+    delete d.blocks[0].reading; patch(d, d.blocks[0]);
+  }
   let plan;
   if(rw && rw.sections && rw.sections.length){
     plan = { title: rw.ofTitle || d.topic, sections: rw.sections };
@@ -2744,8 +2808,9 @@ async function build(d){
     plan = { title: d.topic, sections: ["Definition"] };   // the definer names it once it has read up
   }else try{
     const out = await agent(d, { role:"outline", label:"planning", block:d.blocks[0], by:"you",
-      system: sys(rw ? "rewrite_outline" : "outline"),
-      user: rw ? usr("rewrite_outline_user", { READER:reader, TOPIC:d.topic, INSTRUCTION:rw.instruction, SOURCE:rw.source })
+      system: sys(src ? "source_outline" : rw ? "rewrite_outline" : "outline"),
+      user: src ? usr("source_outline_user", { READER:reader, MODE:SOURCE_MODES[src.mode] || SOURCE_MODES.rewritten, INSTRUCTION:instrText(d), SOURCE:src.text })
+          : rw ? usr("rewrite_outline_user", { READER:reader, TOPIC:d.topic, INSTRUCTION:rw.instruction, SOURCE:rw.source })
                : usr("outline_user", { READER:reader, TOPIC:d.topic, INSTRUCTION:instrText(d) }) });
     plan = out.value; d.planCall = out.callId;
     if(!plan || !Array.isArray(plan.sections) || !plan.sections.length) throw new Error("The outline came back empty.");
@@ -2841,7 +2906,7 @@ async function writeAll(d){
     return;
   }
   if(!run.cancelled){
-    d.blocks.filter(b => (b.kind==="figure" || b.kind==="image") && b.brief && !b.md && !b.src && !b.pending)
+    d.blocks.filter(b => (b.kind==="figure" || b.kind==="image") && (b.brief || b.url) && !b.md && !b.src && !b.pending)
       .forEach(b => retryVisual(d, b, false));
   }
   await finish(d);
@@ -2910,6 +2975,7 @@ async function genSection(d, i, title, outline, reader, by){
                  SUBSECTIONS: subs.length ? "ITS SUBSECTIONS, FROM THE PLAN, EACH OPENED WITH A SUBHEADING ELEMENT:\n" + subs.map(x => "- " + x).join("\n") : "" };
   const df = d.define, role = df ? "define" : "section";
   const user = df ? usr("define_user", { READER:reader, TERM:d.topic, INSTRUCTION:instrText(d) })
+             : d.source ? usr("source_section_user", { ...vars, MODE:SOURCE_MODES[d.source.mode] || SOURCE_MODES.rewritten, SOURCE:d.source.text })
              : d.rewrite ? usr("rewrite_section_user", { ...vars, INSTRUCTION:d.rewrite.instruction, SOURCE:d.rewrite.source })
              : usr("section_user", vars);
   try{
@@ -2917,9 +2983,10 @@ async function genSection(d, i, title, outline, reader, by){
       parent: d.planCall || null, by: by || (d.planCall ? "" : "you") });
     const arr = df && value && !Array.isArray(value) ? value.blocks : value;
     const made = (Array.isArray(arr) ? arr : [])
-      .filter(x => x && (x.md || x.title || ((x.kind==="figure" || x.kind==="image") && x.brief)))
+      .filter(x => x && (x.md || x.title || ((x.kind==="figure" || x.kind==="image") && (x.brief || x.url))))
       .flatMap(x => {
         if(x.kind==="figure" && x.brief) return [{ id:uid(), kind:"figure", md:"", sec:i, brief:String(x.brief).trim(), pending:true, draw:true, by:callId }];
+        if(x.kind==="image"  && x.url)   return [{ id:uid(), kind:"image",  md:"", sec:i, url:String(x.url).trim(), caption:String(x.caption || "").trim(), pending:true, place:true, by:callId }];
         if(x.kind==="image"  && x.brief) return [{ id:uid(), kind:"image",  md:"", sec:i, brief:String(x.brief).trim(), pending:true, find:true, by:callId }];
         if(x.kind==="subheading") return [subBlock(x.title || x.md, { sec:i, by:callId })];
         return proseBlocks(x.md, { sec:i, by:callId });
@@ -2931,8 +2998,8 @@ async function genSection(d, i, title, outline, reader, by){
     const h = d.blocks.find(b => b.kind==="heading" && b.sec===i);
     if(h) delete h.checked;
     save(d);
-    made.filter(b => b.draw || b.find).forEach(b =>
-      sideLater(d, b, () => b.draw ? genFigure(d, b, title, outline, reader) : genImage(d, b, title)));
+    made.filter(b => b.draw || b.find || b.place).forEach(b =>
+      sideLater(d, b, () => b.draw ? genFigure(d, b, title, outline, reader) : b.place ? placeImage(d, b) : genImage(d, b, title)));
     if(setting("research")) sideLater(d, null, () => researchSection(d, i, ""));
   }catch(e){
     replaceSlot(d, i, [{ id:uid(), kind:"prose", md:"", sec:i, slot:true, stopped:!!e.stopped,
@@ -2978,6 +3045,7 @@ async function sideDone(run){
    to replace, the same way. */
 function heir(f){
   const h = { origin:f.origin || f.id, by:f.by, kind:f.kind, md:"", sec:f.sec, brief:f.brief };
+  if(f.url && !f.brief){ h.url = f.url; h.caption = f.caption; }
   if(f.edit) h.edit = f.edit;
   if(f.replaces) h.replaces = f.replaces;
   return h;
@@ -2985,16 +3053,17 @@ function heir(f){
 function failedVisual(d, f, e){
   return { id:uid(), ...heir(f), stopped:!!e.stopped,
     error: e.stopped ? "Stopped."
-         : (f.kind === "figure" ? "Diagram didn't come back. " : e.notFound ? "No suitable image was found. " : "The image search didn't come back. ") + e.message };
+         : (f.kind === "figure" ? "Diagram didn't come back. " : f.url && !f.brief ? "Couldn't fetch this picture. " : e.notFound ? "No suitable image was found. " : "The image search didn't come back. ") + e.message };
 }
 /* byYou: a person clicked Retry, rather than the run picking up leftovers. */
 function retryVisual(d, b, byYou){
   const { titles, outline, reader } = docContext(d);
   const p = { id:uid(), ...heir(b), pending:true, again: byYou ? "you" : "" };
-  p[b.kind === "figure" ? "draw" : "find"] = true;
+  const placed = b.kind === "image" && b.url && !b.brief;
+  p[b.kind === "figure" ? "draw" : placed ? "place" : "find"] = true;
   swapBlock(d, b.id, [p]);
   runOf(d).cancelled = false;
-  sideLater(d, p, () => (b.kind === "figure" ? genFigure(d, p, titles[b.sec] || "", outline, reader) : genImage(d, p, titles[b.sec] || ""))
+  sideLater(d, p, () => (b.kind === "figure" ? genFigure(d, p, titles[b.sec] || "", outline, reader) : placed ? placeImage(d, p) : genImage(d, p, titles[b.sec] || ""))
     .then(() => { livePaint(); tidyRun(d); }));
 }
 /* The section's prose on either side of a visual's slot. */
@@ -3060,6 +3129,22 @@ async function genImage(d, f, sectionTitle){
     save(d);
   }
 }
+/* One of the source's own pictures, fetched into the media store and put
+   where the writer placed it. Its page is the source. */
+async function placeImage(d, f){
+  try{
+    const m = await saveMedia(String(f.url));
+    const made = { id:uid(), ...heir(f), fresh:true, src:m.local, url:String(f.url), caption:f.caption || "",
+      page: d.source && d.source.url || "", title:"", credit:"", why:"" };
+    swapBlock(d, f.id, [made]);
+    save(d);
+  }catch(e){
+    swapBlock(d, f.id, [failedVisual(d, f, e)]);
+    save(d);
+  }
+}
+const isLink = s => /^https?:\/\/\S+$/i.test(String(s || "").trim());
+const firstLine = s => trimTitle(String(s || "").split(/\n/).map(x => x.trim()).find(Boolean) || "", 110, "From existing content");
 async function saveMedia(url){
   const r = await fetch("/api/media", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ url }) });
   const j = await r.json().catch(() => ({}));

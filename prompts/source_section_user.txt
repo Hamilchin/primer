@@ -1,0 +1,23 @@
+READER ALREADY KNOWS:
+{{READER}}
+
+TOPIC: {{TITLE}}
+
+THIS PRIMER IS MADE FROM AN EXISTING TEXT. {{MODE}}
+
+{{INSTRUCTION}}
+
+THE TEXT, IN FULL:
+{{SOURCE}}
+
+FULL OUTLINE OF THE PRIMER:
+{{OUTLINE}}
+
+SECTIONS ALREADY WRITTEN:
+{{PRIOR}}
+
+WRITE SECTION {{N}}: {{SECTION}}
+
+{{SUBSECTIONS}}
+
+This section covers its part of the text and no other: what earlier sections covered is written, and later sections will cover what follows.

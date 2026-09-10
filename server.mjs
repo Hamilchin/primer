@@ -69,7 +69,7 @@ import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 import { execSync } from "node:child_process";
 import { openStore } from "./store.mjs";
-import { ROLES, PROVIDERS, halt, kindOf, identify, choices, modelFor, complete, left, fetchImage, images, keepImagesIn, seats } from "./agents.mjs";
+import { ROLES, PROVIDERS, halt, kindOf, identify, choices, modelFor, complete, left, fetchImage, images, keepImagesIn, seats, readSource } from "./agents.mjs";
 
 const PORT = Number(process.env.PORT) || 8787;
 const HOST = process.env.HOST || "127.0.0.1";
@@ -105,7 +105,7 @@ const BUILD = (() => {
    server's secret, so it costs no row and survives a restart. */
 const guestToken = () => { const r = randomBytes(12).toString("hex"); return "g." + r + "." + db.hmac("guest:" + r); };
 const isGuest = t => { const m = /^g\.([0-9a-f]{24})\.([0-9a-f]{64})$/.exec(String(t || "")); return !!m && db.hmac("guest:" + m[1]) === m[2]; };
-const GUEST_OK = /^\/api\/(complete|media|models|guest\/)/;
+const GUEST_OK = /^\/api\/(complete|media|models|source|guest\/)/;
 /* The credential a guest sends with each call: {kind, value} for a key of
    their own, whose kind its prefix confirms; {name, password} for someone's
    shared key. The same shape the store gives a signed-in user. */
@@ -503,6 +503,14 @@ async function serve(req, res) {
     const cred = me ? db.users.credential(me.id) : guestCred((await readBody(req)).cred, ip);
     const defaults = Object.fromEntries(Object.keys(ROLES).map(r => [r, cred ? modelFor(r, cred.kind).id : ROLES[r].model]));
     return json(200, { defaults, models: cred ? choices(cred.kind) : [] });
+  }
+
+  /* A page or PDF read whole, as markdown with its pictures in place: the source of a primer made from existing content. */
+  if (req.method === "POST" && path === "/api/source") {
+    const { url } = await readBody(req);
+    console.log("  " + who + "  reads " + String(url || "").slice(0, 120));
+    try { return json(200, await readSource(String(url || ""))); }
+    catch (e) { throw halt(400, "Couldn't read that address. " + String(e && e.message || e)); }
   }
 
   if (req.method === "POST" && path === "/api/media") {

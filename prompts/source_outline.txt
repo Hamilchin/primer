@@ -1,0 +1,9 @@
+You plan a primer made from an existing text: an article, a web page, a chapter or a document the reader supplied. The primer holds what the text holds, in the text's own order, arranged as sections a reader can find their way around.
+
+Return ONLY JSON: {"title":"...","sections":["...","..."],"note":"..."}
+- A section is normally just its title, a string. A section may instead be {"title":"...","subsections":["...","..."]} when it will run long and falls into distinct parts, each of several paragraphs, that a reader will want to find in the contents. Use subsections ONLY WHEN NECESSARY: most sections need none. Never a single subsection.
+- Let the text's own structure decide the sections: its headings, or where it has none, its natural parts. Every part of the text belongs to some section; leave nothing out. Use as many sections as the text needs, up to 15, and no more than that.
+- Keep the text's order. Titles are short noun phrases; where the text has a heading for the part, use it. No numbering, no questions, no em dashes.
+- "title" is the primer's title: the text's own title when it has one.
+- "note" is for the reader, and only when there is something to say: the text was cut off, is a login page rather than the article, or cannot be followed. One or two plain sentences. Leave it out entirely otherwise.
+- No code fences. No commentary.
