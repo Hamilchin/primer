@@ -1116,6 +1116,7 @@ const PROMPTS = {
   /* The instructions the pen's actions send the action agent. Loaded here
      for their defaults, but edited under Actions, not on this page. */
   example:              { group:"revise",  label:"Example",  act:true },
+  clarify:              { group:"revise",  label:"Explain better", act:true },
   figure_action:        { group:"revise",  label:"Diagram",  act:true },
   define_action:        { group:"revise",  label:"Define",   act:true },
   ask:                  { group:"revise",  label:"Ask",      act:true },
@@ -1186,6 +1187,7 @@ function instrText(d){
    each block an action made and shown lowercased in the margin.          */
 const DEFAULT_ACTIONS = [
   { id:"example",  label:"Example",  kind:"prompt",   src:"example",       builtin:true },
+  { id:"clarify",  label:"Explain better", kind:"prompt", src:"clarify",    builtin:true },
   { id:"figure",   label:"Diagram",  kind:"prompt",   src:"figure_action", builtin:true },
   { id:"define",   label:"Define",   kind:"prompt",   src:"define_action", builtin:true },
   { id:"ask",      label:"Ask",      kind:"prompt",   src:"ask",    input:true, placeholder:"Ask about this…",     verb:"Ask",  builtin:true },
@@ -1234,6 +1236,15 @@ function normalizeActions(stored){
     if(vb) a.verb = String(vb).slice(0,20);
     seen.add(a.id); out.push(a);
   }
+  /* A built-in the pen gained since this list was stored joins it, at the
+     place it ships in: after the built-in that precedes it there. */
+  DEFAULT_ACTIONS.forEach((d, i) => {
+    if(seen.has(d.id)) return;
+    const before = DEFAULT_ACTIONS.slice(0, i).map(x => x.id).filter(id => seen.has(id)).pop();
+    const at = before ? out.findIndex(a => a.id === before) + 1 : 0;
+    out.splice(at, 0, { ...d, on:true });
+    seen.add(d.id);
+  });
   return out.length ? out : defaultActions();
 }
 function saveActions(){ return store.set("primer:actions", actions); }
@@ -4579,6 +4590,7 @@ const GUIDES = {
     sections: [
       { title: "The built-in actions", html: `<table>
         <tr><td>Example</td><td>Adds the smallest concrete example after the passage.</td></tr>
+        <tr><td>Explain better</td><td>Replaces the passage with a clearer explanation of the same things.</td></tr>
         <tr><td>Diagram</td><td>Draws what the passage describes. On a diagram, redraws it.</td></tr>
         <tr><td>Define</td><td>Writes a separate primer defining the term you selected, and links the words to it.</td></tr>
         <tr><td>Ask</td><td>Asks your question and answers it, as a note in the margin or in the text; asked for a change, it makes it.</td></tr>
