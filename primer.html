@@ -369,6 +369,13 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
   white-space:pre-wrap; word-break:break-word;
 }
 .block.pending .live.prose{font-family:var(--text);font-size:16px;line-height:1.55;color:var(--fg-2);white-space:pre-wrap}
+/* A revision arriving: what the agent has written so far, under the block it is working on. */
+.block.busy > .live{
+  margin:.6rem 0 0; padding:0; background:none; border:0; overflow:visible;
+  font-family:var(--mono); font-size:12.5px; line-height:1.6; color:var(--fg-3);
+  white-space:pre-wrap; word-break:break-word;
+}
+.block.busy > .live.prose{font-family:var(--text);font-size:16px;line-height:1.55;color:var(--fg-2)}
 .block.pending[data-kind="figure"] .body,.block.pending[data-kind="image"] .body{min-height:3.2em}
 .block.pending .brief{margin:0;font-size:14px;color:var(--fg-3)}
 
@@ -1256,6 +1263,7 @@ const BRIEFS = [
   { label:"With derivations",text:"Derive every result step by step instead of stating it, saying what justifies each step." },
   { label:"Worked examples", text:"Give every idea a concrete worked example with real numbers." },
   { label:"Rigorous",        text:"Be precise: exact definitions, stated assumptions, and proofs or proof sketches for the central results." },
+  { label:"Simplify",        text:"As simple as it can be: plain words, short sentences, one idea at a time, every term explained the first time it appears, and an everyday analogy wherever one fits." },
   { label:"With diagrams",   text:"Make it highly visual: a diagram, plot or figure in every section, wherever a structure, a relationship or a quantity is clearer seen than said, and real images where a real artifact beats a drawing." },
   { label:"No pictures",     text:"Text only. Do not request any diagrams or images." }
 ];
@@ -2380,6 +2388,7 @@ function blockEl(b, n){
     if(b.cites && b.cites.length) addCites(body, b.cites);
   }
   e.appendChild(body);
+  if(b.busy && b.live) e.appendChild(livePre(b));
   if(b.kind === "heading" && b.fail && !readonly()){
     const x = el("div", "err", b.fail);
     x.appendChild(btn(null, "Retry", () => researchSection(doc, b.sec, "you")));
@@ -2731,8 +2740,9 @@ function liveInto(d, b){
       if(route !== "doc" || doc !== d || !d.blocks.includes(b)) return;
       const body = main.querySelector(`[data-block-id="${b.id}"] .body`);
       if(!body) return;
-      const old = body.querySelector(".live"), fresh = livePre(b);
-      if(old) old.replaceWith(fresh); else body.appendChild(fresh);
+      const host = b.busy ? body.parentElement : body;
+      const old = host.querySelector(":scope > .live"), fresh = livePre(b);
+      if(old) old.replaceWith(fresh); else host.appendChild(fresh);
     });
   };
 }
@@ -3367,13 +3377,13 @@ async function applyEdit(blockId, act, question){
   const secLabel = target.sec != null ? " §" + (target.sec + 1) : "";
   const words = !!(own && sel.text);
   const stamp = { label:a.label, note:question || "", quote: words ? highlighted : highlighted.slice(0, 220), whole: !words, blocks: spanned.map(b => b.id), ts:Date.now() };
-  const unbusy = () => { target.busy = false; delete target.hl; inFlight--; clearHighlight(); };
+  const unbusy = () => { target.busy = false; delete target.hl; target.live = ""; inFlight--; clearHighlight(); };
   const undone = () => { if(doc === d) undoStack.pop(); patch(d, target); toolsPaint(); tidyRun(d); livePaint(); };
   const finished = () => { livePaint(); if(!done.queued) tidyRun(d); };
 
   let out, callId, done;
   try{
-    ({ value:out, callId } = await agent(d, { role:"action", label: word(a) + secLabel, sec:target.sec, system:sys("action"), user, by:"you", model:a.model }));
+    ({ value:out, callId } = await agent(d, { role:"action", label: word(a) + secLabel, sec:target.sec, block:target, system:sys("action"), user, by:"you", model:a.model }));
   }catch(e){ unbusy(); return undone(); }
   unbusy();
   const changes = Array.isArray(out) ? out : Array.isArray(out && out.changes) ? out.changes : [];
