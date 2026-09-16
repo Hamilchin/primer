@@ -17,7 +17,7 @@
 //   shares     a frozen copy of a primer, readable by anyone with the id
 //   share_media  the image files a public primer or a share refers to, so
 //              they can be served to a reader who is not signed in
-//   meta       the server's own few facts: its secret, its invite code
+//   meta       the server's own few facts: its secret
 //
 // Passwords are scrypt hashes. A key's value is encrypted with a secret that
 // is generated once and kept in meta, or given as PRIMER_SECRET. Nothing
@@ -124,7 +124,6 @@ export function openStore(dir) {
     return v;
   };
   const secret = process.env.PRIMER_SECRET || meta("secret", () => randomBytes(32).toString("hex"));
-  const invite = process.env.INVITE || meta("invite", () => randomBytes(4).toString("hex"));
   const aesKey = createHash("sha256").update(secret).digest();
 
   /* ── passwords ── */
@@ -181,7 +180,6 @@ export function openStore(dir) {
   };
 
   return {
-    invite,
     users: {
       create(name, password) {
         if (q.userByName.get(name)) throw new Error("That name is taken.");

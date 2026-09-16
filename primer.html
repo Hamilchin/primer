@@ -132,9 +132,8 @@ main{padding:1.5rem var(--gutter) 8rem}
   resize:none; overflow:hidden;
 }
 .field:focus{outline:none;border-color:var(--accent)}
-.field + .lab,.field + .more,.invite + .lab{margin-top:1.4rem}
+.field + .lab,.field + .more{margin-top:1.4rem}
 .login .composer-foot{display:flex;gap:1.5rem;align-items:center}
-.invite{margin-top:1.4rem}
 .login .title{margin-bottom:1.8rem}
 .oops{font-size:14px;line-height:1.5;color:var(--accent);margin:1rem 0 0}
 .login .guest{margin:1.6rem 0 0;font-size:14px;line-height:1.5;color:var(--fg-3)}
@@ -1848,7 +1847,7 @@ function aboutPaint(){
 /* Redraw or patch only when the document is the one on screen. */
 function rerender(d){ popLive(d); if(doc === d && route === "doc") render(); }
 
-/* ── sign in, or make an account with the invite code ── */
+/* ── sign in, or make an account ── */
 function renderLogin(){
   const c = el("section", "cover login");
   c.innerHTML = `<form id="loginForm">
@@ -1857,10 +1856,6 @@ function renderLogin(){
       <input id="lName" class="field" autocomplete="username" autocapitalize="off" spellcheck="false">
       <label class="lab" for="lPass">Password</label>
       <input id="lPass" class="field" type="password" autocomplete="current-password">
-      <div class="invite" hidden>
-        <label class="lab" for="lInvite">Invite code</label>
-        <input id="lInvite" class="field" autocomplete="off" autocapitalize="off" spellcheck="false">
-      </div>
       <p class="oops" hidden></p>
       <div class="composer-foot">
         <button class="go" type="submit">Sign in<kbd>↵</kbd></button>
@@ -1869,7 +1864,7 @@ function renderLogin(){
       <p class="guest"><button class="act asGuest" type="button">Continue as a guest</button> A guest's primers and prompt edits are kept only in this browser.</p>
     </form>`;
   main.replaceChildren(c);
-  const form = $("#loginForm"), name = $("#lName"), pass = $("#lPass"), invite = $("#lInvite"),
+  const form = $("#loginForm"), name = $("#lName"), pass = $("#lPass"),
         oops = c.querySelector(".oops"), go = c.querySelector(".go"), sw = c.querySelector(".swap"), title = c.querySelector(".title");
   c.querySelector(".asGuest").onclick = () => enterGuest();
   let creating = false;
@@ -1877,16 +1872,15 @@ function renderLogin(){
     title.textContent = creating ? "Create an account" : "Sign in";
     go.firstChild.textContent = creating ? "Create" : "Sign in";
     sw.textContent = creating ? "Sign in instead" : "Create an account";
-    c.querySelector(".invite").hidden = !creating;
     pass.autocomplete = creating ? "new-password" : "current-password";
     oops.hidden = true;
   };
-  sw.onclick = () => { creating = !creating; mode(); (creating ? invite : name).focus(); };
+  sw.onclick = () => { creating = !creating; mode(); name.focus(); };
   form.onsubmit = async e => {
     e.preventDefault();
     go.disabled = true; oops.hidden = true;
     try{
-      me = await api(creating ? "/api/signup" : "/api/login", { name:name.value.trim(), password:pass.value, invite:invite.value.trim() });
+      me = await api(creating ? "/api/signup" : "/api/login", { name:name.value.trim(), password:pass.value });
       await enter();
     }catch(err){ oops.textContent = err.message; oops.hidden = false; go.disabled = false; }
   };

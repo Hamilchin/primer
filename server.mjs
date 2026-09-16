@@ -19,9 +19,8 @@
 // on the caller's key when nothing is chosen, and what that key can run.
 // The agents themselves, the models and the kinds of key are in agents.mjs.
 //
-// Accounts: POST /api/signup {name,password,invite}, /api/login, /api/logout,
-// GET /api/me. Signing up needs the invite code, which is printed at boot
-// (or set INVITE). Everything the page stores goes through
+// Accounts: POST /api/signup {name,password}, /api/login, /api/logout,
+// GET /api/me. Everything the page stores goes through
 // GET/PUT/DELETE /api/store/:key, per user.
 //
 // Keys: every call runs on a named key, added in Settings: a Claude
@@ -53,14 +52,14 @@
 // lists its frozen links, DELETE /api/share/:id removes one.
 //
 // Environment (all optional):
-//   PORT=8787  HOST=127.0.0.1  DATA_DIR=./data  INVITE=...  PRIMER_SECRET=...  ADMIN=name,name
+//   PORT=8787  HOST=127.0.0.1  DATA_DIR=./data  PRIMER_SECRET=...  ADMIN=name,name
 // No model credential comes from the environment: keys are added in Settings,
 // and each key's provider runs the agents' web searches on it.
 //
 // Setup:
 //   npm install
 //   npm i -g @anthropic-ai/claude-code        (runs a subscription's calls)
-//   npm start                                 (prints the invite code)
+//   npm start
 
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
@@ -223,7 +222,6 @@ createServer(async (req, res) => {
   }
 }).listen(PORT, HOST, () => {
   console.log(`Primer  →  http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}`);
-  console.log(`Invite code for new accounts: ${db.invite}`);
   console.log("Calls run on named keys added in Settings; no model credential is read from the environment.");
   if (!process.env.PRIMER_SECRET) console.log("No PRIMER_SECRET: stored keys are encrypted with a secret kept in the database itself. Set PRIMER_SECRET so a leaked data directory can't be decrypted.");
 });
@@ -254,7 +252,6 @@ async function serve(req, res) {
       guard("signup:" + ip, 8);
       if (!NAME.test(name)) throw halt(400, "A username is 2 to 32 letters, digits, dots, dashes or underscores.");
       if (password.length < 8) throw halt(400, "A password is at least 8 characters.");
-      if (String(b.invite || "").trim() !== db.invite) { strike("signup:" + ip); throw halt(403, "That invite code isn't right."); }
       try { user = db.users.create(name, password); } catch (e) { throw halt(409, e.message); }
     } else {
       guard("login:" + ip, 40); guard("login:" + name, 8);
