@@ -56,6 +56,8 @@
 // No model credential comes from the environment: keys are added in Settings,
 // and each key's provider runs the agents' web searches on it.
 //
+// Everything printed is also kept in DATA_DIR/primer.log (see LOG below).
+//
 // Setup:
 //   npm install
 //   npm i -g @anthropic-ai/claude-code        (runs a subscription's calls)
@@ -63,6 +65,8 @@
 
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
+import { appendFileSync, existsSync, renameSync, statSync } from "node:fs";
+import { format } from "node:util";
 import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -77,6 +81,25 @@ const ROOT = new URL("./", import.meta.url);
 const MEDIA = pathToFileURL(DATA + "/media/");
 const db = openStore(DATA);
 keepImagesIn(MEDIA);
+/* Fly keeps only a short buffer of what a machine prints, so every line
+   is also appended to DATA/primer.log, timestamped. Past LOG_MAX bytes the
+   file becomes primer.log.1 (replacing the last one) and a fresh one starts:
+   at most twice LOG_MAX on disk, and a day's lines are never split from
+   their neighbours by more than one file. Read it with
+   `fly ssh console -C "tail -n 200 /data/primer.log"`. */
+const LOG = DATA + "/primer.log", LOG_MAX = 5 << 20;
+let logged = existsSync(LOG) ? statSync(LOG).size : 0;
+for (const name of ["log", "warn", "error"]) {
+  const out = console[name].bind(console);
+  console[name] = (...args) => {
+    out(...args);
+    const line = new Date().toISOString() + (name === "log" ? "  " : "  " + name + "  ") + format(...args) + "\n";
+    try {
+      if (logged > LOG_MAX) { renameSync(LOG, LOG + ".1"); logged = 0; }
+      appendFileSync(LOG, line); logged += line.length;
+    } catch {}
+  };
+}
 /* Which build this is, for the report the Inspector copies: on Fly the
    deployment's tag from the image reference; at home the commit. */
 /* If the machine is so starved that this loop cannot run, nothing it

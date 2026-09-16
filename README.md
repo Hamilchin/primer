@@ -28,6 +28,11 @@ primers stay in their browser.
 Needs Node 22.13+. Everything is kept in `data/`; back that up and you have
 backed up Primer.
 
+The server's log is also appended to `data/primer.log` (rotated once past
+5 MB into `primer.log.1`), since Fly keeps only a short buffer of it:
+
+    fly ssh console -C "tail -n 200 /data/primer.log"
+
 ## Host it
 
 `HOST=0.0.0.0 npm start` behind a reverse proxy, or on Fly.io with the
