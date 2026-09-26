@@ -26,6 +26,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
+import { Resvg } from "@resvg/resvg-js";
 import { parseHTML } from "linkedom";
 import { Readability } from "@mozilla/readability";
 import TurndownService from "turndown";
@@ -43,7 +44,7 @@ export const ROLES = {
   outline:  { model: "claude-sonnet-4-6", thinking: false },
   section:  { model: "claude-sonnet-4-6", thinking: false },
   action:   { model: "claude-fable-5-1", maxTurns: 12, tools: ["web_search", "fetch_page"] },
-  figure:   { model: "claude-fable-5" },
+  figure:   { model: "claude-opus-5-5", maxTurns: 8, tools: ["render_svg"] },
   finder:   { model: "claude-sonnet-4-6", maxTurns: 24, effort: "low", tools: ["search_images", "web_search", "fetch_page", "look_at_image"] },
   research: { model: "claude-sonnet-4-6", maxTurns: 40, tools: ["web_search", "fetch_page"] },
   define:   { model: "claude-sonnet-4-6", maxTurns: 12, tools: ["web_search", "fetch_page"] }
@@ -57,6 +58,7 @@ const MODELS = [
   { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", anthropic: "claude-sonnet-4-6", openrouter: "anthropic/claude-sonnet-4.6" },
   { id: "claude-sonnet-5",   name: "Claude Sonnet 5",   anthropic: "claude-sonnet-5",   openrouter: "anthropic/claude-sonnet-5" },
   { id: "claude-opus-5",     name: "Claude Opus 5",     anthropic: "claude-opus-5",     openrouter: "anthropic/claude-opus-5" },
+  { id: "claude-opus-5-5",   name: "Claude Opus 5.5",   anthropic: "claude-opus-5-5",   openrouter: "anthropic/claude-opus-5.5" },
   { id: "claude-fable-5",    name: "Claude Fable 5",    anthropic: "claude-fable-5",    openrouter: "anthropic/claude-fable-5" },
   { id: "claude-fable-5-1",  name: "Claude Fable 5.1",  anthropic: "claude-fable-5-1",  openrouter: "anthropic/claude-fable-5.1" },
   { id: "gpt-6-astra",       name: "GPT-6 Astra",       openai: "gpt-6-astra",   openrouter: "openai/gpt-6-astra" },
@@ -518,6 +520,20 @@ async function contactSheet(phrase, lang) {
   return { parts };
 }
 
+/* An SVG as a picture, for the illustrator to look at its own drawing:
+   black on white at twice the viewBox, with the one font the diagrams
+   use bundled so labels render the same on the server as on the page. */
+const FONT = new URL("./fonts/IBMPlexMono-Regular.ttf", import.meta.url).pathname;
+function renderSvg(svg) {
+  if (!/<svg[\s>]/i.test(svg)) throw new Error("That is not an SVG: it has no <svg> element.");
+  if (svg.length > 400000) throw new Error("The SVG is over 400,000 characters; simplify it.");
+  const r = new Resvg(svg, {
+    background: "#ffffff", fitTo: { mode: "zoom", value: 2 },
+    font: { loadSystemFonts: false, fontFiles: [FONT], defaultFontFamily: "IBM Plex Mono", monospaceFamily: "IBM Plex Mono" }
+  });
+  return { png: r.render().asPng(), width: r.width, height: r.height };
+}
+
 /* ── tools ──────────────────────────────────────────────────────
    Our own, defined once, in the shape both SDKs can be given. Each answers
    {text}, or {text, image, type} with the image as base64, or {parts}, a
@@ -535,6 +551,16 @@ const TOOLS = {
     description: "Read a web page as plain text, up to 40,000 characters. Each picture on the page is kept where it stands as [image: URL] with its alt text, so a page's captions lead to its files. A JSON page is returned as it is.",
     input: { url: z.string().describe("The page's URL") },
     run: async ({ url }) => ({ text: await readPage(url) })
+  },
+  render_svg: {
+    description: "Render an SVG and look at the picture, to see the diagram as a reader will before answering with it. " +
+      "Takes the whole <svg>...</svg> and shows it at twice its size, drawn in black on white with the same monospace font the page uses. " +
+      "Check that no label overlaps a shape or another label, nothing runs past the edge, and the drawing shows what the brief asks.",
+    input: { svg: z.string().describe("The complete SVG markup") },
+    run: async ({ svg }) => {
+      const { png, width, height } = renderSvg(String(svg || ""));
+      return { text: "Rendered, " + width + " by " + height + " in the viewBox's units.", image: png.toString("base64"), type: "image/png" };
+    }
   },
   look_at_image: {
     description: "Download an image file and look at it, to judge a candidate before choosing it. " +
@@ -555,6 +581,7 @@ const TOOLS = {
 const BUDGET = {
   search_images: { max: 8, then: "You have searched Commons eight times, the most allowed. Choose from what you have seen, look elsewhere, or answer found:false." },
   look_at_image: { max: 6, then: "You have looked at six candidates, the most allowed. Answer now: the best of those you saw, or found:false." },
+  render_svg: { max: 5, then: "You have rendered five times, the most allowed. Answer now with the best version you have drawn." },
   fetch_page: { max: 20, then: "You have read twenty pages, the most allowed. Answer now with the best candidate you have looked at, or found:false." }
 };
 const attempt = (name, t, input, spent) => {
@@ -645,8 +672,9 @@ function watchdog(abort) {
   return w;
 }
 function brief(content) {
-  const s = typeof content === "string" ? content
-    : (Array.isArray(content) ? content : []).map(c => c.type === "text" ? c.text : "[" + c.type + "]").join(" ");
+  const s = (typeof content === "string" ? content
+    : (Array.isArray(content) ? content : []).map(c => c.type === "text" ? c.text : "[" + c.type + "]").join(" "))
+    .replace(/\s*\[Image: source: [^\]]*\]/g, "");   // where Claude Code put the picture on disk is not news
   return s.length > 400 ? s.slice(0, 400) + "…" : s;
 }
 const FATAL = new Set(["billing_error", "authentication_failed", "rate_limit"]);

@@ -2,6 +2,11 @@ You draw one explanatory diagram as inline SVG, with a caption.
 
 Return ONLY JSON: {"blocks":[{"kind":"figure","md":"<svg ...>...</svg>","caption":"..."}]}
 
+Look before you answer:
+- Draw the SVG, then call render_svg with it and look at the picture, as a reader will see it.
+- Fix what you see: a label crossing a line or another label, anything past the edge, arrows that miss their targets, spacing that hides the structure. Render again until it is right; a second look is usually enough.
+- Answer with the final SVG, the one you last rendered, in the JSON above. Nothing but the JSON in the answer.
+
 Caption:
 - One short phrase or sentence saying what the diagram shows. Plain text; $inline$ math is allowed.
 - Never use an em dash, in the caption or any label.

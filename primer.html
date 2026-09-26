@@ -158,6 +158,12 @@ main{padding:1.5rem var(--gutter) 8rem}
 .chip{color:var(--fg-2);text-decoration:underline;text-decoration-thickness:1px;text-decoration-color:var(--rule-2);text-underline-offset:3px}
 .chip:hover{color:var(--fg);text-decoration-color:currentColor}
 .chip.on{color:var(--accent);text-decoration-color:currentColor}
+/* Editing a chip's text: its field under the chips, a Reset while it differs from the shipped one. */
+.chip-edit{margin-top:.8rem}
+.chip-edit .field{margin:0}
+.chip-edit .acts{display:flex;gap:1.2rem;margin-top:.45rem;font-size:13px}
+.chip-edit .acts .reset{display:none}
+.chip-edit.mod .acts .reset{display:inline}
 .composer-foot{margin-top:1.75rem}
 .go{
   font-size:14px; font-weight:500; color:var(--bg); background:var(--fg);
@@ -353,7 +359,15 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
   right:calc(100% + .75rem - 5px); padding:0 5px; box-sizing:content-box; background-clip:content-box;
   pointer-events:auto; cursor:pointer; border:0;
 }
-.block.edited:hover .bar,.block.edited .bar:hover{background-color:var(--accent)}
+.block.edited .bar.lit{background-color:var(--accent)}
+/* The blocks one request made share one rule: each after the first reaches
+   up across the gap to meet the one before, and only the first carries the
+   word in the margin. The gap is a heading's own top margin, else the
+   margin under the block before. */
+.block.edited.cont .bar{top:calc(-1 * var(--gap, 1rem) - .2em)}
+.block[data-kind="heading"].edited.cont .bar{--gap:2.6rem}
+.block[data-kind="subheading"].edited.cont .bar{--gap:1.9rem}
+.block[data-kind="subheading"] + .block.edited.cont:not([data-kind="heading"]):not([data-kind="subheading"]) .bar{--gap:.55rem}
 .block.busy::before{background:var(--accent);animation:pulse 1.6s ease-in-out infinite}
 .block.pending::before{background:var(--rule)}
 .status{color:var(--fg-3)}
@@ -407,6 +421,7 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 .more-form .lab{grid-column:1 / -1;margin:0}
 .more-form .field{margin:0}
 .more-form + .colophon{margin-top:1.4rem}
+.more-form + .more-form{margin-top:1.6rem}
 .colophon .fill{flex:1}
 .colophon button{color:var(--fg-2)}
 .colophon button:hover{color:var(--accent)}
@@ -760,7 +775,7 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
   html,body{background:#fff;color:#000}
   body{font-size:10.5pt;line-height:1.5}
   .head,.pen,.pop,.toast,.marg,.side-q,.side-toc,.doc-bar,.status-row,.doc-tools,.doc-foot,
-  .colophon button,.colophon .confirm,.err button{display:none!important}
+  .meta,.more-form,.colophon,.err button{display:none!important}
   main{padding:0}
   .doc{max-width:none;margin:0;padding-bottom:0!important}
   .title{font-size:22pt}
@@ -1100,6 +1115,8 @@ const PROMPTS = {
   instruction:          { group:"base",    label:"Instructions wrapper", user:true },
   outline:              { group:"write",   label:"Outline" },
   outline_user:         { group:"write",   label:"Outline · user", user:true },
+  extend:               { group:"write",   label:"Outline, adding to a primer" },
+  extend_user:          { group:"write",   label:"Adding · user", user:true },
   section:              { group:"write",   label:"Section" },
   section_user:         { group:"write",   label:"Section · user", user:true },
   figure:               { group:"write",   label:"Illustrator" },
@@ -1147,6 +1164,7 @@ async function loadPrompts(){
 }
 
 let overrides = {};   // {key: text} from storage
+let briefs = {};      // {chip label: text} a reader rewrote, from storage
 function rawPrompt(k){ return (k in overrides) ? overrides[k] : PROMPTS[k].text; }
 
 /* {{KEY}} → vars.KEY. Unknown keys are left visible. Blank runs collapse. */
@@ -1277,6 +1295,11 @@ const BRIEFS = [
   { label:"With diagrams",   text:"Make it highly visual: a diagram, plot or figure in every section, wherever a structure, a relationship or a quantity is clearer seen than said, and real images where a real artifact beats a drawing." },
   { label:"No pictures",     text:"Text only. Do not request any diagrams or images." }
 ];
+
+/* A chip's text as the reader left it; its shipped text stays in `base`. */
+function applyBriefs(){
+  BRIEFS.forEach(b => { if(b.base == null) b.base = b.text; b.text = typeof briefs[b.label] === "string" && briefs[b.label].trim() ? briefs[b.label] : b.base; });
+}
 
 /* Ways to rewrite a primer as a new one. Each becomes a row in the Rewrite
    menu; text is the instruction the planner and writer follow. An entry may
@@ -1931,10 +1954,36 @@ function renderCover(){
   });
 
   /* A chip appends its instruction, so several can be combined, and clicking
-     one again takes it back off. */
+     one again takes it back off. With Edit on, clicking a chip opens its
+     text instead, to be rewritten; the change is kept for this reader. */
   const chips = $("#cChips");
+  let editing = false, editor = null;
+  const closeEditor = () => { if(editor){ editor.remove(); editor = null; } };
+  const openEditor = (p, chip) => {
+    closeEditor();
+    editor = el("div", "chip-edit");
+    const lab = el("label", "lab", p.label); lab.htmlFor = "chipText";
+    const ta = el("textarea", "field"); ta.id = "chipText"; ta.rows = 1; ta.value = p.text; ta.spellcheck = false;
+    const acts = el("div", "acts"), rst = btn("act reset", "Reset"), done = btn("act", "Done");
+    acts.append(rst, done);
+    editor.append(lab, ta, acts);
+    const mark = () => editor.classList.toggle("mod", ta.value !== p.base);
+    /* The new text takes the old one's place in the field too, where it was on. */
+    const take = text => {
+      const was = p.text; p.text = text; chip.dataset.text = text; chip.title = text;
+      if(was !== text && instr.value.includes(was)){ instr.value = instr.value.replace(was, text); instr.dispatchEvent(new Event("input")); }
+      if(text === p.base) delete briefs[p.label]; else briefs[p.label] = text;
+      return store.set("primer:briefs", briefs);
+    };
+    let t = null;
+    ta.oninput = () => { grow(ta); mark(); clearTimeout(t); t = setTimeout(() => { if(ta.value.trim()) take(ta.value); }, 350); };
+    rst.onclick = () => { ta.value = p.base; grow(ta); mark(); clearTimeout(t); take(p.base); };
+    done.onclick = () => { clearTimeout(t); if(ta.value.trim()) take(ta.value); closeEditor(); };
+    chips.after(editor); grow(ta); mark(); ta.focus();
+  };
   BRIEFS.forEach(p => {
     const b = btn("chip", p.label, () => {
+      if(editing){ openEditor(p, b); return; }
       const has = instr.value.includes(p.text);
       const rest = instr.value.split(/\n+/).map(s => s.trim()).filter(s => s && s !== p.text);
       instr.value = (has ? rest : rest.concat(p.text)).join("\n");
@@ -1944,8 +1993,11 @@ function renderCover(){
     b.dataset.text = p.text; b.title = p.text;
     chips.append(b);
   });
+  const edit = btn("chip edit", "Edit", () => { editing = !editing; edit.classList.toggle("on", editing); if(!editing) closeEditor(); });
+  edit.title = "Rewrite what a chip says";
+  chips.append(edit);
   instr.addEventListener("input", () =>
-    chips.querySelectorAll(".chip").forEach(c => c.classList.toggle("on", instr.value.includes(c.dataset.text))));
+    chips.querySelectorAll(".chip:not(.edit)").forEach(c => c.classList.toggle("on", instr.value.includes(c.dataset.text))));
 
   /* What was typed stays put through a trip to Settings or a reload of the
      tab, until a primer is started from it. */
@@ -2083,9 +2135,9 @@ function renderDoc(){
   }
 
   let n = 0, m = 0, fi = 0;
-  doc.blocks.forEach(b => {
+  doc.blocks.forEach((b, i) => {
     if(b.kind === "heading"){ n++; m = 0; } else if(b.kind === "subheading") m++;
-    const e = blockEl(b, b.kind === "subheading" ? n + "." + m : n);
+    const e = blockEl(b, b.kind === "subheading" ? n + "." + m : n, doc, i);
     if(e.classList.contains("fresh")) e.style.setProperty("--i", fi++);
     a.appendChild(e);
   });
@@ -2093,7 +2145,7 @@ function renderDoc(){
     const foot = el("div", "doc-foot"); foot.append(barNode(doc), metaNode(doc)); a.appendChild(foot);
   }
   if(!doc.blocks.some(b => b.pending) && doc.blocks.some(b => b.kind==="heading")){
-    if(route === "doc") a.appendChild(moreNode(doc));
+    if(route === "doc") a.append(extendNode(doc), moreNode(doc));
     a.appendChild(colophon());
   }
   main.replaceChildren(a);
@@ -2328,14 +2380,28 @@ function statusWord(b){
   return "writing";
 }
 
-function blockEl(b, n){
+/* The blocks one request made, stamped alike, read as one revision. */
+const inRun = x => !!(x && x.edit && x.kind !== "note");
+const sameRun = (a, b) => inRun(a) && inRun(b) && a.edit.ts === b.edit.ts;
+const markable = x => !!x && x.kind !== "heading" && x.kind !== "subheading" && x.kind !== "note";
+/* The word in the margin goes on the first block of a request that can
+   carry one; whether an earlier block of the same request already does. */
+function markedBefore(d, i){
+  for(let k = i - 1; k >= 0 && sameRun(d.blocks[k], d.blocks[i]); k--) if(markable(d.blocks[k])) return true;
+  return false;
+}
+/* `d` and `i` place the block among its neighbours, for the rule it may continue. */
+function blockEl(b, n, d, i){
+  if(d && i == null) i = d.blocks.indexOf(b);
+  const prev = d && i > 0 ? d.blocks[i - 1] : null;
   const e = el("div", "block");
   e.dataset.blockId = b.id;
   e.dataset.kind = b.kind || "prose";
   if(b.busy) e.classList.add("busy");
   if(b.fresh) e.classList.add("fresh");
   if(b.pending) e.classList.add("pending");
-  if(b.edit && b.kind !== "note") e.classList.add("edited");
+  const cont = sameRun(prev, b);
+  if(inRun(b)){ e.classList.add("edited"); e.dataset.run = b.edit.ts; if(cont) e.classList.add("cont"); }
   b.fresh = false;
 
   if(b.kind === "heading" || b.kind === "subheading"){
@@ -2347,7 +2413,7 @@ function blockEl(b, n){
     s.appendChild(el("i", "dot"));
     s.append(statusWord(b));
     e.appendChild(s);
-  }else if(b.edit && b.kind !== "note" && b.kind !== "heading" && b.kind !== "subheading"){
+  }else if(b.edit && markable(b) && !(cont && markedBefore(d, i))){
     const m = btn("marg mark", word(b.edit));
     m.setAttribute("aria-label", b.edit.label + ", revision");
     m.onclick = ev => { ev.stopPropagation(); showPop(m, provNodes(b)); };
@@ -2367,6 +2433,10 @@ function blockEl(b, n){
     bar.onclick = ev => { ev.stopPropagation(); showPop(bar, provNodes(b)); };
     askedOnHover(bar, e, b);
     e.appendChild(bar);
+    /* Hovering any block of the request lights the whole rule. */
+    const light = on => main.querySelectorAll(`.block[data-run="${b.edit.ts}"] .bar`).forEach(x => x.classList.toggle("lit", on));
+    e.addEventListener("mouseenter", () => light(true));
+    e.addEventListener("mouseleave", () => light(false));
   }
 
   const body = el("div", "body");
@@ -2472,6 +2542,66 @@ function addCites(body, cites){
   });
 }
 
+/* At the foot of a finished primer, more of it: what it should also cover,
+   planned as sections after the last and written in turn, with everything
+   already written in view. */
+function extendNode(d){
+  const f = el("form", "more-form");
+  const lab = el("label", "lab", "Add to this primer"); lab.htmlFor = "extendAsk";
+  const t = el("textarea", "field"); t.id = "extendAsk"; t.rows = 1; t.placeholder = "What it should also cover";
+  t.oninput = () => grow(t);
+  t.onkeydown = e => { if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); f.requestSubmit(); } };
+  const go = btn("go", "Add"); go.type = "submit";
+  f.append(lab, t, go);
+  f.onsubmit = e => {
+    e.preventDefault();
+    const ask = t.value.trim(); if(!ask){ t.focus(); return; }
+    if(me && !me.key){ goto("settings"); toast("Add a key, or link to a shared one, first"); return; }
+    extendDoc(d, ask);
+  };
+  return f;
+}
+/* Plan the sections the request calls for, after the ones there are, then
+   write them the way the primer was written. The request stays on each
+   new heading, so its writer knows what was asked. */
+async function extendDoc(d, ask){
+  if(running(d)) return;
+  if(await heldElsewhere(d.id)){ elsewhere.add(d.id); toast("Another tab is writing this primer."); livePaint(); return; }
+  elsewhere.delete(d.id); unschedule(d); unqueue(d.id); delete d.halt; d.tries = 0;
+  const run = runOf(d); run.cancelled = false; run.active = true; run.auto = false; takeLease(d);
+  d.status = "planning"; d.statusNote = "";
+  const n0 = d.blocks.filter(b => b.kind === "heading").length;
+  const ph = { id:uid(), kind:"prose", pending:true, plan:true, md:"", sec:n0 };
+  d.blocks.push(ph);
+  rerender(d); save(d, true);
+  const { outline, reader } = docContext(d);
+  try{
+    const out = await agent(d, { role:"outline", label:"planning more", block:ph, by:"you", system:sys("extend"),
+      user: usr("extend_user", { READER:reader, TITLE:d.title, OUTLINE:outline, INSTRUCTION:instrText(d), ASK:ask }) });
+    const secs = out.value && Array.isArray(out.value.sections) ? out.value.sections : [];
+    if(!secs.length) throw new Error("The plan came back empty.");
+    d.blocks = d.blocks.filter(b => b !== ph);
+    secs.forEach((raw, j) => {
+      const o = raw && typeof raw === "object" ? raw : { title:raw };
+      const title = trimTitle(o.title, 72, "Section " + (n0 + j + 1));
+      const subs = (Array.isArray(o.subsections) ? o.subsections : [])
+        .map(x => trimTitle(x && typeof x === "object" ? x.title : x, 72, "")).filter(Boolean);
+      const h = { id:uid(), kind:"heading", md:"## " + title, sec:n0 + j, fresh:true, ask };
+      if(subs.length > 1) h.subs = subs;
+      d.blocks.push(h);
+      d.blocks.push({ id:uid(), kind:"prose", pending:true, queued:true, md:"", sec:n0 + j, slot:true });
+    });
+  }catch(e){
+    d.blocks = d.blocks.filter(b => b !== ph);
+    d.status = e.stopped ? "stopped" : "done"; d.statusNote = "";
+    run.active = false;
+    settle(d);
+    if(!e.stopped) toast("Couldn't plan the addition. " + e.message, { err:true });
+    return;
+  }
+  await writeAll(d);
+}
+
 /* At the foot of a finished primer, the next one: a related topic, written
    for a reader who has just read this one. What they already knew, and what
    this primer covered, go with it. */
@@ -2521,8 +2651,11 @@ function patch(d, b){
   if(doc !== d || route !== "doc") return;
   const old = main.querySelector(`[data-block-id="${b.id}"]`);
   if(!old) return render();
-  const fresh = blockEl(b, numberOf(d, b));
+  const i = d.blocks.indexOf(b), next = d.blocks[i + 1];
+  const fresh = blockEl(b, numberOf(d, b), d, i);
   old.replaceWith(fresh);
+  const ne = next && main.querySelector(`[data-block-id="${next.id}"]`);
+  if(ne) ne.classList.toggle("cont", sameRun(b, next));
   typeset(fresh);
   layoutSidenotes();
   rehighlight();
@@ -2893,6 +3026,7 @@ async function resumeByHand(d){
    back through here and writes what is missing in order.               */
 async function writeAll(d){
   const run = runOf(d); run.cancelled = false; run.active = true; takeLease(d);
+  d.blocks = d.blocks.filter(b => !(b.plan && b.sec != null));   // an addition's plan that never landed
   const { titles, outline, reader } = docContext(d);
   d.status = "writing"; d.statusNote = "";
   save(d); livePaint();
@@ -2986,7 +3120,8 @@ async function genSection(d, i, title, outline, reader, by){
   if(!slot) return;
   const h0 = d.blocks.find(b => b.kind==="heading" && b.sec===i), subs = (h0 && h0.subs) || [];
   const vars = { READER:reader, TITLE:d.title, OUTLINE:outline, N:i+1, SECTION:title,
-                 PRIOR: priorText(d, i) || "(none yet)", INSTRUCTION: instrText(d),
+                 PRIOR: priorText(d, i) || "(none yet)",
+                 INSTRUCTION: instrText(d) + (h0 && h0.ask ? "\n\nTHIS SECTION WAS ADDED AFTER THE PRIMER WAS READ, AT THE READER'S REQUEST: " + h0.ask : ""),
                  SUBSECTIONS: subs.length ? "ITS SUBSECTIONS, FROM THE PLAN, EACH OPENED WITH A SUBHEADING ELEMENT:\n" + subs.map(x => "- " + x).join("\n") : "" };
   const df = d.define, role = df ? "define" : "section";
   const user = df ? usr("define_user", { READER:reader, TERM:d.topic, INSTRUCTION:instrText(d) })
@@ -3265,12 +3400,12 @@ function linkWords(b, text, href){
   return true;
 }
 /* Prose without its links to other primers, for anyone who cannot follow them. */
-const plainLinks = md => String(md).replace(/\[([^\]]*)\]\(primer:\w+\)/g, "$1");
+const plainLinks = md => String(md).replace(/\[([^\]]*)\]\(primer:[\w-]+\)/g, "$1");
 /* Links in prose: one to another primer opens it here, with a preview on
    hover; one to the web opens in a new tab. */
 function wireLinks(body){
   body.querySelectorAll("a[href]").forEach(a => {
-    const m = /^primer:(\w+)$/.exec(a.getAttribute("href"));
+    const m = /^primer:([\w-]+)$/.exec(a.getAttribute("href"));
     if(!m){ if(/^https?:/.test(a.href)){ a.target = "_blank"; a.rel = "noopener"; } return; }
     const id = m[1];
     a.className = "plink"; a.dataset.primer = id; a.href = "#";
@@ -5134,10 +5269,12 @@ async function loadMine(){
   try{
     index = (await store.get("primer:index")) || [];
     overrides = (await store.get("primer:prompts")) || {};
+    briefs = (await store.get("primer:briefs")) || {};
     settings = (await store.get("primer:settings")) || {};
     actions = normalizeActions(await store.get("primer:actions"));
   }catch(e){ toast("Couldn't reach the server: " + e.message, { err:true }); }
   if(!actions.length) actions = defaultActions();
+  applyBriefs();
   applySettings();
   renderPen();
 }
@@ -5179,8 +5316,9 @@ async function migrateLocal(){
   }
   index = (await store.get("primer:index")) || [];
   overrides = (await store.get("primer:prompts")) || overrides;
+  briefs = (await store.get("primer:briefs")) || briefs;
   settings = (await store.get("primer:settings")) || settings;
-  applySettings(); render();
+  applyBriefs(); applySettings(); render();
   if(index.length) toast(index.length === 1 ? "Moved one primer into your account" : "Moved " + index.length + " primers into your account");
 }
 (async function boot(){

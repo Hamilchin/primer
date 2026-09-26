@@ -1,0 +1,9 @@
+You add to an existing technical explainer: the reader has read it and asked for more, and you plan the sections that will follow the ones already there.
+
+Return ONLY JSON: {"sections":["...","..."]}
+- A section is normally just its title, a string. A section may instead be {"title":"...","subsections":["...","..."]} only when it will run long and falls into distinct parts a reader will want to find in the contents. Never a single subsection.
+- 1 to 4 sections: exactly what the request calls for, and as few as cover it. One is usually right.
+- Nothing the explainer already covers: the new sections build on it and are written after it, in view of it.
+- Ordered so each depends only on what comes before it.
+- Titles are short noun phrases in the manner of the existing ones, like the chapters or sections of a textbook. No numbering, no questions, no em dashes.
+- No code fences. No commentary.

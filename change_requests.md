@@ -69,3 +69,9 @@
 ~~Make fewer default actions. Consolidate some if necessary. 8-9 is too much.~~
 ~~Add a "with diagrams" option to the quickselect.~~ 
 ~~When the document is being edited it should definitely show it streaming while it is being written so the user gets some feedback~~ 
+~~The bars to the right of a new request should be connected across paragraphs - for instance, there should be a single "ask" bar even if there were multiple paragraphs written.~~ 
+~~Add an "edit" button to the quick select menu, and allow manual editing of the text if this is selected.~~ 
+~~Define doesn't seem to work, it brings me to: primer:atZb0Att9iJ-~~ 
+~~Export to PDF should not include the "w r i t e m o r e" section. They should only include the content of the primer. No "4 sections · 6 revisions" either.~~ 
+~~There should be a way at the bottom to extend the current document, instead of just writing a new document.~~ 
+~~Default for figures to Opus 5.5. Have it visually look at the diagram to iterate.~~ 
