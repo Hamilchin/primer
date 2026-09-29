@@ -154,8 +154,8 @@ export function openStore(dir) {
     return Buffer.concat([iv, c.getAuthTag(), enc]).toString("base64");
   };
   /* Null for a key sealed under another secret (PRIMER_SECRET changed):
-     such a key is shown as unreadable and runs nothing, rather than
-     breaking every page that lists keys. */
+     such a key has no hint and runs nothing, rather than breaking every
+     page that lists keys. */
   const open = blob => {
     try {
       const b = Buffer.from(blob, "base64"), d = createDecipheriv("aes-256-gcm", aesKey, b.subarray(0, 12));
@@ -167,7 +167,8 @@ export function openStore(dir) {
   /* A session token is random; only its hash is kept, so the database
      alone cannot sign anyone in. */
   const hashToken = t => createHash("sha256").update(t).digest("hex");
-  const hint = s => s == null ? "unreadable: add it again" : s.length > 8 ? "…" + s.slice(-4) : "set";
+  let pruned = "";   // the day the visitors' table was last pruned
+  const hint = s => s == null ? null : s.length > 8 ? "…" + s.slice(-4) : "set";
   const today = () => new Date().toISOString().slice(0, 10);
 
   /* What a key looks like from outside: never its value. `mine` adds what
@@ -361,7 +362,7 @@ export function openStore(dir) {
       visitor(ip) {
         const day = today(), who = createHash("sha256").update(secret + ":visit:" + day + ":" + String(ip)).digest("hex").slice(0, 24);
         if (q.seenAdd.run(day, who).changes) q.visitAdd.run(day, "visitors");
-        if (Math.random() < 0.01) q.seenPrune.run(new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10));
+        if (pruned !== day) { pruned = day; q.seenPrune.run(new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10)); }
       },
       /* The last `days` days that saw anything, newest first, and the all-time totals. */
       list(days) {

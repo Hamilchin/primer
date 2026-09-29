@@ -97,11 +97,13 @@ export const PROVIDERS = {
 export const kindOf = value => Object.keys(PROVIDERS).find(k => PROVIDERS[k].prefix.test(value)) || null;
 /* The models a kind of key can run, in the catalogue's order. */
 export const choices = kind => MODELS.filter(m => m[PROVIDERS[kind].at]).map(({ id, name }) => ({ id, name }));
+/* A role's spec; an unknown role is written like a section. */
+const roleSpec = role => Object.hasOwn(ROLES, String(role)) ? ROLES[role] : ROLES.section;
 /* The model a role runs on a kind of key: the one chosen for it, or its
    own, whichever the key serves first; else the provider's stand-in. */
 export function modelFor(role, kind, chosen) {
   const at = PROVIDERS[kind].at, served = id => { const m = model(id); return m && m[at] ? m : null; };
-  return served(chosen) || served((Object.hasOwn(ROLES, String(role)) ? ROLES[role] : ROLES.section).model) || served(PROVIDERS[kind].standIn);
+  return served(chosen) || served(roleSpec(role).model) || served(PROVIDERS[kind].standIn);
 }
 
 /* ── web search ─────────────────────────────────────────────────
@@ -297,7 +299,7 @@ function ip6Bytes(a) {
 /* Only a public unicast address may be fetched. An IPv6 address that
    carries an IPv4 one (mapped, compatible, NAT64, 6to4) is judged as that
    IPv4 address; anything outside 2000::/3 is not the public internet. */
-export const isPrivate = ip => {
+const isPrivate = ip => {
   if (isIP(ip) === 4) return privateV4(ip.split(".").map(Number));
   const b = ip6Bytes(ip);
   if (!b) return true;
@@ -306,7 +308,7 @@ export const isPrivate = ip => {
   if (zero(0, 12)) return true;                                                           // ::, ::1, ::a.b.c.d
   if (b[0] === 0 && b[1] === 0x64 && b[2] === 0xff && b[3] === 0x9b && zero(4, 12)) return privateV4(b.slice(12));   // 64:ff9b::a.b.c.d
   if (b[0] === 0x20 && b[1] === 0x02) return privateV4(b.slice(2, 6));                    // 2002:abcd::, 6to4
-  if (b[0] === 0x20 && b[1] === 0x01 && b[2] === 0 && (b[3] === 0 || b[3] === 0x0d && false)) return true;   // 2001:0::, Teredo
+  if (b[0] === 0x20 && b[1] === 0x01 && b[2] === 0 && b[3] === 0) return true;                   // 2001:0::, Teredo
   if (b[0] === 0x20 && b[1] === 0x01 && b[2] === 0x0d && b[3] === 0xb8) return true;    // 2001:db8::, documentation
   return (b[0] & 0xe0) !== 0x20;                                                          // outside 2000::/3
 };
@@ -345,7 +347,7 @@ async function safeFetch(url, opts = {}) {
 }
 /* A response's bytes, read as they come and cut off at `max`: what the
    server sends, after any compression, never sits whole in memory first. */
-export async function bodyOf(r, max, what) {
+async function bodyOf(r, max, what) {
   if (!r.body) return Buffer.alloc(0);
   const reader = r.body.getReader(), chunks = [];
   let n = 0;
@@ -363,6 +365,11 @@ function textOf(buf, type) {
   const m = /charset=["']?([\w-]+)/i.exec(type || "");
   try { return new TextDecoder(m ? m[1] : "utf-8").decode(buf); } catch { return buf.toString("utf8"); }
 }
+/* Bytes free where `dir` is; a write is refused under ROOM_MIN, by the
+   server for what it stores and here for images, so a full disk never
+   takes the whole site down. */
+export const ROOM_MIN = 200 << 20;
+export function roomLeft(dir) { try { const s = statfsSync(dir); return s.bavail * s.bsize; } catch { return Infinity; } }
 export async function fetchImage(url) {
   const u = webURL(url);
   const wiki = await wikiThumb(u, 1000).catch(e => { if (e.missing) throw e; return null; });
@@ -379,8 +386,7 @@ export async function fetchImage(url) {
   const buf = await bodyOf(r, IMAGE_MAX, "The image");
   const name = createHash("sha1").update(url).digest("hex").slice(0, 20) + "." + ext;
   await mkdir(MEDIA, { recursive: true });
-  let room = Infinity; try { const s = statfsSync(MEDIA); room = s.bavail * s.bsize; } catch {}
-  if (room < (200 << 20)) throw new Error("The server's disk is nearly full; no more images can be kept.");
+  if (roomLeft(MEDIA) < ROOM_MIN) throw new Error("The server's disk is nearly full; no more images can be kept.");
   await writeFile(new URL(name, MEDIA), buf);
   const info = { local: "/media/" + name, type, bytes: buf.length };
   images.set(url, info);
@@ -408,11 +414,10 @@ async function readPage(url) {
    page is reduced to its article first, so a site's furniture does not
    come along; the article keeps its headings, lists, code, links and
    pictures. There is no cap on the words, only on the download. */
-const SOURCE_MAX = 20 * 1024 * 1024, SOURCE_HTML_MAX = 2 * 1024 * 1024, PDF_PAGES_MAX = 200, SOURCE_WORDS_MAX = 400000;
+const SOURCE_MAX = 20 * 1024 * 1024, SOURCE_HTML_MAX = 2 * 1024 * 1024, PDF_PAGES_MAX = 200, SOURCE_CHARS_MAX = 400000;
 /* What comes back goes into a prompt: so much and no more. */
-const cappedSource = src => src.md && src.md.length > SOURCE_WORDS_MAX ? { ...src, md: src.md.slice(0, SOURCE_WORDS_MAX) + "\n\n(Cut at " + SOURCE_WORDS_MAX + " characters.)" } : src;
-export async function readSource(url) { return cappedSource(await readSourceWhole(url)); }
-async function readSourceWhole(url) {
+const cut = md => md.length > SOURCE_CHARS_MAX ? md.slice(0, SOURCE_CHARS_MAX) + "\n\n(Cut at " + SOURCE_CHARS_MAX + " characters.)" : md;
+export async function readSource(url) {
   const r = await safeFetch(url, { headers: { "user-agent": UA, accept: "text/html, application/pdf;q=0.9, text/plain;q=0.8, */*;q=0.5" },
                                    signal: AbortSignal.timeout(30000) });
   if (!r.ok) throw new Error("HTTP " + r.status + " from " + new URL(url).host);
@@ -421,13 +426,14 @@ async function readSourceWhole(url) {
   if (len > SOURCE_MAX) throw new Error("Too large to read (" + (len / 1048576).toFixed(0) + " MB).");
   const at = r.url || url;
   if (type === "application/pdf" || /\.pdf(\?|$)/i.test(at)) {
-    const buf = await bodyOf(r, SOURCE_MAX, "The PDF");
-    return { ...(await pdfText(buf)), url: at, kind: "pdf" };
+    const pdf = await pdfText(await bodyOf(r, SOURCE_MAX, "The PDF"));
+    return { title: pdf.title, md: cut(pdf.md), url: at, kind: "pdf" };
   }
   if (!/html|xml|^text\//.test(type)) throw new Error("Not a page or a PDF (" + (type || "unknown type") + ").");
   const text = textOf(await bodyOf(r, SOURCE_HTML_MAX, "The page"), ct);
-  if (!/html|xml/.test(type)) return { title: "", md: text.trim(), url: at, kind: "text" };
-  return { ...articleOf(text, at), url: at, kind: "page" };
+  if (!/html|xml/.test(type)) return { title: "", md: cut(text.trim()), url: at, kind: "text" };
+  const page = articleOf(text, at);
+  return { title: page.title, md: cut(page.md), url: at, kind: "page" };
 }
 /* The article in a page, as markdown. Readability finds the article; when
    it finds nothing, the body stands in. Pictures told to be 40px or under,
@@ -513,7 +519,7 @@ function plain(html, base) {
 /* Whole elements whose words are not the page's, gone with their
    contents. One pass forward, so a page of unclosed tags costs no more
    than its length. */
-export function stripElements(html) {
+function stripElements(html) {
   const lower = html.toLowerCase(), open = /<(script|style|noscript|svg|nav|header|footer|aside|template)\b/g;
   let out = "", at = 0, m;
   while ((m = open.exec(lower))) {
@@ -613,7 +619,7 @@ async function contactSheet(phrase, lang) {
    use bundled so labels render the same on the server as on the page. */
 const FONT = new URL("./fonts/IBMPlexMono-Regular.ttf", import.meta.url).pathname;
 const PIXELS_MAX = 4e6;   // in the SVG's own units; drawn at twice that, 64 MB of pixels at most
-export async function renderSvg(svg) {
+async function renderSvg(svg) {
   if (!/<svg[\s>]/i.test(svg)) throw new Error("That is not an SVG: it has no <svg> element.");
   if (svg.length > 200000) throw new Error("The SVG is over 200,000 characters; simplify it.");
   /* Nothing from outside the drawing: no file or web reference, no script, no HTML inside. */
@@ -714,7 +720,7 @@ const aiTools = (names, sees, spent) => Object.fromEntries(names.map(name => {
    is the text of the model's last message (or the assembled deltas if it
    never sent one). signal aborts. */
 export async function complete({ system, user, role, model: chosen }, cred, emit, signal) {
-  const spec = Object.hasOwn(ROLES, String(role)) ? ROLES[role] : ROLES.section;
+  const spec = roleSpec(role);
   const m = modelFor(role, cred.kind, chosen);
   const names = spec.tools || [];
   const call = { system: String(system || ""), user: String(user || ""), model: m, names, maxTurns: spec.maxTurns || 1, effort: spec.effort, thinking: spec.thinking };
@@ -733,7 +739,6 @@ export async function complete({ system, user, role, model: chosen }, cred, emit
     throw e;
   } finally { clearTimeout(deadline); }
 }
-const CALL_MAX = 15 * 60000;
 
 /* ── seats ──────────────────────────────────────────────────────
    A subscription call is a Claude Code subprocess: a few hundred MB and a
@@ -765,7 +770,7 @@ function leave() {
   if (next) { seated++; next.resolve(); }
 }
 
-const IDLE = 150000;
+const IDLE = 150000, CALL_MAX = 15 * 60000;
 const EXHAUSTED = n => "The agent used all " + n + " turns without answering.";
 const QUIET = "No answer from the model for " + IDLE / 60000 + " minutes. If this keeps happening, check the key in Settings.";
 /* Aborts a call that has gone quiet for IDLE. */

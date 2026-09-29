@@ -66,14 +66,14 @@
 
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { appendFileSync, existsSync, renameSync, statSync, statfsSync } from "node:fs";
+import { appendFileSync, existsSync, renameSync, statSync } from "node:fs";
 import { format } from "node:util";
 import { randomBytes, createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 import { execSync } from "node:child_process";
 import { openStore } from "./store.mjs";
-import { ROLES, PROVIDERS, halt, kindOf, identify, choices, modelFor, complete, left, fetchImage, images, keepImagesIn, seats, readSource } from "./agents.mjs";
+import { ROLES, PROVIDERS, halt, kindOf, identify, choices, modelFor, complete, left, fetchImage, images, keepImagesIn, seats, readSource, roomLeft, ROOM_MIN } from "./agents.mjs";
 
 const PORT = Number(process.env.PORT) || 8787;
 const HOST = process.env.HOST || "127.0.0.1";
@@ -223,7 +223,7 @@ const decode = s => { try { return decodeURIComponent(s); } catch { throw halt(4
 
 async function readText(req, max) {
   /* A body is JSON from the page; a form or a plain-text post is not ours. */
-  if (req.headers["content-length"] !== "0" && req.headers["content-length"] !== undefined && !/^application\/json/i.test(req.headers["content-type"] || "")) throw halt(415, "Send JSON.");
+  if (req.headers["content-length"] > 0 && !/^application\/json/i.test(req.headers["content-type"] || "")) throw halt(415, "Send JSON.");
   let body = "";
   for await (const chunk of req) { body += chunk; if (body.length > max) throw halt(413, "Too large."); }
   return body;
@@ -249,15 +249,14 @@ function strike(...keys) {
 }
 /* At most `max` of something a minute, every try counted: for what costs the server or a third party. */
 function limit(key, max) { guard(key, max); strike(key); }
-/* Room left on the data volume; a write that would fill it is refused instead. */
-const ROOM_MIN = 200 << 20;
-function room() { try { const s = statfsSync(DATA); return s.bavail * s.bsize; } catch { return Infinity; } }
-function needRoom() { if (room() < ROOM_MIN) throw halt(507, "The server's disk is nearly full. Tell whoever hosts it."); }
+/* A write that would fill the data volume is refused instead. */
+function needRoom() { if (roomLeft(DATA) < ROOM_MIN) throw halt(507, "The server's disk is nearly full. Tell whoever hosts it."); }
 /* What one account may keep: primers, settings and traces, in bytes and in keys. */
 const KV_BYTES = 200 << 20, KV_KEYS = 4000;
 /* Calls in flight per caller and per address, so one person cannot hold every seat. */
 const inflight = new Map();
-const take = (k, max) => { const n = inflight.get(k) || 0; if (n >= max) throw halt(429, "Too many calls at once. Wait for some to finish."); inflight.set(k, n + 1); };
+const CALLS_EACH = 6, CALLS_PER_ADDRESS = 12;
+const take = k => inflight.set(k, (inflight.get(k) || 0) + 1);
 const give = k => { const n = (inflight.get(k) || 1) - 1; if (n > 0) inflight.set(k, n); else inflight.delete(k); };
 
 createServer(async (req, res) => {
@@ -296,8 +295,18 @@ async function serve(req, res) {
   }
   const token = cookies(req).primer;
   const me = db.sessions.user(token);
-  /* A count for the host's eye; never in the way of the request. */
+  /* Counts for the host's eye, never in the way of the request: a kind of
+     event, or a page opened by someone. */
   const count = kind => { try { db.visits.count(kind); } catch {} };
+  const viewed = () => { if (req.method !== "GET") return; count("views"); try { db.visits.visitor(ip); } catch {} };
+  /* The page, titled after the primer it is opened at, if any. */
+  const sendPage = async title => {
+    let html = await readFile(new URL("primer.html", ROOT), "utf8");
+    if (title) html = html.replace("<title>primer</title>", "<title>" + escapeHtml(title) + " · primer</title>");
+    viewed();
+    res.writeHead(200, { "content-type": TYPES.html, "cache-control": "no-cache", "content-security-policy": CSP });
+    res.end(html);
+  };
   const guest = !me && isGuest(token);
   /* Who to log: an account by name, a guest by the first bit of their cookie, so two guests can be told apart. */
   const who = me ? me.name : guest ? "guest-" + token.slice(2, 8) : "reader";
@@ -534,9 +543,10 @@ async function serve(req, res) {
     const body = await readBody(req);
     const cred = me ? db.users.credential(me.id) : guestCred(body.cred, ip);
     if (!cred) throw halt(400, "No key to run on. Add one, or link to a shared key, in Settings.", "no_key");
-    take("calls:" + who, 6); try { take("calls:" + ip, 12); } catch (e) { give("calls:" + who); throw e; }
+    const held = ["calls:" + who, "calls:" + ip];
+    if ((inflight.get(held[0]) || 0) >= CALLS_EACH || (inflight.get(held[1]) || 0) >= CALLS_PER_ADDRESS) throw halt(429, "Too many calls at once. Wait for some to finish.");
+    held.forEach(take); res.on("close", () => held.forEach(give));
     count("calls"); if (body.role === "outline") count("primers");
-    res.on("close", () => { give("calls:" + who); give("calls:" + ip); });
     /* Who is calling, on which key: the record of shared use. */
     console.log("  " + who + "  " + (body.role || "?") + "  on “" + cred.key.name + "”" + (cred.own ? "" : " (" + cred.key.owner + "’s)"));
     /* Headers go out with the first frame, so a failure before any text can
@@ -601,31 +611,20 @@ async function serve(req, res) {
      primer so the link unfurls and the tab reads right; the page does the
      rest from the URL. */
   const pubAt = /^\/p\/([\w-]+)$/.exec(path), shareAt = /^\/s\/([\w-]+)$/.exec(path);
-  if (pubAt || shareAt) {
-    let title = null;
-    if (pubAt) { const pub = db.public.get(pubAt[1]), snap = pub && snapshot(pub.user, pubAt[1]); if (snap) title = snap.title; }
-    else { const s = SHARE_ID.test(shareAt[1]) && db.shares.get(shareAt[1]); if (s) title = s.title; }
-    let html = await readFile(new URL("primer.html", ROOT), "utf8");
-    if (title) html = html.replace("<title>primer</title>", "<title>" + escapeHtml(title) + " · primer</title>");
-    if (req.method === "GET") { count("views"); try { db.visits.visitor(ip); } catch {} }
-    res.writeHead(200, { "content-type": TYPES.html, "cache-control": "no-cache", "content-security-policy": CSP });
-    return res.end(html);
-  }
-  /* The guide, Settings and a primer are the same page at their own addresses. */
-  const name = PAGE_PATH.test(path) ? "primer.html" : decode(path.slice(1));
-  /* Only a name we know, or an image file by its own name: nothing that
-     could be read as a path. An image is private to the people signed in,
-     and guests, unless a shared primer shows it. */
-  const media = name.startsWith("media/") ? name.slice(6) : null;
+  if (pubAt) { const pub = db.public.get(pubAt[1]), snap = pub && snapshot(pub.user, pubAt[1]); return sendPage(snap && snap.title); }
+  if (shareAt) { const s = SHARE_ID.test(shareAt[1]) && db.shares.get(shareAt[1]); return sendPage(s && s.title); }
+  /* The guide, Settings and the cover are the same page at their own addresses. */
+  if (PAGE_PATH.test(path)) return sendPage(null);
+  /* Only a file by a name we know, or an image by its own name: nothing
+     that could be read as a path. An image is private to the people
+     signed in, and guests, unless a shared primer shows it. */
+  const name = decode(path.slice(1)), media = name.startsWith("media/") ? name.slice(6) : null;
   const ok = media != null ? MEDIA_NAME.test(media) && (me || guest || db.shares.mediaShared(media))
-    : name === "primer.html" || name === "favicon.svg" || name === "apple-touch-icon.png" || /^prompts\/[\w-]+\.txt$/.test(name);
+    : name === "favicon.svg" || name === "apple-touch-icon.png" || /^prompts\/[\w-]+\.txt$/.test(name);
   if (!ok) throw halt(404, "Not found.");
-  const from = media != null ? new URL(media, MEDIA) : new URL(name, ROOT);
-  if (name === "primer.html" && req.method === "GET") { count("views"); try { db.visits.visitor(ip); } catch {} }
   let buf;
-  try { buf = await readFile(from); } catch { throw halt(404, "Not found."); }
+  try { buf = await readFile(media != null ? new URL(media, MEDIA) : new URL(name, ROOT)); } catch { throw halt(404, "Not found."); }
   res.writeHead(200, { "content-type": TYPES[name.split(".").pop()] || "application/octet-stream",
-                       "cache-control": media != null ? "private, max-age=31536000" : "no-cache",
-                       ...(name === "primer.html" ? { "content-security-policy": CSP } : {}) });
+                       "cache-control": media != null ? "private, max-age=31536000" : "no-cache" });
   res.end(buf);
 }
