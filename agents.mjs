@@ -17,6 +17,7 @@
 // carries the status it should be answered with.
 
 import { writeFile, mkdir } from "node:fs/promises";
+import { statfsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
@@ -99,7 +100,7 @@ export const choices = kind => MODELS.filter(m => m[PROVIDERS[kind].at]).map(({ 
    own, whichever the key serves first; else the provider's stand-in. */
 export function modelFor(role, kind, chosen) {
   const at = PROVIDERS[kind].at, served = id => { const m = model(id); return m && m[at] ? m : null; };
-  return served(chosen) || served((ROLES[role] || ROLES.section).model) || served(PROVIDERS[kind].standIn);
+  return served(chosen) || served((Object.hasOwn(ROLES, String(role)) ? ROLES[role] : ROLES.section).model) || served(PROVIDERS[kind].standIn);
 }
 
 /* ── web search ─────────────────────────────────────────────────
@@ -315,6 +316,8 @@ export async function fetchImage(url) {
   if (buf.length > IMAGE_MAX) throw new Error("Too large (" + (buf.length / 1048576).toFixed(1) + " MB). Find a smaller rendering.");
   const name = createHash("sha1").update(url).digest("hex").slice(0, 20) + "." + ext;
   await mkdir(MEDIA, { recursive: true });
+  let room = Infinity; try { const s = statfsSync(MEDIA); room = s.bavail * s.bsize; } catch {}
+  if (room < (200 << 20)) throw new Error("The server's disk is nearly full; no more images can be kept.");
   await writeFile(new URL(name, MEDIA), buf);
   const info = { local: "/media/" + name, type, bytes: buf.length };
   images.set(url, info);
@@ -524,13 +527,18 @@ async function contactSheet(phrase, lang) {
    black on white at twice the viewBox, with the one font the diagrams
    use bundled so labels render the same on the server as on the page. */
 const FONT = new URL("./fonts/IBMPlexMono-Regular.ttf", import.meta.url).pathname;
-function renderSvg(svg) {
+const PIXELS_MAX = 4e6;   // in the SVG's own units; drawn at twice that, 64 MB of pixels at most
+export function renderSvg(svg) {
   if (!/<svg[\s>]/i.test(svg)) throw new Error("That is not an SVG: it has no <svg> element.");
-  if (svg.length > 400000) throw new Error("The SVG is over 400,000 characters; simplify it.");
+  if (svg.length > 200000) throw new Error("The SVG is over 200,000 characters; simplify it.");
+  /* Nothing from outside the drawing: no file or web reference, no script, no HTML inside. */
+  if (/<\s*(image|use|feImage|foreignObject|script|a)\b/i.test(svg) || /href\s*=\s*["']?\s*(?!#)/i.test(svg) || /url\s*\(\s*["']?\s*(?!#)/i.test(svg))
+    throw new Error("The SVG refers to something outside itself (an image, a use, a link or a URL); draw it with shapes and text only.");
   const r = new Resvg(svg, {
     background: "#ffffff", fitTo: { mode: "zoom", value: 2 },
     font: { loadSystemFonts: false, fontFiles: [FONT], defaultFontFamily: "IBM Plex Mono", monospaceFamily: "IBM Plex Mono" }
   });
+  if (!(r.width * r.height <= PIXELS_MAX)) throw new Error("The drawing is " + r.width + " by " + r.height + ", too large to render; keep the viewBox to about 640 wide and at most a few thousand tall.");
   return { png: r.render().asPng(), width: r.width, height: r.height };
 }
 
@@ -620,7 +628,7 @@ const aiTools = (names, sees, spent) => Object.fromEntries(names.map(name => {
    is the text of the model's last message (or the assembled deltas if it
    never sent one). signal aborts. */
 export async function complete({ system, user, role, model: chosen }, cred, emit, signal) {
-  const spec = ROLES[role] || ROLES.section;
+  const spec = Object.hasOwn(ROLES, String(role)) ? ROLES[role] : ROLES.section;
   const m = modelFor(role, cred.kind, chosen);
   const names = spec.tools || [];
   const call = { system: String(system || ""), user: String(user || ""), model: m, names, maxTurns: spec.maxTurns || 1, effort: spec.effort, thinking: spec.thinking };
@@ -709,8 +717,9 @@ function foundByClaudeCode(content) {
   return text;
 }
 async function viaClaudeCode({ system, user, model: m, names, maxTurns, effort, thinking }, cred, emit, signal) {
+  /* The child gets the caller's token and nothing of the server's own. */
   const env = { ...process.env, CLAUDE_CODE_OAUTH_TOKEN: cred.value };
-  delete env.ANTHROPIC_API_KEY; delete env.ANTHROPIC_AUTH_TOKEN;
+  for (const k of ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "PRIMER_SECRET", "INVITE", "SHARE_CODE", "ADMIN", "FLY_API_TOKEN"]) delete env[k];
   const abortController = new AbortController();
   signal.addEventListener("abort", () => abortController.abort(), { once: true });
   const dog = watchdog(() => abortController.abort());

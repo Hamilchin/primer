@@ -182,7 +182,7 @@ function snapshot(user, docId) {
   if (!d || !Array.isArray(d.blocks)) return null;
   try { st = JSON.parse(db.kv.get(user, "primer:settings")) || {}; } catch {}
   const blocks = d.blocks.filter(b => b && (b.md || b.src)).map(({ by, origin, slot, fail, checked, ...r }) => {
-    if (r.md) r.md = String(r.md).replace(/\[([^\]]*)\]\(primer:\w+\)/g, "$1");
+    if (r.md) r.md = String(r.md).replace(/\[([^\]]*)\]\(primer:[\w-]+\)/g, "$1");
     /* A revision's mark stays, without the words the reader typed to ask
        for it; a research correction keeps its reason and its source. */
     if (r.edit && typeof r.edit === "object") {
@@ -221,6 +221,8 @@ const secure = req => /^https/.test(req.headers["x-forwarded-proto"] || "");
 const decode = s => { try { return decodeURIComponent(s); } catch { throw halt(400, "Bad path."); } };
 
 async function readText(req, max) {
+  /* A body is JSON from the page; a form or a plain-text post is not ours. */
+  if (req.headers["content-length"] !== "0" && req.headers["content-length"] !== undefined && !/^application\/json/i.test(req.headers["content-type"] || "")) throw halt(415, "Send JSON.");
   let body = "";
   for await (const chunk of req) { body += chunk; if (body.length > max) throw halt(413, "Too large."); }
   return body;

@@ -10,7 +10,7 @@
 (function(){try{var d=document.documentElement,t=localStorage.getItem("primer:theme")||"paper";d.dataset.theme=t==="dark"||t==="paper-dark"||(t==="system"&&matchMedia("(prefers-color-scheme:dark)").matches)?"dark":"light";if(t.indexOf("paper")===0)d.dataset.look="paper";}catch(e){}})();
 </script>
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Literata:ital,opsz,wght@0,7..72,400..700;1,7..72,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
@@ -318,7 +318,7 @@ body[data-contents="off"] .toc,body[data-contents="off"] .side-toc{display:none!
 
 .block[data-kind="figure"] .body,.block[data-kind="image"] .body{padding:.4rem 0 .5rem}
 .block[data-kind="figure"] figure,.block[data-kind="image"] figure{margin:0}
-.block[data-kind="figure"] svg{max-width:100%;height:auto;display:block;color:var(--fg)}
+.block[data-kind="figure"] svg{max-width:100%;height:auto;display:block;color:var(--fg);overflow:hidden!important;position:static!important}
 .block[data-kind="figure"] figcaption,.block[data-kind="image"] figcaption{margin-top:.6rem;font-size:14px;line-height:1.5;color:var(--fg-2);text-wrap:pretty}
 .block[data-kind="figure"] svg [stroke="#A23B2A"],.block[data-kind="figure"] svg [stroke="#2C6B60"]{stroke:var(--accent)}
 .block[data-kind="figure"] svg [fill="#A23B2A"],.block[data-kind="figure"] svg [fill="#2C6B60"]{fill:var(--accent)}
@@ -1449,7 +1449,7 @@ const MATH_RE = /\$\$[\s\S]*?\$\$|\$(?!\s)(?:\\.|[^$\\\n])+?(?<!\s)\$(?!\d)/g;
 /* Math is handed to KaTeX in its \( \) and \[ \] forms, so a dollar sign
    left in the prose is only ever a dollar sign. It goes into the HTML as
    text, so a < in a formula is never the start of a tag. */
-const escHtml = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const escHtml = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 const texForm = m => escHtml(m.startsWith("$$") ? "\\[" + m.slice(2, -2) + "\\]" : "\\(" + m.slice(1, -1) + "\\)");
 /* A lone ~ is "about": "~450 nm" is not the start of a strikethrough, which
    takes two. Marked would pair two of them across a sentence. */
@@ -1461,8 +1461,17 @@ const keepTilde = s => s.split(/(`+[^`]*`+)/g).map((x, i) => i % 2 ? x : x.repla
    restyle the page or reach outside it. Math is typeset in the DOM
    afterwards.                                                          */
 const SAFE_URI = /^(?:(?:https?|mailto|primer):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i;
-const safeHtml = html => DOMPurify.sanitize(html, { USE_PROFILES:{ html:true }, FORBID_TAGS:["style"], ALLOWED_URI_REGEXP:SAFE_URI });
-const safeSvg = svg => DOMPurify.sanitize(String(svg), { USE_PROFILES:{ svg:true, svgFilters:true }, FORBID_TAGS:["style", "image"], ADD_ATTR:["role"] });
+/* Prose is text with links, emphasis, lists, tables and code: nothing
+   that could lay over the page, post a form, load from elsewhere or
+   stand in for one of the page's own elements. */
+const safeHtml = html => DOMPurify.sanitize(html, { USE_PROFILES:{ html:true }, ALLOWED_URI_REGEXP:SAFE_URI, ALLOW_DATA_ATTR:false,
+  FORBID_TAGS:["style","form","input","button","select","textarea","option","dialog","video","audio","source","track","marquee","img","picture","iframe","object","embed","meter","progress"],
+  FORBID_ATTR:["style","action","method","enctype","background","poster","formaction","target","id","name","tabindex","autofocus","popovertarget"] });
+/* A figure is a drawing: no links out, nothing loaded from elsewhere, no
+   style that could place it anywhere but in its box. */
+const safeSvg = svg => DOMPurify.sanitize(String(svg), { USE_PROFILES:{ svg:true, svgFilters:true }, ADD_ATTR:["role"], ALLOW_DATA_ATTR:false,
+  FORBID_TAGS:["style","image","feImage","a","use","foreignObject","script","animate","set","animateMotion","animateTransform"],
+  FORBID_ATTR:["style"] });   // ids stay: arrowheads are markers referred to by id
 
 function mdToHtml(md){
   const parts = String(md).split(/(```[\s\S]*?```)/g);
@@ -2518,7 +2527,8 @@ async function inspectBlock(d, b){
 function imageNode(b){
   const fig = el("figure");
   const img = el("img");
-  img.src = b.src; img.alt = b.title || b.caption || ""; img.loading = "lazy";
+  if(/^\/media\/[0-9a-f]{20}\.(png|jpg|gif|webp)$/.test(String(b.src))) img.src = b.src;   // only a file this server keeps, never a hotlink
+  img.alt = b.title || b.caption || ""; img.loading = "lazy";
   img.onerror = () => fig.replaceChildren(errNode({ ...b, error:"The image file is missing." }));
   fig.appendChild(img);
   const fc = el("figcaption");

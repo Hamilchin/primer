@@ -144,16 +144,21 @@ export function openStore(dir) {
     const enc = Buffer.concat([c.update(String(text), "utf8"), c.final()]);
     return Buffer.concat([iv, c.getAuthTag(), enc]).toString("base64");
   };
+  /* Null for a key sealed under another secret (PRIMER_SECRET changed):
+     such a key is shown as unreadable and runs nothing, rather than
+     breaking every page that lists keys. */
   const open = blob => {
-    const b = Buffer.from(blob, "base64"), d = createDecipheriv("aes-256-gcm", aesKey, b.subarray(0, 12));
-    d.setAuthTag(b.subarray(12, 28));
-    return Buffer.concat([d.update(b.subarray(28)), d.final()]).toString("utf8");
+    try {
+      const b = Buffer.from(blob, "base64"), d = createDecipheriv("aes-256-gcm", aesKey, b.subarray(0, 12));
+      d.setAuthTag(b.subarray(12, 28));
+      return Buffer.concat([d.update(b.subarray(28)), d.final()]).toString("utf8");
+    } catch { return null; }
   };
 
   /* A session token is random; only its hash is kept, so the database
      alone cannot sign anyone in. */
   const hashToken = t => createHash("sha256").update(t).digest("hex");
-  const hint = s => s.length > 8 ? "…" + s.slice(-4) : "set";
+  const hint = s => s == null ? "unreadable: add it again" : s.length > 8 ? "…" + s.slice(-4) : "set";
   const today = () => new Date().toISOString().slice(0, 10);
 
   /* What a key looks like from outside: never its value. `mine` adds what
@@ -169,7 +174,7 @@ export function openStore(dir) {
     return r;
   };
   /* A user may run on a key they own or one they have linked to. */
-  const canUse = (userId, k) => !!k && (k.owner === userId || (k.shared && !!q.linkHas.get(userId, k.id)));
+  const canUse = (userId, k) => !!k && open(k.secret) != null && (k.owner === userId || (k.shared && !!q.linkHas.get(userId, k.id)));
   /* The key a user's calls run on: null when there is none, or it has
      been taken away since they picked it. */
   const activeKey = u => { const k = u.active_key ? q.keyById.get(u.active_key) : null; return canUse(u.id, k) ? k : null; };
@@ -205,13 +210,14 @@ export function openStore(dir) {
          the name and password are checked on every call. */
       sharedCredential(name, password) {
         const k = q.keySharedNamed.get(name);
-        return k && k.pass && checkPassword(password, k.pass) ? credential(k) : null;
+        return k && k.pass && open(k.secret) != null && checkPassword(password, k.pass) ? credential(k) : null;
       },
       /* One of a user's own keys, as a call runs on it: to ask its provider
          what is left on it. */
       own(userId, id) {
         const k = q.keyById.get(id);
         if (!k || k.owner !== userId) throw new Error("No such key of yours.");
+        if (open(k.secret) == null) throw new Error("That key can't be read any more: delete it and add it again.");
         return credential(k);
       },
       /* Everything a user can see: their own keys in full, the shared keys
