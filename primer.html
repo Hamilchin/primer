@@ -1882,6 +1882,7 @@ function toolsNode(d){
   }
   if(!readonly()){
     if(settled(d)){ const r = add("Rewrite", () => openRewrite(r)); r.setAttribute("aria-haspopup", "true"); }
+    add("Edit request", () => editRequest(d));
     add("Inspector", () => goto("inspector"), route === "inspector");
     if(route === "inspector") add("Copy report", () => copyReport(d));
   }
@@ -2030,24 +2031,29 @@ function renderCover(){
   instr.addEventListener("input", () =>
     chips.querySelectorAll(".chip:not(.edit)").forEach(c => c.classList.toggle("on", instr.value.includes(c.dataset.text))));
 
-  /* What was typed stays put through a trip to Settings or a reload of the
-     tab, until a primer is started from it. */
-  const DRAFT = "primer:draft";
-  try{
-    const d = JSON.parse(sessionStorage.getItem(DRAFT) || "null");
-    if(d){ topic.value = d.topic || ""; known.value = d.known || ""; instr.value = d.instr || ""; }
-  }catch(e){}
-  if(instr.value) instr.dispatchEvent(new Event("input"));
-  form.addEventListener("input", () => {
-    try{ sessionStorage.setItem(DRAFT, JSON.stringify({ topic:topic.value, known:known.value, instr:instr.value })); }catch(e){}
-  });
-
   /* From existing content: a link or a text, and whether it is kept word
      for word. The topic is optional then; the text names the primer. */
   const fromLink = $("#cFromLink"), from = $("#cFrom"), source = $("#cSource");
   source.oninput = () => grow(source);
-  fromLink.onclick = () => { from.hidden = !from.hidden; fromLink.classList.toggle("on", !from.hidden); if(!from.hidden){ grow(source); source.focus(); } };
+  const showFrom = on => { from.hidden = !on; fromLink.classList.toggle("on", on); if(on) grow(source); };
+  fromLink.onclick = () => { showFrom(from.hidden); if(!from.hidden) source.focus(); };
   source.onkeydown = e => { if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){ e.preventDefault(); form.requestSubmit(); } };
+
+  /* What was typed stays put through a trip to Settings or a reload of the
+     tab, until a primer is started from it; a primer's own request is put
+     here too, by Edit request, to be changed and asked again. */
+  try{
+    const d = JSON.parse(sessionStorage.getItem(DRAFT) || "null");
+    if(d){
+      topic.value = d.topic || ""; known.value = d.known || ""; instr.value = d.instr || "";
+      if(d.source){ source.value = d.source; showFrom(true); const m = form.querySelector(`input[name=cMode][value="${d.mode === "verbatim" ? "verbatim" : "rewritten"}"]`); if(m) m.checked = true; }
+    }
+  }catch(e){}
+  if(instr.value) instr.dispatchEvent(new Event("input"));
+  form.addEventListener("input", () => {
+    try{ sessionStorage.setItem(DRAFT, JSON.stringify({ topic:topic.value, known:known.value, instr:instr.value,
+      source: from.hidden ? "" : source.value, mode:(form.querySelector("input[name=cMode]:checked") || {}).value })); }catch(e){}
+  });
   form.onsubmit = e => {
     e.preventDefault();
     const t = topic.value.trim(), src = from.hidden ? "" : source.value.trim();
@@ -2063,6 +2069,17 @@ function renderCover(){
   carryOn();
   requestAnimationFrame(() => fields.forEach(grow));
   if(!matchMedia("(pointer:coarse)").matches) topic.focus({ preventScroll:true });
+}
+
+const DRAFT = "primer:draft";
+/* The request a primer was made from, put back on the cover to be changed
+   and asked again: what it was about, what the reader knew, how it was to
+   be written, and the content it was made from. */
+function editRequest(d){
+  const draft = { topic: d.topic === "From existing content" ? "" : (d.topic || ""), known: d.known || "", instr: d.instruction || "" };
+  if(d.source){ draft.source = d.source.input || d.source.url || ""; draft.mode = d.source.mode || "rewritten"; }
+  try{ sessionStorage.setItem(DRAFT, JSON.stringify(draft)); }catch(e){}
+  goHome();
 }
 
 /* What the library says about a document: nothing when it is finished,
@@ -2340,7 +2357,7 @@ function statusNode(d){
       if(pendingRetry(d) || queue.includes(d.id)) line.append(btn("lnk", "Stop", () => stopRun(d, true)));
     }
   }
-  else if(s.kind === "short"){ line.append(s.text); if(!readonly()) line.append(btn("lnk", "Fill in", () => resumeByHand(d))); }
+  else if(s.kind === "short"){ line.append(s.text); if(!readonly()) line.append(btn("lnk", "Resume", () => resumeByHand(d))); }
   if(line.childNodes.length) box.append(line);
   const mine = readonly() ? [] : issues.filter(x => x.docId === d.id);
   if(mine.length){
@@ -3042,7 +3059,7 @@ function resume(d, auto){
   if(!d.blocks.some(b => b.kind === "heading")) return build(d);
   return writeAll(d);
 }
-/* Resume, Retry and Fill in: a person asked, unless another tab is on it. */
+/* Resume and Retry: a person asked, unless another tab is on it. */
 async function resumeByHand(d){
   if(running(d)) return;
   if(await heldElsewhere(d.id)){ elsewhere.add(d.id); toast("Another tab is writing this primer."); livePaint(); return; }
