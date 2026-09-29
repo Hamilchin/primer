@@ -21,7 +21,8 @@
 //
 // Accounts: POST /api/signup {name,password}, /api/login, /api/logout,
 // GET /api/me. Everything the page stores goes through
-// GET/PUT/DELETE /api/store/:key, per user.
+// GET/PUT/DELETE /api/store/:key, per user. GET /api/stats, for the host:
+// visits, visitors, guests, signups, primers and calls, by day.
 //
 // Keys: every call runs on a named key, added in Settings: a Claude
 // subscription token (from `claude setup-token`), or an Anthropic, OpenRouter
@@ -295,6 +296,8 @@ async function serve(req, res) {
   }
   const token = cookies(req).primer;
   const me = db.sessions.user(token);
+  /* A count for the host's eye; never in the way of the request. */
+  const count = kind => { try { db.visits.count(kind); } catch {} };
   const guest = !me && isGuest(token);
   /* Who to log: an account by name, a guest by the first bit of their cookie, so two guests can be told apart. */
   const who = me ? me.name : guest ? "guest-" + token.slice(2, 8) : "reader";
@@ -319,6 +322,7 @@ async function serve(req, res) {
       if (!user) { strike("login:" + ip, "login:" + name); throw halt(401, "Wrong username or password."); }
     }
     setCookie(db.sessions.create(user.id));
+    count(path === "/api/signup" ? "signups" : "logins");
     return json(200, { name: user.name, key: user.key, admin: user.admin });
   }
   if (req.method === "POST" && path === "/api/logout") { db.sessions.delete(token); setCookie(null); return json(200, {}); }
@@ -330,7 +334,7 @@ async function serve(req, res) {
     throw halt(401, "Not signed in.");
   }
   /* A guest: no account, primers kept in their browser, a credential sent with each call. */
-  if (req.method === "POST" && path === "/api/guest") { setCookie(guestToken()); return json(200, { guest: true }); }
+  if (req.method === "POST" && path === "/api/guest") { setCookie(guestToken()); count("guests"); return json(200, { guest: true }); }
 
   /* ── a public primer, as its owner has it right now: anyone with the address ── */
   if (req.method === "GET" && path.startsWith("/api/primer/")) {
@@ -389,6 +393,10 @@ async function serve(req, res) {
     if (!me.admin) throw halt(403, "Only the host reads feedback.");
     return json(200, { items: db.feedback.list(300) });
   }
+  if (req.method === "GET" && path === "/api/stats") {
+    if (!me.admin) throw halt(403, "Only the host sees this.");
+    return json(200, db.visits.list(30));
+  }
 
   /* ── sharing: open a primer's address to anyone, freeze a copy, list, take back ── */
   if (req.method === "PUT" && path.startsWith("/api/public/")) {
@@ -409,6 +417,7 @@ async function serve(req, res) {
     /* What the primer cost comes from the page, which keeps the trace. */
     if (b.usage) snap.usage = String(b.usage).slice(0, 200);
     const s = db.shares.create(me.id, of, snap.title, JSON.stringify(snap), mediaOf(snap.blocks));
+    if (!s.reused) count("shares");
     console.log("  " + me.name + "  share " + s.id + (s.reused ? "  (unchanged, same link)" : ""));
     return json(200, s);
   }
@@ -526,6 +535,7 @@ async function serve(req, res) {
     const cred = me ? db.users.credential(me.id) : guestCred(body.cred, ip);
     if (!cred) throw halt(400, "No key to run on. Add one, or link to a shared key, in Settings.", "no_key");
     take("calls:" + who, 6); try { take("calls:" + ip, 12); } catch (e) { give("calls:" + who); throw e; }
+    count("calls"); if (body.role === "outline") count("primers");
     res.on("close", () => { give("calls:" + who); give("calls:" + ip); });
     /* Who is calling, on which key: the record of shared use. */
     console.log("  " + who + "  " + (body.role || "?") + "  on “" + cred.key.name + "”" + (cred.own ? "" : " (" + cred.key.owner + "’s)"));
@@ -597,6 +607,7 @@ async function serve(req, res) {
     else { const s = SHARE_ID.test(shareAt[1]) && db.shares.get(shareAt[1]); if (s) title = s.title; }
     let html = await readFile(new URL("primer.html", ROOT), "utf8");
     if (title) html = html.replace("<title>primer</title>", "<title>" + escapeHtml(title) + " · primer</title>");
+    if (req.method === "GET") { count("views"); try { db.visits.visitor(ip); } catch {} }
     res.writeHead(200, { "content-type": TYPES.html, "cache-control": "no-cache", "content-security-policy": CSP });
     return res.end(html);
   }
@@ -610,6 +621,7 @@ async function serve(req, res) {
     : name === "primer.html" || name === "favicon.svg" || name === "apple-touch-icon.png" || /^prompts\/[\w-]+\.txt$/.test(name);
   if (!ok) throw halt(404, "Not found.");
   const from = media != null ? new URL(media, MEDIA) : new URL(name, ROOT);
+  if (name === "primer.html" && req.method === "GET") { count("views"); try { db.visits.visitor(ip); } catch {} }
   let buf;
   try { buf = await readFile(from); } catch { throw halt(404, "Not found."); }
   res.writeHead(200, { "content-type": TYPES[name.split(".").pop()] || "application/octet-stream",

@@ -18,6 +18,8 @@
 //   share_media  the image files a public primer or a share refers to, so
 //              they can be served to a reader who is not signed in
 //   meta       the server's own few facts: its secret
+//   visits     how the site is used, a count per day per kind; seen is
+//              the day's visitors as one-way hashes, so each counts once
 //
 // Passwords are scrypt hashes. A key's value is encrypted with a secret that
 // is generated once and kept in meta, or given as PRIMER_SECRET. Nothing
@@ -53,6 +55,8 @@ export function openStore(dir) {
                                          primary key (user, key));
     create table if not exists feedback (id integer primary key, user integer, name text not null, kind text not null,
                                          text text not null, ctx text not null, created integer not null);
+    create table if not exists visits   (day text not null, kind text not null, n integer not null default 0, primary key (day, kind));
+    create table if not exists seen     (day text not null, who text not null, primary key (day, who));
     create table if not exists key_usage (key integer not null, day text not null, calls integer not null default 0,
                                          tokens_in integer not null default 0, tokens_out integer not null default 0,
                                          searches integer not null default 0, cost real not null default 0,
@@ -108,6 +112,11 @@ export function openStore(dir) {
     usageTotal: db.prepare("select coalesce(sum(calls),0) as calls, coalesce(sum(tokens_in),0) as tokens_in, coalesce(sum(tokens_out),0) as tokens_out, coalesce(sum(searches),0) as searches, coalesce(sum(cost),0) as cost from key_usage where key = ?"),
     usageDel: db.prepare("delete from key_usage where key = ?"),
     firstUser: db.prepare("select min(id) as id from users"),
+    visitAdd: db.prepare("insert into visits (day, kind, n) values (?, ?, 1) on conflict(day, kind) do update set n = n + 1"),
+    visitDays: db.prepare("select day, kind, n from visits where day >= ? order by day desc"),
+    visitTotal: db.prepare("select kind, sum(n) as n from visits group by kind"),
+    seenAdd: db.prepare("insert or ignore into seen (day, who) values (?, ?)"),
+    seenPrune: db.prepare("delete from seen where day < ?"),
     fbAdd: db.prepare("insert into feedback (user, name, kind, text, ctx, created) values (?, ?, ?, ?, ?, ?)"),
     fbList: db.prepare("select * from feedback order by created desc limit ?")
   };
@@ -341,6 +350,26 @@ export function openStore(dir) {
         const r = q.pubDel.run(doc, user);
         if (r.changes) q.shareMediaDel.run(doc);
         return !!r.changes;
+      }
+    },
+    /* ── visits: what the host sees of the site's use, without keeping anyone's address ── */
+    visits: {
+      count(kind) { q.visitAdd.run(today(), kind); },
+      /* A visitor is counted once a day: their address, hashed with the
+         day and the secret, is kept only to tell a second visit from a
+         first, and dropped after sixty days. */
+      visitor(ip) {
+        const day = today(), who = createHash("sha256").update(secret + ":visit:" + day + ":" + String(ip)).digest("hex").slice(0, 24);
+        if (q.seenAdd.run(day, who).changes) q.visitAdd.run(day, "visitors");
+        if (Math.random() < 0.01) q.seenPrune.run(new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10));
+      },
+      /* The last `days` days that saw anything, newest first, and the all-time totals. */
+      list(days) {
+        const since = new Date(Date.now() - days * 864e5).toISOString().slice(0, 10), byDay = new Map();
+        for (const r of q.visitDays.all(since)) { if (!byDay.has(r.day)) byDay.set(r.day, { day: r.day }); byDay.get(r.day)[r.kind] = r.n; }
+        const total = {};
+        for (const r of q.visitTotal.all()) total[r.kind] = r.n;
+        return { days: [...byDay.values()], total };
       }
     },
     /* ── feedback: a word from a reader to whoever hosts, with where it came from ── */

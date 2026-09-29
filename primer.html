@@ -493,6 +493,9 @@ body[data-marks="off"] .mark,body[data-marks="off"] .block.edited .bar{display:n
 .inbox .src a{color:var(--accent);text-decoration:none}
 .inbox .src a:hover{text-decoration:underline;text-underline-offset:3px}
 .inbox .none{color:var(--fg-3);font-size:14px}
+.inbox .visits{margin-bottom:1.6rem}
+.inbox .visits .lab,.inbox > div > .lab{display:block;margin-bottom:.5rem}
+.inbox .usage .num{text-align:right;font-variant-numeric:tabular-nums}
 /* The Share menu: a link for the primer as it stands, the links made before, and other ways out. */
 .share{width:min(20rem,90vw)}
 .share .pub{display:flex;align-items:center;gap:.7rem;padding:.4rem .6rem .1rem;font-size:14px;color:var(--fg)}
@@ -4492,9 +4495,22 @@ const CONTROLS = {
   },
   /* What readers sent, newest first, each with where it came from. */
   inbox(){
-    const box = el("div", "inbox"); box.textContent = "Loading…";
+    const box = el("div", "inbox"), visits = el("div", "visits"), mail = el("div"); mail.textContent = "Loading…";
+    box.append(visits, mail);
+    /* The site's use by day: pages opened, people (once a day each), guests
+       and accounts made, sign-ins, primers planned, model calls, links made. */
+    const KINDS = [["views","Views"],["visitors","Visitors"],["guests","Guests"],["signups","Signups"],["logins","Sign-ins"],["primers","Primers"],["calls","Calls"],["shares","Shares"]];
+    api("/api/stats").then(r => {
+      const days = r.days || [];
+      if(!days.length){ visits.append(el("p", "none", "No visits counted yet.")); return; }
+      const cell = (row, k) => ({ text: row[k] ? String(row[k]) : "", cls:"num" });
+      visits.append(el("span", "lab", "Visits, last 30 days"),
+        usageTable([{ text:"Day" }, ...KINDS.map(([, t]) => ({ text:t, cls:"num" }))],
+          days.map(d => [{ text: shortDate(Date.parse(d.day + "T12:00:00Z")) }, ...KINDS.map(([k]) => cell(d, k))]),
+          [{ text:"All time" }, ...KINDS.map(([k]) => cell(r.total || {}, k))]));
+    }).catch(e => { visits.append(el("p", "none", "Couldn't load visits: " + e.message)); });
     api("/api/feedback").then(r => {
-      const items = r.items || [];
+      const box = mail, items = r.items || [];
       if(!items.length){ box.replaceChildren(el("p", "none", "Nothing yet. What readers send from the Feedback button, or Complain in the pen, lands here.")); return; }
       const ul = el("ul", "inbox");
       items.forEach(it => {
@@ -4510,8 +4526,8 @@ const CONTROLS = {
         if(src.childNodes.length) li.append(src);
         ul.append(li);
       });
-      box.replaceChildren(ul);
-    }).catch(e => { box.textContent = "Couldn't load feedback: " + e.message; });
+      box.replaceChildren(el("span", "lab", "Messages"), ul);
+    }).catch(e => { mail.textContent = "Couldn't load feedback: " + e.message; });
     return box;
   },
   account(){
