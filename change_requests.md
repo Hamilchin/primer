@@ -75,3 +75,5 @@
 ~~Export to PDF should not include the "w r i t e m o r e" section. They should only include the content of the primer. No "4 sections · 6 revisions" either.~~ 
 ~~There should be a way at the bottom to extend the current document, instead of just writing a new document.~~ 
 ~~Default for figures to Opus 5.5. Have it visually look at the diagram to iterate.~~ 
+There should be a "talk through it" option where instead of just generating your primer one-shot, the model asks for clarification and asks you some questions before writing it. Integrate this cleanly. Maybe with a drop down on the make primer button? Do a nice multiple-choice question asking UI that also allows a user to further clarify as one of the options. 
+Add to this primer should be much more elegantly integrated. Not just anothe field above the other one. Maybe a drop-down option for write/add button? 

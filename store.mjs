@@ -76,6 +76,7 @@ export function openStore(dir) {
     kvGet: db.prepare("select v from kv where user = ? and k = ?"),
     kvSet: db.prepare("insert into kv (user, k, v, updated) values (?, ?, ?, ?) on conflict(user, k) do update set v = excluded.v, updated = excluded.updated"),
     kvDel: db.prepare("delete from kv where user = ? and k = ?"),
+    kvUsage: db.prepare("select coalesce(sum(length(v)), 0) as bytes, count(*) as keys from kv where user = ?"),
     shareAdd: db.prepare("insert into shares (id, user, doc, title, hash, body, created) values (?, ?, ?, ?, ?, ?, ?)"),
     pubAdd: db.prepare("insert or ignore into public (doc, user, created) values (?, ?, ?)"),
     pubGet: db.prepare("select public.*, users.name as by from public join users on users.id = public.user where public.doc = ?"),
@@ -289,6 +290,8 @@ export function openStore(dir) {
       get(user, k) { const r = q.kvGet.get(user, k); return r ? r.v : null; },
       set(user, k, v) { q.kvSet.run(user, k, v, Date.now()); },
       del(user, k) { q.kvDel.run(user, k); },
+      /* How much one account keeps, in bytes of text and in keys. */
+      usage(user) { return q.kvUsage.get(user); },
     },
     shares: {
       /* body is the primer as JSON text; doc is the id it was made from,

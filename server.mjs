@@ -65,9 +65,9 @@
 
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { appendFileSync, existsSync, renameSync, statSync } from "node:fs";
+import { appendFileSync, existsSync, renameSync, statSync, statfsSync } from "node:fs";
 import { format } from "node:util";
-import { randomBytes } from "node:crypto";
+import { randomBytes, createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 import { execSync } from "node:child_process";
@@ -123,6 +123,18 @@ const BUILD = (() => {
   try { return execSync("git describe --always --dirty", { cwd: new URL(ROOT).pathname, stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); } catch { return ""; }
 })();
 
+/* What the page may load and run, and nothing else: its own two inline
+   scripts by hash, the libraries from cdnjs, the fonts, images from here.
+   So a script that slipped into a primer's text would not run. */
+const CSP = await (async () => {
+  const html = await readFile(new URL("primer.html", ROOT), "utf8");
+  const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => "'sha256-" + createHash("sha256").update(m[1]).digest("base64") + "'");
+  return ["default-src 'none'", "script-src " + inline.join(" ") + " https://cdnjs.cloudflare.com",
+          "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com",
+          "font-src https://fonts.gstatic.com https://cdnjs.cloudflare.com", "img-src 'self' data:", "connect-src 'self'",
+          "frame-ancestors 'none'", "base-uri 'none'", "form-action 'self'"].join("; ");
+})();
+
 /* A guest has a cookie but no account: a random value signed with the
    server's secret, so it costs no row and survives a restart. */
 const guestToken = () => { const r = randomBytes(12).toString("hex"); return "g." + r + "." + db.hmac("guest:" + r); };
@@ -134,7 +146,7 @@ const GUEST_OK = /^\/api\/(complete|media|models|source|guest\/)/;
 function guestCred(c, ip) {
   if (!c || typeof c !== "object") return null;
   if (c.value) {
-    const value = String(c.value), kind = kindOf(value) || (PROVIDERS[c.kind] ? c.kind : null);
+    const value = String(c.value), kind = kindOf(value) || (Object.hasOwn(PROVIDERS, String(c.kind)) ? c.kind : null);
     return kind ? { kind, value, own: true, key: { name: "your " + PROVIDERS[kind].word, kind, owner: "you" } } : null;
   }
   if (!c.name) return null;
@@ -232,6 +244,18 @@ function guard(key, max) {
 function strike(...keys) {
   for (const k of keys) { const t = strikes.get(k) || { n: 0 }; t.n++; t.at = Date.now(); strikes.set(k, t); }
 }
+/* At most `max` of something a minute, every try counted: for what costs the server or a third party. */
+function limit(key, max) { guard(key, max); strike(key); }
+/* Room left on the data volume; a write that would fill it is refused instead. */
+const ROOM_MIN = 200 << 20;
+function room() { try { const s = statfsSync(DATA); return s.bavail * s.bsize; } catch { return Infinity; } }
+function needRoom() { if (room() < ROOM_MIN) throw halt(507, "The server's disk is nearly full. Tell whoever hosts it."); }
+/* What one account may keep: primers, settings and traces, in bytes and in keys. */
+const KV_BYTES = 200 << 20, KV_KEYS = 4000;
+/* Calls in flight per caller and per address, so one person cannot hold every seat. */
+const inflight = new Map();
+const take = (k, max) => { const n = inflight.get(k) || 0; if (n >= max) throw halt(429, "Too many calls at once. Wait for some to finish."); inflight.set(k, n + 1); };
+const give = k => { const n = (inflight.get(k) || 1) - 1; if (n > 0) inflight.set(k, n); else inflight.delete(k); };
 
 createServer(async (req, res) => {
   try { await serve(req, res); }
@@ -256,6 +280,17 @@ async function serve(req, res) {
   };
   const url = new URL(req.url, "http://x");
   const path = url.pathname;
+  res.setHeader("x-content-type-options", "nosniff");
+  res.setHeader("x-frame-options", "DENY");
+  res.setHeader("referrer-policy", "strict-origin-when-cross-origin");
+  if (secure(req)) res.setHeader("strict-transport-security", "max-age=31536000; includeSubDomains");
+  /* A change asked for from another site is not the page asking: the
+     cookie is SameSite already; this refuses the request outright. */
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    const origin = req.headers.origin;
+    let from = null; try { from = origin ? new URL(origin).host : null; } catch {}
+    if ((from && from !== req.headers.host) || req.headers["sec-fetch-site"] === "cross-site") throw halt(403, "Cross-site request refused.");
+  }
   const token = cookies(req).primer;
   const me = db.sessions.user(token);
   const guest = !me && isGuest(token);
@@ -272,7 +307,7 @@ async function serve(req, res) {
     const name = String(b.name || "").trim().toLowerCase(), password = String(b.password || "");
     let user;
     if (path === "/api/signup") {
-      guard("signup:" + ip, 8);
+      limit("signup:" + ip, 8);
       if (!NAME.test(name)) throw halt(400, "A username is 2 to 32 letters, digits, dots, dashes or underscores.");
       if (password.length < 8) throw halt(400, "A password is at least 8 characters.");
       try { user = db.users.create(name, password); } catch (e) { throw halt(409, e.message); }
@@ -316,7 +351,7 @@ async function serve(req, res) {
   /* ── feedback: from anyone on the page, to whoever hosts ── */
   if (req.method === "POST" && path === "/api/feedback") {
     const b = await readBody(req);
-    if (!me) { guard("feedback:" + ip, 20); strike("feedback:" + ip); }
+    limit("feedback:" + (me ? me.name : ip), 20);
     const text = String(b.text || "").trim().slice(0, 4000);
     if (!text) throw halt(400, "Say something first.");
     const kind = b.kind === "complaint" ? "complaint" : "feedback";
@@ -334,6 +369,7 @@ async function serve(req, res) {
 
   /* ── a guest's credential: which kind it is, or whose shared key it opens ── */
   if (req.method === "POST" && path === "/api/guest/check") {
+    limit("identify:" + ip, 10);
     const value = String((await readBody(req)).value || "").trim();
     if (!value) throw halt(400, "Paste the key or token first.");
     return json(200, { kind: await identify(value) });
@@ -394,6 +430,7 @@ async function serve(req, res) {
     if (!KEY_NAME.test(name)) throw halt(400, "Give the key a name: up to 40 characters, no quotes.");
     if (!value) throw halt(400, "Paste the key or token first.");
     if (shared && password.length < 6) throw halt(400, "A shared key needs a password of at least 6 characters.");
+    limit("identify:" + ip, 10);
     const kind = await identify(value);
     try { db.keys.create(me.id, { name, kind, value, shared, password }); } catch (e) { throw halt(409, e.message); }
     console.log("  " + me.name + "  key + “" + name + "”" + (shared ? " (shared)" : ""));
@@ -466,6 +503,9 @@ async function serve(req, res) {
     if (req.method === "PUT") {
       const body = await readText(req, 8e6);
       try { JSON.parse(body); } catch { throw halt(400, "Not JSON."); }
+      needRoom();
+      const u = db.kv.usage(me.id), had = db.kv.get(me.id, k);
+      if (u.bytes - (had ? had.length : 0) + body.length > KV_BYTES || (!had && u.keys >= KV_KEYS)) throw halt(413, "Your library is full. Delete some primers first.");
       db.kv.set(me.id, k, body);
       return json(200, {});
     }
@@ -483,6 +523,8 @@ async function serve(req, res) {
     const body = await readBody(req);
     const cred = me ? db.users.credential(me.id) : guestCred(body.cred, ip);
     if (!cred) throw halt(400, "No key to run on. Add one, or link to a shared key, in Settings.", "no_key");
+    take("calls:" + who, 6); try { take("calls:" + ip, 12); } catch (e) { give("calls:" + who); throw e; }
+    res.on("close", () => { give("calls:" + who); give("calls:" + ip); });
     /* Who is calling, on which key: the record of shared use. */
     console.log("  " + who + "  " + (body.role || "?") + "  on “" + cred.key.name + "”" + (cred.own ? "" : " (" + cred.key.owner + "’s)"));
     /* Headers go out with the first frame, so a failure before any text can
@@ -527,6 +569,7 @@ async function serve(req, res) {
 
   /* A page or PDF read whole, as markdown with its pictures in place: the source of a primer made from existing content. */
   if (req.method === "POST" && path === "/api/source") {
+    limit("source:" + who, 15);
     const { url } = await readBody(req);
     console.log("  " + who + "  reads " + String(url || "").slice(0, 120));
     try { return json(200, await readSource(String(url || ""))); }
@@ -534,6 +577,7 @@ async function serve(req, res) {
   }
 
   if (req.method === "POST" && path === "/api/media") {
+    limit("media:" + who, 60); needRoom();
     const { url } = await readBody(req);
     try { return json(200, images.get(url) || (await fetchImage(url)).info); }
     catch (e) { throw halt(400, String(e && e.message || e)); }
@@ -551,20 +595,23 @@ async function serve(req, res) {
     else { const s = SHARE_ID.test(shareAt[1]) && db.shares.get(shareAt[1]); if (s) title = s.title; }
     let html = await readFile(new URL("primer.html", ROOT), "utf8");
     if (title) html = html.replace("<title>primer</title>", "<title>" + escapeHtml(title) + " · primer</title>");
-    res.writeHead(200, { "content-type": TYPES.html, "cache-control": "no-cache" });
+    res.writeHead(200, { "content-type": TYPES.html, "cache-control": "no-cache", "content-security-policy": CSP });
     return res.end(html);
   }
   /* The guide, Settings and a primer are the same page at their own addresses. */
   const name = PAGE_PATH.test(path) ? "primer.html" : decode(path.slice(1));
-  if (name.includes("..") || name.startsWith("/")) throw halt(400, "Bad path.");
-  const from = name.startsWith("media/") ? new URL(name.slice(6), MEDIA) : new URL(name, ROOT);
-  /* An image is private to the people signed in, and guests, unless a shared primer shows it. */
-  const ok = name === "primer.html" || name === "favicon.svg" || name === "apple-touch-icon.png" || /^prompts\/[\w-]+\.txt$/.test(name)
-    || (name.startsWith("media/") && (me || guest || db.shares.mediaShared(name.slice(6))));
+  /* Only a name we know, or an image file by its own name: nothing that
+     could be read as a path. An image is private to the people signed in,
+     and guests, unless a shared primer shows it. */
+  const media = name.startsWith("media/") ? name.slice(6) : null;
+  const ok = media != null ? MEDIA_NAME.test(media) && (me || guest || db.shares.mediaShared(media))
+    : name === "primer.html" || name === "favicon.svg" || name === "apple-touch-icon.png" || /^prompts\/[\w-]+\.txt$/.test(name);
   if (!ok) throw halt(404, "Not found.");
+  const from = media != null ? new URL(media, MEDIA) : new URL(name, ROOT);
   let buf;
   try { buf = await readFile(from); } catch { throw halt(404, "Not found."); }
   res.writeHead(200, { "content-type": TYPES[name.split(".").pop()] || "application/octet-stream",
-                       "cache-control": name.startsWith("media/") ? "private, max-age=31536000" : "no-cache" });
+                       "cache-control": media != null ? "private, max-age=31536000" : "no-cache",
+                       ...(name === "primer.html" ? { "content-security-policy": CSP } : {}) });
   res.end(buf);
 }

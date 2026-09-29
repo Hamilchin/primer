@@ -1046,11 +1046,33 @@ function jsonStart(s){
   const a = s.indexOf("["), o = s.indexOf("{");
   return (a<0)?o : (o<0)?a : Math.min(a,o);
 }
+/* Where the first JSON value ends: just past the bracket that closes the one
+   it opens with, or -1 if that never closes (a response cut off, which
+   repairJSON salvages). What follows it, such as the "Sources:" list a
+   model that searched the web may add, is not part of the answer. */
+function jsonEnd(s){
+  let depth=0, inStr=false, esc=false;
+  for(let i=0;i<s.length;i++){
+    const c = s[i];
+    if(inStr){
+      if(esc) esc = false;
+      else if(c==="\\") esc = true;
+      else if(c==='"') inStr = false;
+      continue;
+    }
+    if(c==='"') inStr = true;
+    else if(c==="{" || c==="[") depth++;
+    else if((c==="}" || c==="]") && --depth===0) return i+1;
+  }
+  return -1;
+}
 function parseJSON(txt){
   let s = String(txt).trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
   const start = jsonStart(s);
   if(start>0) s = s.slice(start);
   s = fixEscapes(s);
+  const end = jsonEnd(s);
+  if(end>0) s = s.slice(0, end);
   try{ return JSON.parse(s); }catch(e){ return repairJSON(s); }
 }
 
@@ -2879,7 +2901,11 @@ function liveInto(d, b){
       const body = main.querySelector(`[data-block-id="${b.id}"] .body`);
       if(!body) return;
       const host = b.busy ? body.parentElement : body;
-      const old = host.querySelector(":scope > .live"), fresh = livePre(b);
+      const old = host.querySelector(":scope > .live");
+      /* The call may have finished, and cleared b.live, since this frame
+         was asked for: nothing is streaming any more, so nothing to show. */
+      if(!b.live){ if(old) old.remove(); return; }
+      const fresh = livePre(b);
       if(old) old.replaceWith(fresh); else host.appendChild(fresh);
     });
   };
