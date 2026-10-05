@@ -77,3 +77,5 @@
 ~~Default for figures to Opus 5.5. Have it visually look at the diagram to iterate.~~ 
 There should be a "talk through it" option where instead of just generating your primer one-shot, the model asks for clarification and asks you some questions before writing it. Integrate this cleanly. Maybe with a drop down on the make primer button? Do a nice multiple-choice question asking UI that also allows a user to further clarify as one of the options. 
 Add to this primer should be much more elegantly integrated. Not just anothe field above the other one. Maybe a drop-down option for write/add button? 
+~~The "or say what should change" thing should take into account the existing written primer as context for the new primer. It should be a rewrite of the existing primer, essentially.~~ 
+~~The "from existing content" should be "from existing content/add context" and pressing add context should give a place for pasting in context.~~ 

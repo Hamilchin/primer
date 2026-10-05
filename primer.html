@@ -149,7 +149,8 @@ main{padding:1.5rem var(--gutter) 8rem}
 .page .body td:first-child{white-space:nowrap;padding-right:1.5rem}
 /* Common instructions, one click each; they add up and toggle back off. */
 .chips{display:flex;flex-wrap:wrap;gap:.35rem 1rem;margin-top:.6rem;font-size:13.5px}
-.from-link{display:block;margin-top:1.2rem;font-size:13px;color:var(--fg-2);text-decoration:underline;text-decoration-thickness:1px;text-decoration-color:var(--rule-2);text-underline-offset:3px}
+.from-links{display:flex;flex-wrap:wrap;gap:.3rem 1.2rem;margin-top:1.2rem}
+.from-link{font-size:13px;color:var(--fg-2);text-decoration:underline;text-decoration-thickness:1px;text-decoration-color:var(--rule-2);text-underline-offset:3px}
 .from-link:hover,.from-link.on{color:var(--accent)}
 .from{margin-top:1rem}
 .from .modes{display:flex;flex-wrap:wrap;gap:.3rem 1.4rem;margin-top:.6rem;font-size:13.5px;color:var(--fg-2)}
@@ -1138,6 +1139,7 @@ const PROMPTS = {
   house:                { group:"base",    label:"House style" },
   reader:               { group:"base",    label:"Reader" },
   instruction:          { group:"base",    label:"Instructions wrapper", user:true },
+  context:              { group:"base",    label:"Context wrapper", user:true },
   outline:              { group:"write",   label:"Outline" },
   outline_user:         { group:"write",   label:"Outline · user", user:true },
   extend:               { group:"write",   label:"Outline, adding to a primer" },
@@ -1170,9 +1172,66 @@ const PROMPTS = {
 };
 /* What the writers are told about a primer made from existing content. */
 const SOURCE_MODES = {
-  rewritten: "Rewrite the text so it is clearer and more digestible, with exactly the same content: every fact, number, claim, example, caveat and picture the text has, none added and none dropped. Its pictures go where they belong, by their addresses.",
-  verbatim:  "Keep the text VERBATIM: every sentence exactly as written, in its order, nothing paraphrased, added or dropped. Your only work is to divide it into the planned sections and place the text's pictures where they stand, by their addresses. A subheading only where the text itself has a heading inside this section's part; where it has none, none. Each prose element is one of the text's own paragraphs, lists, code blocks or equations. Request no diagrams and no found images."
+  rewritten: "Rewrite the text so it is clearer and more digestible, with exactly the same content: every fact, number, claim, example, caveat and picture the text has, none added and none dropped. A list in the text stays one list; the heading the text gives this part is the section's heading, not a sentence of the prose. As many elements as the part needs, even one. Its pictures go where they belong, by their addresses.",
+  verbatim:  "Keep the text VERBATIM: every sentence exactly as written, in its order, nothing paraphrased, added or dropped. Your only work is to divide it into the planned sections and place the text's pictures where they stand, by their addresses. A subheading only where the text itself has a heading inside this section's part; where it has none, none. Each prose element is one of the text's own paragraphs, lists, code blocks or equations: a list stays one list, as the text numbers or marks it, and the elements are as many as the part has, even one. The heading the text gives this part is the section's heading and is not written again as prose. Request no diagrams and no found images."
 };
+/* Where each planned section's part of the text begins. The planner copies
+   the first words of each part; they are looked for in order, in a copy of
+   the text with everything but letters, digits and single spaces smoothed
+   away, so a bold mark, a quote or a line break does not hide them. A part
+   runs from its own start to the next section's. A start that is not
+   found, or is found out of order, is unknown: that part then runs from
+   the last known start before it, and the writer is told what earlier
+   sections covered. Two sections that start at the same place are one part
+   planned twice, and the second is dropped. Returns [lo, hi] for each
+   section, or null for a dropped one. */
+function sourceSpans(text, sections){
+  text = String(text || "");
+  const chars = [], map = [];
+  let space = true;
+  for(let i = 0; i < text.length; i++){
+    const c = text[i];
+    if(/\s/.test(c)){ if(!space){ chars.push(" "); map.push(i); space = true; } continue; }
+    if(!/[\p{L}\p{N}]/u.test(c)) continue;
+    for(const ch of c.toLowerCase()){ chars.push(ch); map.push(i); }
+    space = false;
+  }
+  const flat = chars.join("");
+  const norm = a => String(a || "").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim();
+  const starts = sections.map(() => null), drop = sections.map(() => false);
+  let last = -1;
+  sections.forEach((o, i) => {
+    if(i === 0){ starts[0] = 0; last = 0; return; }
+    const a = norm(o && o.from);
+    if(a.length < 12) return;
+    if(last >= 0 && flat.startsWith(a, last)){ drop[i] = true; return; }
+    const at = flat.indexOf(a, last + 1);
+    if(at < 0) return;
+    last = at;
+    /* Back over the marks and quotes stuck to the first word, and over a
+       heading's #, so the part begins where its line does. */
+    let from = map[at];
+    while(from > 0 && !/[\p{L}\p{N}\n]/u.test(text[from - 1])) from--;
+    /* A heading on the line above the first words is this part's too. */
+    const above = text.slice(0, from).replace(/\s+$/, ""), nl = above.lastIndexOf("\n");
+    if(/^\s*(#{1,6}\s\S.*|\*\*[^*\n]+\*\*|__[^_\n]+__)\s*$/.test(above.slice(nl + 1))) from = nl + 1;
+    starts[i] = from;
+  });
+  const out = [];
+  let lo = 0;
+  sections.forEach((o, i) => {
+    if(drop[i]){ out.push(null); return; }
+    if(starts[i] != null) lo = starts[i];
+    let hi = text.length;
+    for(let j = i + 1; j < sections.length; j++) if(!drop[j] && starts[j] != null){ hi = starts[j]; break; }
+    out.push([lo, hi]);
+  });
+  return out;
+}
+/* The part of the text a section covers, or all of it for a section added later. */
+const sourcePart = (d, h) => h && h.span ? d.source.text.slice(h.span[0], h.span[1]) : d.source.text;
+/* How much pasted context a primer carries. */
+const CONTEXT_MAX = 300000;
 
 /* Fetch prompts/<key>.txt for every entry. Returns the keys that failed.
    Needs http; file:// blocks fetch. */
@@ -1212,6 +1271,12 @@ function readerText(known){
 function instrText(d){
   const t = String(d.instruction || "").trim();
   return t ? usr("instruction", { INSTRUCTION: t }) : "";
+}
+/* Material the reader pasted for the writers to draw on, wrapped the same
+   way. Empty when there is none. */
+function contextText(d){
+  const t = String(d.context || "").trim();
+  return t ? usr("context", { CONTEXT: t }) : "";
 }
 
 /* ══ actions ══════════════════════════════════════════════════
@@ -1964,7 +2029,10 @@ function renderCover(){
         <label class="lab" for="cInstr">Instructions (optional)</label>
         <textarea id="cInstr" class="field" rows="1"></textarea>
         <div class="chips" id="cChips"></div>
-        <button class="from-link" type="button" id="cFromLink">From existing content</button>
+        <div class="from-links">
+          <button class="from-link" type="button" id="cFromLink">From existing content</button>
+          <button class="from-link" type="button" id="cContextLink">Add context</button>
+        </div>
         <div class="from" id="cFrom" hidden>
           <label class="lab" for="cSource">A link, or the text itself</label>
           <textarea id="cSource" class="field" rows="2" autocomplete="off" spellcheck="false"></textarea>
@@ -1972,6 +2040,10 @@ function renderCover(){
             <label><input type="radio" name="cMode" value="rewritten" checked> Rewritten to be clearer, same content</label>
             <label><input type="radio" name="cMode" value="verbatim"> Verbatim, only divided into sections</label>
           </div>
+        </div>
+        <div class="from" id="cContext" hidden>
+          <label class="lab" for="cContextText">Context to draw on</label>
+          <textarea id="cContextText" class="field" rows="2" autocomplete="off" spellcheck="false"></textarea>
         </div>
         <div class="composer-foot"><button class="go" type="submit">Write new primer<kbd>↵</kbd></button></div>
       </div>
@@ -2041,6 +2113,12 @@ function renderCover(){
   const showFrom = on => { from.hidden = !on; fromLink.classList.toggle("on", on); if(on) grow(source); };
   fromLink.onclick = () => { showFrom(from.hidden); if(!from.hidden) source.focus(); };
   source.onkeydown = e => { if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){ e.preventDefault(); form.requestSubmit(); } };
+  /* Context: material of the reader's own, pasted in, for the writers to draw on. */
+  const ctxLink = $("#cContextLink"), ctx = $("#cContext"), ctxText = $("#cContextText");
+  ctxText.oninput = () => grow(ctxText);
+  const showCtx = on => { ctx.hidden = !on; ctxLink.classList.toggle("on", on); if(on) grow(ctxText); };
+  ctxLink.onclick = () => { showCtx(ctx.hidden); if(!ctx.hidden) ctxText.focus(); };
+  ctxText.onkeydown = source.onkeydown;
 
   /* What was typed stays put through a trip to Settings or a reload of the
      tab, until a primer is started from it; a primer's own request is put
@@ -2050,21 +2128,24 @@ function renderCover(){
     if(d){
       topic.value = d.topic || ""; known.value = d.known || ""; instr.value = d.instr || "";
       if(d.source){ source.value = d.source; showFrom(true); const m = form.querySelector(`input[name=cMode][value="${d.mode === "verbatim" ? "verbatim" : "rewritten"}"]`); if(m) m.checked = true; }
+      if(d.context){ ctxText.value = d.context; showCtx(true); }
     }
   }catch(e){}
   if(instr.value) instr.dispatchEvent(new Event("input"));
   form.addEventListener("input", () => {
     try{ sessionStorage.setItem(DRAFT, JSON.stringify({ topic:topic.value, known:known.value, instr:instr.value,
-      source: from.hidden ? "" : source.value, mode:(form.querySelector("input[name=cMode]:checked") || {}).value })); }catch(e){}
+      source: from.hidden ? "" : source.value, mode:(form.querySelector("input[name=cMode]:checked") || {}).value,
+      context: ctx.hidden ? "" : ctxText.value })); }catch(e){}
   });
   form.onsubmit = e => {
     e.preventDefault();
-    const t = topic.value.trim(), src = from.hidden ? "" : source.value.trim();
+    const t = topic.value.trim(), src = from.hidden ? "" : source.value.trim(), cx = ctx.hidden ? "" : ctxText.value.trim();
     if(!t && !src){ topic.focus(); return; }
     if(me && !me.key){ goto("settings"); toast("Add a key, or link to a shared one, first"); return; }
     try{ sessionStorage.removeItem(DRAFT); }catch(e){}
     const o = { topic:t, known:known.value.trim(), instruction:instr.value.trim() };
     if(src) o.source = { input:src, mode:(form.querySelector("input[name=cMode]:checked") || {}).value || "rewritten" };
+    if(cx){ o.context = cx.slice(0, CONTEXT_MAX); if(cx.length > CONTEXT_MAX) toast("The context was cut to " + CONTEXT_MAX.toLocaleString() + " characters."); }
     startDoc(o);
   };
   shelfSig = null; libQuery = "";
@@ -2081,6 +2162,7 @@ const DRAFT = "primer:draft";
 function editRequest(d){
   const draft = { topic: d.topic === "From existing content" ? "" : (d.topic || ""), known: d.known || "", instr: d.instruction || "" };
   if(d.source){ draft.source = d.source.input || d.source.url || ""; draft.mode = d.source.mode || "rewritten"; }
+  if(d.context) draft.context = d.context;
   try{ sessionStorage.setItem(DRAFT, JSON.stringify(draft)); }catch(e){}
   goHome();
 }
@@ -2273,6 +2355,7 @@ function metaNode(d){
   }else row("Asked for", d.topic || d.title);
   if(d.known) row("Already knew", d.known);
   if(d.instruction) row("Asked to", d.instruction);
+  if(d.context) row("With context", trimTitle(d.context, 90, "pasted text"));
   if(d.rewrite){
     const v = el("span");
     if(d.rewrite.of && !readonly()) v.append(btn("link", d.rewrite.ofTitle, () => openDoc(d.rewrite.of)));
@@ -2629,7 +2712,7 @@ async function extendDoc(d, ask){
   const { outline, reader } = docContext(d);
   try{
     const out = await agent(d, { role:"outline", label:"planning more", block:ph, by:"you", system:sys("extend"),
-      user: usr("extend_user", { READER:reader, TITLE:d.title, OUTLINE:outline, INSTRUCTION:instrText(d), ASK:ask }) });
+      user: usr("extend_user", { READER:reader, TITLE:d.title, OUTLINE:outline, INSTRUCTION:instrText(d), CONTEXT:contextText(d), ASK:ask }) });
     const secs = out.value && Array.isArray(out.value.sections) ? out.value.sections : [];
     if(!secs.length) throw new Error("The plan came back empty.");
     d.blocks = d.blocks.filter(b => b !== ph);
@@ -2962,6 +3045,7 @@ function trimTitle(s, max, fallback){
 function startDoc(o, background){
   const d = { id:docId(), title:o.topic, topic:o.topic, known:o.known || "", instruction:o.instruction || "",
               created:Date.now(), status:"planning", blocks:[] };
+  if(o.context) d.context = o.context;
   if(o.rewrite) d.rewrite = o.rewrite;
   if(o.source){ d.source = o.source; if(!d.topic){ d.topic = "From existing content"; d.title = isLink(o.source.input) ? o.source.input : firstLine(o.source.input); } }
   if(o.define) d.define = o.define;
@@ -3013,9 +3097,9 @@ async function build(d){
   }else try{
     const out = await agent(d, { role:"outline", label:"planning", block:d.blocks[0], by:"you",
       system: sys(src ? "source_outline" : rw ? "rewrite_outline" : "outline"),
-      user: src ? usr("source_outline_user", { READER:reader, MODE:SOURCE_MODES[src.mode] || SOURCE_MODES.rewritten, INSTRUCTION:instrText(d), SOURCE:src.text })
-          : rw ? usr("rewrite_outline_user", { READER:reader, TOPIC:d.topic, INSTRUCTION:rw.instruction, SOURCE:rw.source })
-               : usr("outline_user", { READER:reader, TOPIC:d.topic, INSTRUCTION:instrText(d) }) });
+      user: src ? usr("source_outline_user", { READER:reader, MODE:SOURCE_MODES[src.mode] || SOURCE_MODES.rewritten, INSTRUCTION:instrText(d), CONTEXT:contextText(d), SOURCE:src.text })
+          : rw ? usr("rewrite_outline_user", { READER:reader, TOPIC:d.topic, INSTRUCTION:rw.instruction, CONTEXT:contextText(d), SOURCE:rw.source })
+               : usr("outline_user", { READER:reader, TOPIC:d.topic, INSTRUCTION:instrText(d), CONTEXT:contextText(d) }) });
     plan = out.value; d.planCall = out.callId;
     if(!plan || !Array.isArray(plan.sections) || !plan.sections.length) throw new Error("The outline came back empty.");
   }catch(e){
@@ -3032,15 +3116,19 @@ async function build(d){
   const note = String(plan.note || "").replace(/\s+/g, " ").trim().slice(0, 600);
   if(note) d.note = note; else delete d.note;
   d.blocks = [];
-  plan.sections.forEach((raw, i) => {
-    /* A section is its title, or {title, subsections} where the planner
-       found a section that needs dividing. One subsection is none. */
-    const o = raw && typeof raw === "object" ? raw : { title:raw };
+  /* A section is its title, or {title, subsections} where the planner
+     found a section that needs dividing. One subsection is none. For a
+     primer made from a text each section also says where its part of the
+     text begins, and a part the planner gave two sections keeps one. */
+  const secs = plan.sections.map(raw => raw && typeof raw === "object" ? raw : { title:raw });
+  if(src) sourceSpans(src.text, secs).forEach((span, k) => { secs[k].span = span; });
+  secs.filter(o => !src || o.span).forEach((o, i) => {
     const title = trimTitle(o.title, 72, "Section " + (i + 1));
     const subs = (Array.isArray(o.subsections) ? o.subsections : [])
       .map(x => trimTitle(x && typeof x === "object" ? x.title : x, 72, "")).filter(Boolean);
     const h = { id:uid(), kind:"heading", md:"## "+title, sec:i, fresh:true };
     if(subs.length > 1) h.subs = subs;
+    if(o.span) h.span = o.span;
     d.blocks.push(h);
     d.blocks.push({ id:uid(), kind:"prose", pending:true, queued:true, md:"", sec:i, slot:true });
   });
@@ -3176,19 +3264,19 @@ async function genSection(d, i, title, outline, reader, by){
   if(!slot) return;
   const h0 = d.blocks.find(b => b.kind==="heading" && b.sec===i), subs = (h0 && h0.subs) || [];
   const vars = { READER:reader, TITLE:d.title, OUTLINE:outline, N:i+1, SECTION:title,
-                 PRIOR: priorText(d, i) || "(none yet)",
+                 PRIOR: priorText(d, i) || "(none yet)", CONTEXT: contextText(d),
                  INSTRUCTION: instrText(d) + (h0 && h0.ask ? "\n\nTHIS SECTION WAS ADDED AFTER THE PRIMER WAS READ, AT THE READER'S REQUEST: " + h0.ask : ""),
                  SUBSECTIONS: subs.length ? "ITS SUBSECTIONS, FROM THE PLAN, EACH OPENED WITH A SUBHEADING ELEMENT:\n" + subs.map(x => "- " + x).join("\n") : "" };
   const df = d.define, role = df ? "define" : "section";
   const user = df ? usr("define_user", { READER:reader, TERM:d.topic, INSTRUCTION:instrText(d) })
-             : d.source ? usr("source_section_user", { ...vars, MODE:SOURCE_MODES[d.source.mode] || SOURCE_MODES.rewritten, SOURCE:d.source.text })
+             : d.source ? usr("source_section_user", { ...vars, MODE:SOURCE_MODES[d.source.mode] || SOURCE_MODES.rewritten, SOURCE:sourcePart(d, h0) })
              : d.rewrite ? usr("rewrite_section_user", { ...vars, INSTRUCTION:d.rewrite.instruction, SOURCE:d.rewrite.source })
              : usr("section_user", vars);
   try{
     const { value, callId } = await agent(d, { role, label: df ? "defining" : "writing §"+(i+1), sec:i, block:slot, system:sys(role), user,
       parent: d.planCall || null, by: by || (d.planCall ? "" : "you") });
     const arr = df && value && !Array.isArray(value) ? value.blocks : value;
-    const made = (Array.isArray(arr) ? arr : [])
+    const made = joinLists((Array.isArray(arr) ? arr : [])
       .filter(x => x && (x.md || x.title || ((x.kind==="figure" || x.kind==="image") && (x.brief || x.url))))
       .flatMap(x => {
         if(x.kind==="figure" && x.brief) return [{ id:uid(), kind:"figure", md:"", sec:i, brief:String(x.brief).trim(), pending:true, draw:true, by:callId }];
@@ -3196,7 +3284,7 @@ async function genSection(d, i, title, outline, reader, by){
         if(x.kind==="image"  && x.brief) return [{ id:uid(), kind:"image",  md:"", sec:i, brief:String(x.brief).trim(), pending:true, find:true, by:callId }];
         if(x.kind==="subheading") return [subBlock(x.title || x.md, { sec:i, by:callId })];
         return proseBlocks(x.md, { sec:i, by:callId });
-      });
+      }));
     if(!made.some(b => b.kind === "prose" && b.md)) throw new Error("Empty section.");
     if(df && value && !Array.isArray(value) && value.title) d.title = trimTitle(value.title, 110, d.title);
     replaceSlot(d, i, made);
@@ -3212,6 +3300,18 @@ async function genSection(d, i, title, outline, reader, by){
       error: e.stopped ? "Stopped." : "Section "+(i+1)+" didn't come back. "+e.message }]);
     save(d);
   }
+}
+/* A list the writer returned one item at a time is one list: prose elements
+   that are nothing but list items, one after another, are joined. */
+function joinLists(blocks){
+  const items = b => b.kind === "prose" && b.md && b.md.split("\n").every(l => !l.trim() || /^\s*(\d+[.)]|[-*+])\s/.test(l));
+  const out = [];
+  for(const b of blocks){
+    const last = out[out.length - 1];
+    if(last && items(last) && items(b)){ last.md += "\n" + b.md; continue; }
+    out.push(b);
+  }
+  return out;
 }
 /* Retry on a section writes every missing section, in order, so a section
    is never written ahead of one that is still missing. */
@@ -4204,7 +4304,7 @@ function startRewrite(src, instruction, sections){
   closePops();
   const rewrite = { of:src.id, ofTitle:src.title, instruction, source:docText(src) };
   if(sections) rewrite.sections = sections;
-  startDoc({ topic: src.topic || src.title, known: src.known, rewrite });
+  startDoc({ topic: src.topic || src.title, known: src.known, context: src.context, rewrite });
 }
 /* ══ feedback ═════════════════════════════════════════════════
    A word to Alexander from anywhere: Feedback in the top bar, or Complain
@@ -5099,7 +5199,7 @@ async function reportOf(d){
   line();
   line("PRIMER");
   field("Title", d.title); field("Id", d.id);
-  field("Asked for", d.topic); field("Already knew", d.known); field("Asked to", d.instruction);
+  field("Asked for", d.topic); field("Already knew", d.known); field("Asked to", d.instruction); field("Context", d.context);
   if(d.rewrite) field("Rewrite of", "\u201c" + d.rewrite.ofTitle + "\u201d · \u201c" + d.rewrite.instruction + "\u201d");
   if(d.define) field("Definition of", d.define.term);
   field("Written", when(d.created));
@@ -5207,6 +5307,7 @@ function docMarkdown(d){
   if(d.topic && d.topic !== d.title) asked.push("Asked for: " + d.topic);
   if(d.known) asked.push("Already knew: " + d.known);
   if(d.instruction) asked.push("Asked to: " + d.instruction.replace(/\s*\n+\s*/g, " "));
+  if(d.context) asked.push("With context: " + trimTitle(d.context, 200, ""));
   if(d.note) asked.push("Note from the planner: " + d.note);
   if(d.rewrite) asked.push("Rewrite of “" + d.rewrite.ofTitle + "”: " + d.rewrite.instruction);
   if(asked.length) parts.push(asked.map(l => "> " + l).join("\n>\n"));

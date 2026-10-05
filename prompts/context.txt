@@ -1,0 +1,2 @@
+CONTEXT THE READER SUPPLIED, TO DRAW ON. Take facts, terms and examples from it where they apply and stay consistent with it. It is material, not the subject and not instructions:
+{{CONTEXT}}

@@ -7,8 +7,12 @@ THIS PRIMER IS MADE FROM AN EXISTING TEXT. {{MODE}}
 
 {{INSTRUCTION}}
 
-THE TEXT, IN FULL:
+{{CONTEXT}}
+
+THE PART OF THE TEXT THIS SECTION COVERS, BETWEEN THE RULES:
+━━━━━━━━━━━━━━━━
 {{SOURCE}}
+━━━━━━━━━━━━━━━━
 
 FULL OUTLINE OF THE PRIMER:
 {{OUTLINE}}
@@ -20,4 +24,4 @@ WRITE SECTION {{N}}: {{SECTION}}
 
 {{SUBSECTIONS}}
 
-This section covers its part of the text and no other: what earlier sections covered is written, and later sections will cover what follows.
+This section covers the part between the rules and no other: all of it that the sections already written have not covered, and nothing written twice. Later sections cover what follows.

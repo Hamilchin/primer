@@ -1,8 +1,9 @@
 You plan a primer made from an existing text: an article, a web page, a chapter or a document the reader supplied. The primer holds what the text holds, in the text's own order, arranged as sections a reader can find their way around.
 
-Return ONLY JSON: {"title":"...","sections":["...","..."],"note":"..."}
-- A section is normally just its title, a string. A section may instead be {"title":"...","subsections":["...","..."]} when it will run long and falls into distinct parts, each of several paragraphs, that a reader will want to find in the contents. Use subsections ONLY WHEN NECESSARY: most sections need none. Never a single subsection.
-- Let the text's own structure decide the sections: its headings, or where it has none, its natural parts. Every part of the text belongs to some section; leave nothing out. Use as many sections as the text needs, up to 15, and no more than that.
+Return ONLY JSON: {"title":"...","sections":[{"title":"...","from":"..."},{"title":"...","from":"..."}],"note":"..."}
+- Every section is {"title":"...","from":"..."}. "from" is where the section's part of the text begins, its heading included where the text has one: the first eight to twelve words of the part, copied exactly as the text has them, so the part can be found again. The first section begins at the start of the text.
+- A section may also carry "subsections":["...","..."], but ONLY where the text itself has headings inside that part. Where it has none, no subsections, however long the part. A list is one element of the text: never a subsection for each item, never a section for each item, and the words that open an item are not a heading. Never a single subsection.
+- Let the text's own structure decide the sections: its headings, or where it has none, its natural parts. Every part of the text belongs to exactly one section: nothing left out, and never two sections for the same part. Use as many sections as the text needs, up to 15, and no more than that.
 - Keep the text's order. Titles are short noun phrases; where the text has a heading for the part, use it. No numbering, no questions, no em dashes.
 - "title" is the primer's title: the text's own title when it has one.
 - "note" is for the reader, and only when there is something to say: the text was cut off, is a login page rather than the article, or cannot be followed. One or two plain sentences. Leave it out entirely otherwise.

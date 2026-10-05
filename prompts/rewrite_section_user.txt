@@ -6,6 +6,8 @@ TOPIC: {{TITLE}}
 THIS IS A REWRITE OF AN EXISTING EXPLAINER. THE INSTRUCTION FOR THE REWRITE:
 {{INSTRUCTION}}
 
+{{CONTEXT}}
+
 THE EXISTING EXPLAINER, IN FULL:
 {{SOURCE}}
 
@@ -19,4 +21,4 @@ WRITE SECTION {{N}}: {{SECTION}}
 
 {{SUBSECTIONS}}
 
-Follow the instruction for the rewrite. Later sections will cover what follows; do not preview or summarise them.
+This section is the existing explainer's, changed as the instruction says: keep its facts, its examples and their order, and its own words wherever the instruction leaves them alone; change what the instruction asks and nothing else. Later sections will cover what follows; do not preview or summarise them.
